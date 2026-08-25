@@ -720,3 +720,38 @@ sudo systemctl restart zippalgo360-web
   인덱스가 있는지 확인해볼 만함 — 우리 쪽도 정확히 같은 문제였음
   (`apartment_complexes(latitude, longitude)` 인덱스 누락, 이 로그 위쪽
   "지도를 다중 레이어 구조로 전환" 섹션 참고).
+
+---
+
+## 2026-08-25 — 집테리어 marker limit 422 원인 확정 (인덱스 문제 아님, le=3000 검증)
+
+### 진행 중
+- 사용자가 "500으로 또 제한 걸렸다"고 지적 — 임시로 낮춘 500이 아니라 진짜
+  원인을 찾기로 함. 집테리어가 이 세션과 같은 서버에 있어서 소스코드와
+  DB를 직접(읽기 전용, sudo) 확인할 수 있었음.
+- **[확인 완료] 원인**: 인덱스/성능 문제가 전혀 아니었음.
+  - `apartment_complexes`: `idx_complex_coordinates btree (latitude,
+    longitude)` 이미 있음.
+  - `companies`: `latitude numeric(10,7)`, `longitude numeric(10,7)`
+    컬럼 있고 `idx_companies_map btree (latitude, longitude) WHERE
+    is_visible_on_map = true` 인덱스도 있음. `marker_type=company` 쿼리
+    (`/srv/zipterior/backend/app/modules/public_map/repository.py`의
+    `list_markers`)도 실제로 완전히 구현되어 있음 — `status='active'
+    AND is_visible_on_map=TRUE AND deleted_at IS NULL` 조건, bbox 필터,
+    멤버십 우선순위 정렬까지 갖춘 정상 기능. **이전에 "가정, 미확인
+    계약"이라고 남겼던 부분은 이제 확정 — 실제로 지원됨.**
+  - **진짜 원인**: `limit` 쿼리 파라미터가 FastAPI에서 `le=3000`으로
+    검증되고 있어서, 5000을 보내면 그냥 422로 거부됨(집테리어에 직접
+    `curl -sv`로 호출해서 확인, 응답:
+    `Input should be less than or equal to 3000`).
+- **[완료]** `ZIPTERIOR_MARKER_FETCH_LIMIT`를 500 -> 3000(집테리어의
+  실제 상한)으로 상향. `apps/api/app/modules/integrations/router.py`의
+  두 엔드포인트(`map-markers`, `company-markers`) `limit` 검증도
+  `le=10000` -> `le=3000`으로 맞춤(우리 쪽에서 더 큰 값을 받아봐야
+  집테리어가 어차피 거부하므로 의미 없음). 우리 DB로 직접 가는
+  `MARKER_FETCH_LIMIT = 5000`은 그대로 유지(우리 인덱스는 충분히
+  감당 가능하다고 판단).
+- 로컬 빌드 확인(`npm run build`, `ast.parse`).
+
+### 완료 후
+(진행 중 — 서버 배포는 사용자 요청 시.)

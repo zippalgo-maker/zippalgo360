@@ -62,10 +62,10 @@ const COMPANY_LAYER_COLOR: Partial<Record<LayerKey, string>> = {
 const CLUSTERED_LAYERS: ReadonlySet<LayerKey> = new Set(["listings", "interiorPortfolio"]);
 // 우리 DB(인덱스 있음, 직접 제어 가능)로 가는 요청은 넉넉하게.
 const MARKER_FETCH_LIMIT = 5000;
-// 집테리어로 프록시되는 요청은 그쪽 서버 사정을 모르므로 보수적으로 — 5000을
-// 넘기니 타임아웃/거부로 추정되는 실패가 발생해서 낮춰둠(docs/WORK_LOG.md
-// 참고, 집테리어 쪽 인덱싱/limit 상한 확인 필요).
-const ZIPTERIOR_MARKER_FETCH_LIMIT = 500;
+// 집테리어 쪽 /api/v1/public/map/markers의 limit 파라미터는 le=3000으로
+// 고정 검증되어 있음(소스 확인, 2026-08-25) — 인덱스/성능 문제가 아니라
+// 그냥 그 이상은 422로 거부한다. 3000이 이 레이어의 실제 상한.
+const ZIPTERIOR_MARKER_FETCH_LIMIT = 3000;
 
 const KAKAO_APP_KEY = process.env.NEXT_PUBLIC_KAKAO_MAP_JS_KEY ?? "";
 const SEOUL_CENTER = { lat: 37.5665, lng: 126.978 };

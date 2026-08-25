@@ -29,7 +29,7 @@ def get_interior_map_markers(
     west: float | None = None,
     sido: str | None = None,
     sigungu: str | None = None,
-    limit: int = Query(1000, ge=1, le=10000),
+    limit: int = Query(1000, ge=1, le=3000),
 ) -> ZipteriorMapMarkerListOut:
     return zipterior_client.get_interior_map_markers(
         north=north, south=south, east=east, west=west, sido=sido, sigungu=sigungu, limit=limit
@@ -42,6 +42,6 @@ def get_interior_companies(
     south: float | None = None,
     east: float | None = None,
     west: float | None = None,
-    limit: int = Query(1000, ge=1, le=10000),
+    limit: int = Query(1000, ge=1, le=3000),
 ) -> ZipteriorCompanyMapMarkerListOut:
     return zipterior_client.get_interior_companies(north=north, south=south, east=east, west=west, limit=limit)
