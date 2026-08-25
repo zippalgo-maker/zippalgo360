@@ -162,3 +162,64 @@ sudo systemctl restart zippalgo360-web
 보여주는지, 특히 로그인 등 쿠키 필요한 기능이 iframe 안에서 정상 동작하는지
 확인되면 기록. 만약 로그인이 iframe 안에서 안 되면 → zipterior 백엔드의 세션
 쿠키를 `SameSite=None; Secure`로 바꿔야 함 — 이건 데스크탑 세션과 조율 필요.)
+
+---
+
+## 2026-08-25 — interior.zippalgo360.com 서브도메인 생성 (iframe 제3자 쿠키 문제 해결)
+
+### 시작 전
+- 다른 세션(웹) 진행 중 이 브랜치와 별도로, 사용자가 "집테리어를 zippalgo360.com
+  안에 부분 기능처럼 붙이고 싶다"는 요청을 새 세션에서 시작함. 이 세션은
+  처음엔 위 iframe 임베드 작업(`9b7d4ea`, `c68d1c7`)의 존재를 모른 채 별도로
+  서브패스(`/interior`)·서브도메인 방식을 검토함.
+- 서브패스(`zippalgo360.com/interior`)는 집테리어 프론트가 `/api/`, `/login`
+  등 절대경로를 하드코딩하고 있고 집팔고360도 `/api/`를 쓰고 있어 경로 충돌
+  발생 — 집테리어 소스 수정 없이는 불가능하다고 판단, 서브도메인 방식으로
+  전환.
+- 서버(115.68.195.144) SSH 직접 접속 가능(사용자가 zipterior 계정 SSH 붙여줌 —
+  이 세션에서 SSH 아웃바운드가 막혀 있어 사용자가 명령어를 직접 실행하고
+  결과를 붙여넣는 방식으로 진행).
+
+### 진행 중
+- **[완료] nginx** — `/etc/nginx/sites-available/interior.zippalgo360.com`
+  신규 생성 (기존 `zipterior`/`zippalgo360` 파일은 미수정). 기존 `zipterior`
+  server 블록의 location들을 그대로 복사 — `root /var/www/zipterior`,
+  `/api/` 및 `/api/v1/chat/ws` → `127.0.0.1:8000`(집테리어 백엔드, 기존과 동일),
+  clean-URL alias들도 동일하게 유지. `server_name`만
+  `interior.zippalgo360.com`으로 교체. `nginx -t` 통과 후 reload.
+- **[완료] SSL** — DNS A레코드(`interior` → `115.68.195.144`)가 이미 전파된
+  상태에서 `certbot --nginx -d interior.zippalgo360.com` 성공. 만료일
+  2026-11-23, 자동 갱신 등록됨.
+- **[완료] CORS** — `/srv/zipterior/backend/app/main.py`의 `CORSMiddleware
+  allow_origins`에 `https://interior.zippalgo360.com` 추가(기존
+  `zipterior.kr`/`www.zipterior.kr` 항목은 유지, 추가만 함). 수정 전 파일은
+  `main.py.bak_before_interior_subdomain`으로 백업. `zipterior-api` 재시작,
+  `/api/health` 200 확인.
+  - 참고: 프론트/API가 항상 same-origin으로 서빙되는 구조라 이 값이 페이지
+    내 일반 `/api/...` 호출에 실제로 영향을 주진 않지만, 향후 크로스 서비스
+    연동을 대비해 안전하게 추가해둠.
+- **[완료] 최종 확인** — `interior.zippalgo360.com`(200),
+  `zipterior.kr`(200, 영향 없음), `zippalgo360.com`(200, 영향 없음) 모두
+  curl로 확인.
+- 이 시점에 사용자로부터 이 브랜치(`claude/jippalgo360-platform-6bvrfh`)가
+  실제 배포 브랜치이고, 이미 iframe 임베드(`9b7d4ea`)가 구현되어 있다는 걸
+  알게 됨. 이 세션이 만들려던 `/interior` 서브패스 방식은 폐기하고, 대신
+  **이미 만든 `interior.zippalgo360.com` 서브도메인을 iframe 임베드의
+  src로 사용**하는 방향으로 전환 — 위 iframe 작업이 미해결로 남긴 "제3자
+  쿠키" 리스크를 정확히 해결하는 조합.
+- **[완료]** `apps/web/src/app/jipterior/page.tsx`의
+  `ZIPTERIOR_URL`을 `https://zipterior.kr` → `https://interior.zippalgo360.com`으로
+  변경. `interior.zippalgo360.com`은 `zipterior.kr`과 완전히 동일한 서버/DB/
+  백엔드를 서빙하는 서브도메인이며, `zippalgo360.com`과 eTLD+1이 같아 iframe
+  안에서도 same-site로 취급됨 — `zipterior.kr`을 그대로 쓸 때 우려했던 제3자
+  쿠키 문제(로그인 세션 유지 실패 가능성)를 구조적으로 피할 수 있음.
+
+### 완료 후
+- 로그인이 iframe 안에서 실제로 유지되는지는 여전히 **브라우저 실접속 확인
+  필요** — same-site로 바뀌어서 문제가 줄었을 가능성이 높지만, 완전히
+  검증된 건 아님. 문제가 남아있다면 다음 후보는 `zipterior-api`의 세션
+  쿠키에 `Domain=.zippalgo360.com`을 명시하는 것(단, 이건 zipterior.kr
+  자체 접속 시의 쿠키 동작에도 영향을 주므로 데스크탑 세션과 조율 필요).
+- 서버 재배포(`git pull` → `npm run build` →
+  `systemctl restart zippalgo360-web`)는 이 커밋 푸시 후 사용자에게 요청함,
+  결과 확인 대기 중.

@@ -1,6 +1,10 @@
 "use client";
 
-const ZIPTERIOR_URL = "https://zipterior.kr";
+// interior.zippalgo360.com은 zipterior.kr과 동일한 서버/백엔드를 서빙하는
+// 서브도메인. zippalgo360.com과 eTLD+1이 같아 iframe 안에서도 same-site로
+// 취급되므로, zipterior.kr을 직접 넣을 때 발생하는 제3자 쿠키 문제(로그인 세션
+// 유지 실패)를 피할 수 있다.
+const ZIPTERIOR_URL = "https://interior.zippalgo360.com";
 
 export default function JipteriorEmbedPage() {
   return (
