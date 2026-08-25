@@ -64,3 +64,30 @@ class ZipteriorCompanyMapMarkerListOut(BaseModel):
     total: int
     available: bool
     """집테리어 API에 접속할 수 없거나 아직 이 마커 종류를 지원하지 않을 때 False."""
+
+
+class ZipteriorViewportItem(BaseModel):
+    item_type: str
+    """"cluster" 또는 "marker"(개별)."""
+    marker_type: str
+    id: int | None = None
+    name: str | None = None
+    latitude: float
+    longitude: float
+    count: int
+    """이 클러스터/마커가 대표하는 개수(개별 마커면 1)."""
+    portfolio_count: int = 0
+    apartment_type_count: int | None = None
+    logo_path: str | None = None
+
+
+class ZipteriorViewportOut(BaseModel):
+    zoom: int
+    clustered: bool
+    items: list[ZipteriorViewportItem]
+    total_items: int
+    """실제로 화면에 그릴 클러스터/마커 개수(적음, 이게 보통 원본 개수가 아님)."""
+    source_marker_count: int
+    """이 뷰포트 안에 있는 원본 마커 총합(클러스터링 전 진짜 개수)."""
+    available: bool
+    """집테리어 API에 접속할 수 없을 때 False."""

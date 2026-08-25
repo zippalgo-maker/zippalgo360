@@ -5,6 +5,7 @@ from app.modules.integrations.schemas import (
     ZipteriorCompanyMapMarkerListOut,
     ZipteriorMapMarkerListOut,
     ZipteriorPortfolioListOut,
+    ZipteriorViewportOut,
 )
 
 router = APIRouter(prefix="/integrations/zipterior", tags=["integrations"])
@@ -45,3 +46,26 @@ def get_interior_companies(
     limit: int = Query(1000, ge=1, le=3000),
 ) -> ZipteriorCompanyMapMarkerListOut:
     return zipterior_client.get_interior_companies(north=north, south=south, east=east, west=west, limit=limit)
+
+
+@router.get("/viewport", response_model=ZipteriorViewportOut)
+def get_interior_viewport(
+    marker_type: str = Query("complex"),
+    zoom: int = Query(..., ge=1, le=20),
+    north: float = Query(...),
+    south: float = Query(...),
+    east: float = Query(...),
+    west: float = Query(...),
+    has_portfolio: bool = Query(False),
+    source_limit: int = Query(3000, ge=1, le=5000),
+) -> ZipteriorViewportOut:
+    return zipterior_client.get_interior_viewport(
+        marker_type=marker_type,
+        zoom=zoom,
+        north=north,
+        south=south,
+        east=east,
+        west=west,
+        has_portfolio=has_portfolio,
+        source_limit=source_limit,
+    )

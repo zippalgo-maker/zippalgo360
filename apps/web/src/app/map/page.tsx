@@ -8,8 +8,8 @@ import type {
   ApartmentComplex,
   CompanyMapMarker,
   ListingMapMarker,
-  ZipteriorCompanyMapMarkerListOut,
-  ZipteriorMapMarkerListOut,
+  ZipteriorViewportItem,
+  ZipteriorViewportOut,
 } from "@/lib/types";
 
 // 집팔고360은 집팔고/집사고/집테리어/집이사/집청소가 신원(로그인)뿐 아니라
@@ -56,16 +56,18 @@ const COMPANY_LAYER_COLOR: Partial<Record<LayerKey, string>> = {
   company_cleaner: "#2f9e6f",
 };
 
-// 마커가 많은 레이어(매물/인테리어 시공사례)는 뷰포트 안 전체를 가져오되
-// 클러스터링으로 렌더링을 빠르게 유지한다 — 개수 자체를 인위적으로 작게
-// 자르지 않는다.
-const CLUSTERED_LAYERS: ReadonlySet<LayerKey> = new Set(["listings", "interiorPortfolio"]);
+// 매물 레이어는 아직 우리 쪽에 서버 클러스터링이 없어서 원본 마커를
+// 그대로 가져와 클라이언트에서 카카오 공식 클러스터러로 뭉친다.
+const CLUSTERED_LAYERS: ReadonlySet<LayerKey> = new Set(["listings"]);
 // 우리 DB(인덱스 있음, 직접 제어 가능)로 가는 요청은 넉넉하게.
 const MARKER_FETCH_LIMIT = 5000;
-// 집테리어 쪽 /api/v1/public/map/markers의 limit 파라미터는 le=3000으로
-// 고정 검증되어 있음(소스 확인, 2026-08-25) — 인덱스/성능 문제가 아니라
-// 그냥 그 이상은 422로 거부한다. 3000이 이 레이어의 실제 상한.
-const ZIPTERIOR_MARKER_FETCH_LIMIT = 3000;
+// 집테리어로 프록시되는 두 레이어(인테리어 시공사례/업체)는 원본 마커 대신
+// 집테리어가 줌 레벨에 맞춰 미리 클러스터링해서 내려주는
+// /api/v1/public/map/viewport를 쓴다(집테리어 자체 지도와 같은 방식,
+// 2026-08-25 소스 확인) — 그래서 여기 보내는 source_limit은 "화면에
+// 그릴 개수"가 아니라 "서버가 클러스터링 전에 얼마나 원본을 모을지"라
+// 3000(집테리어 쪽 실제 상한)으로 넉넉히 잡아도 렌더링 비용은 낮다.
+const ZIPTERIOR_SOURCE_LIMIT = 3000;
 
 const KAKAO_APP_KEY = process.env.NEXT_PUBLIC_KAKAO_MAP_JS_KEY ?? "";
 const SEOUL_CENTER = { lat: 37.5665, lng: 126.978 };
@@ -152,6 +154,42 @@ function ServiceMapView() {
     });
   }, []);
 
+  // 집테리어 viewport 응답(이미 서버에서 줌 레벨에 맞춰 클러스터링됨)을
+  // 렌더링한다. 클러스터 항목은 숫자 뱃지로, 개별 항목은 작은 점으로
+  // 그리고 클러스터 클릭 시 그 위치로 확대한다 — 마커를 카카오
+  // 클러스터러에 넘기지 않는다(이미 뭉쳐서 온 소수의 항목이라 그럴 필요가
+  // 없음, 이게 원본 마커를 다 보내던 이전 방식보다 훨씬 가벼운 이유).
+  const renderViewportItems = useCallback(
+    (layer: LayerKey, items: ZipteriorViewportItem[], color: string, buildContent: (item: ZipteriorViewportItem) => string) => {
+      const kakao = window.kakao;
+      const map = mapRef.current;
+      items.forEach((item) => {
+        const position = new kakao.maps.LatLng(item.latitude, item.longitude);
+        const isCluster = item.item_type === "cluster";
+        const el = document.createElement("div");
+        if (isCluster) {
+          const size = Math.min(56, 28 + Math.round(Math.log10(item.count + 1) * 12));
+          el.style.cssText = `display:flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;border-radius:9999px;background:${color};color:#fff;font-size:12px;font-weight:700;box-shadow:0 2px 6px rgba(0,0,0,.35);cursor:pointer;border:2px solid white;`;
+          el.textContent = item.count.toLocaleString();
+        } else {
+          el.style.cssText = `width:14px;height:14px;border-radius:9999px;background:${color};border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:pointer;`;
+        }
+        const overlay = new kakao.maps.CustomOverlay({ position, content: el, map, yAnchor: 0.5, xAnchor: 0.5 });
+        el.addEventListener("click", () => {
+          if (isCluster) {
+            map.setLevel(Math.max(1, map.getLevel() - 2));
+            map.setCenter(position);
+            return;
+          }
+          infoWindowRef.current.setContent(buildContent(item));
+          infoWindowRef.current.open(map, overlay);
+        });
+        markersByLayerRef.current[layer].push(overlay);
+      });
+    },
+    []
+  );
+
   const loadListingMarkers = useCallback(async () => {
     const kakao = window.kakao;
     const map = mapRef.current;
@@ -194,31 +232,21 @@ function ServiceMapView() {
     const bounds = map.getBounds();
     const sw = bounds.getSouthWest();
     const ne = bounds.getNorthEast();
-    const data = await apiFetch<ZipteriorMapMarkerListOut>(
-      `/integrations/zipterior/map-markers?north=${ne.getLat()}&south=${sw.getLat()}&east=${ne.getLng()}&west=${sw.getLng()}&limit=${ZIPTERIOR_MARKER_FETCH_LIMIT}`
+    const data = await apiFetch<ZipteriorViewportOut>(
+      `/integrations/zipterior/viewport?marker_type=complex&has_portfolio=true&zoom=${map.getLevel()}&north=${ne.getLat()}&south=${sw.getLat()}&east=${ne.getLng()}&west=${sw.getLng()}&source_limit=${ZIPTERIOR_SOURCE_LIMIT}`
     );
     if (!activeLayersRef.current.has("interiorPortfolio")) return;
     clearLayerMarkers("interiorPortfolio");
     setLayerUnavailable("interiorPortfolio", !data.available);
-    const kakaoMarkers = data.items.map((item) => {
-      const position = new kakao.maps.LatLng(item.latitude, item.longitude);
-      const marker = new kakao.maps.Marker({ position });
-      kakao.maps.event.addListener(marker, "click", () => {
-        infoWindowRef.current.setContent(
-          `<div style="padding:10px 12px;min-width:180px;font-size:13px;line-height:1.6;">
-            <strong>${item.name}</strong><br/>
-            시공사례 ${item.portfolio_count}건<br/>
-            <a href="https://zipterior.zippalgo360.com/?complex_id=${item.id}" target="_blank" rel="noreferrer" style="color:#bb1730;font-weight:600;">집테리어에서 보기 →</a>
-          </div>`
-        );
-        infoWindowRef.current.open(map, marker);
-      });
-      return marker;
-    });
-    markersByLayerRef.current.interiorPortfolio = kakaoMarkers;
-    clusterersByLayerRef.current.interiorPortfolio.addMarkers(kakaoMarkers);
-    setLayerCounts((prev) => ({ ...prev, interiorPortfolio: data.items.length }));
-  }, [clearLayerMarkers, setLayerUnavailable]);
+    renderViewportItems("interiorPortfolio", data.items, "#bb1730", (item) =>
+      `<div style="padding:10px 12px;min-width:180px;font-size:13px;line-height:1.6;">
+        <strong>${item.name}</strong><br/>
+        시공사례 ${item.portfolio_count}건<br/>
+        <a href="https://zipterior.zippalgo360.com/?complex_id=${item.id}" target="_blank" rel="noreferrer" style="color:#bb1730;font-weight:600;">집테리어에서 보기 →</a>
+      </div>`
+    );
+    setLayerCounts((prev) => ({ ...prev, interiorPortfolio: data.source_marker_count }));
+  }, [clearLayerMarkers, setLayerUnavailable, renderViewportItems]);
 
   const loadInteriorCompanyMarkers = useCallback(async () => {
     const kakao = window.kakao;
@@ -227,30 +255,21 @@ function ServiceMapView() {
     const bounds = map.getBounds();
     const sw = bounds.getSouthWest();
     const ne = bounds.getNorthEast();
-    const data = await apiFetch<ZipteriorCompanyMapMarkerListOut>(
-      `/integrations/zipterior/company-markers?north=${ne.getLat()}&south=${sw.getLat()}&east=${ne.getLng()}&west=${sw.getLng()}&limit=${ZIPTERIOR_MARKER_FETCH_LIMIT}`
+    const data = await apiFetch<ZipteriorViewportOut>(
+      `/integrations/zipterior/viewport?marker_type=company&zoom=${map.getLevel()}&north=${ne.getLat()}&south=${sw.getLat()}&east=${ne.getLng()}&west=${sw.getLng()}&source_limit=${ZIPTERIOR_SOURCE_LIMIT}`
     );
     if (!activeLayersRef.current.has("company_interior")) return;
     clearLayerMarkers("company_interior");
     setLayerUnavailable("company_interior", !data.available);
     const color = COMPANY_LAYER_COLOR.company_interior ?? "#21463b";
-    data.items.forEach((item) => {
-      const position = new kakao.maps.LatLng(item.latitude, item.longitude);
-      const dot = document.createElement("div");
-      dot.style.cssText = `width:14px;height:14px;border-radius:9999px;background:${color};border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:pointer;`;
-      const overlay = new kakao.maps.CustomOverlay({ position, content: dot, map, yAnchor: 0.5, xAnchor: 0.5 });
-      dot.addEventListener("click", () => {
-        infoWindowRef.current.setContent(
-          `<div style="padding:10px 12px;min-width:160px;font-size:13px;line-height:1.6;">
-            <strong>${item.name}</strong>${item.phone ? `<br/>${item.phone}` : ""}
-          </div>`
-        );
-        infoWindowRef.current.open(map, overlay);
-      });
-      markersByLayerRef.current.company_interior.push(overlay);
-    });
-    setLayerCounts((prev) => ({ ...prev, company_interior: data.items.length }));
-  }, [clearLayerMarkers, setLayerUnavailable]);
+    renderViewportItems("company_interior", data.items, color, (item) =>
+      `<div style="padding:10px 12px;min-width:160px;font-size:13px;line-height:1.6;">
+        <strong>${item.name}</strong><br/>
+        시공사례 ${item.portfolio_count}건
+      </div>`
+    );
+    setLayerCounts((prev) => ({ ...prev, company_interior: data.source_marker_count }));
+  }, [clearLayerMarkers, setLayerUnavailable, renderViewportItems]);
 
   const loadCompanyMarkers = useCallback(
     async (layer: LayerKey) => {

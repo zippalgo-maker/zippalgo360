@@ -9,6 +9,8 @@ from app.modules.integrations.schemas import (
     ZipteriorMapMarkerListOut,
     ZipteriorPortfolioCard,
     ZipteriorPortfolioListOut,
+    ZipteriorViewportItem,
+    ZipteriorViewportOut,
 )
 
 settings = get_settings()
@@ -195,3 +197,72 @@ def get_interior_companies(
         return ZipteriorCompanyMapMarkerListOut(items=[], total=0, available=False)
 
     return ZipteriorCompanyMapMarkerListOut(items=items, total=data.get("total", len(items)), available=True)
+
+
+def get_interior_viewport(
+    *,
+    marker_type: str,
+    zoom: int,
+    north: float,
+    south: float,
+    east: float,
+    west: float,
+    has_portfolio: bool = False,
+    source_limit: int = 3000,
+) -> ZipteriorViewportOut:
+    """줌 레벨에 맞춰 집테리어 서버가 미리 클러스터링해서 내려주는 지도
+    뷰포트를 가져온다(`/api/v1/public/map/viewport`) — 집테리어 자체
+    지도가 쓰는 것과 같은 엔드포인트. `get_interior_map_markers`(원본
+    마커를 그대로 주는 `/map/markers`)와 달리, 줌아웃 상태에서도 브라우저가
+    수천 개 원본 마커를 직접 다루지 않고 이미 뭉쳐진 소수의 클러스터/
+    마커만 받는다 — 실측: zoom=8 넓은 화면에서 원본 1,261건이 클러스터
+    4개로 줄어서 옴.
+    """
+    params: dict = {
+        "marker_type": marker_type,
+        "zoom": zoom,
+        "north": north,
+        "south": south,
+        "east": east,
+        "west": west,
+        "source_limit": source_limit,
+    }
+    if has_portfolio:
+        params["has_portfolio"] = "true"
+
+    try:
+        response = httpx.get(
+            f"{settings.zipterior_api_base_url}/api/v1/public/map/viewport",
+            params=params,
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        data = response.json()
+        items = [
+            ZipteriorViewportItem(
+                item_type=item["item_type"],
+                marker_type=item["marker_type"],
+                id=item.get("id"),
+                name=item.get("name"),
+                latitude=float(item["latitude"]),
+                longitude=float(item["longitude"]),
+                count=item["count"],
+                portfolio_count=item.get("portfolio_count") or 0,
+                apartment_type_count=item.get("apartment_type_count"),
+                logo_path=item.get("logo_path"),
+            )
+            for item in data["items"]
+        ]
+    except (httpx.HTTPError, ValueError, KeyError, TypeError):
+        return ZipteriorViewportOut(
+            zoom=zoom, clustered=False, items=[], total_items=0, source_marker_count=0, available=False
+        )
+
+    return ZipteriorViewportOut(
+        zoom=data.get("zoom", zoom),
+        clustered=data.get("clustered", False),
+        items=items,
+        total_items=data.get("total_items", len(items)),
+        source_marker_count=data.get("source_marker_count", 0),
+        available=True,
+    )

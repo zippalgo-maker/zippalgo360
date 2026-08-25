@@ -254,3 +254,25 @@ export interface ZipteriorCompanyMapMarkerListOut {
   total: number;
   available: boolean;
 }
+
+export interface ZipteriorViewportItem {
+  item_type: "cluster" | "marker";
+  marker_type: "complex" | "company";
+  id: number | null;
+  name: string | null;
+  latitude: number;
+  longitude: number;
+  count: number;
+  portfolio_count: number;
+  apartment_type_count: number | null;
+  logo_path: string | null;
+}
+
+export interface ZipteriorViewportOut {
+  zoom: number;
+  clustered: boolean;
+  items: ZipteriorViewportItem[];
+  total_items: number;
+  source_marker_count: number;
+  available: boolean;
+}

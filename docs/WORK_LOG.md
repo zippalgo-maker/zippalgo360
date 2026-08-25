@@ -754,4 +754,63 @@ sudo systemctl restart zippalgo360-web
 - 로컬 빌드 확인(`npm run build`, `ast.parse`).
 
 ### 완료 후
-(진행 중 — 서버 배포는 사용자 요청 시.)
+- **사용자 피드백**: 3000까지는 뜨지만 여전히 버벅거림. 반면 집테리어
+  자체 지도는 5000개 넘어도 안 버벅임 — 다음 섹션에서 원인/해결.
+
+---
+
+## 2026-08-25 — 집테리어의 서버 사이드 클러스터링(viewport) 엔드포인트로 전환
+
+### 시작 전
+- "집테리어는 5000개 넘어도 안 버벅이는데 우리는 3000개로 버벅인다"는
+  지적에 따라, 우리 방식(원본 마커를 최대 3000개까지 그대로 브라우저에
+  보내서 카카오 공식 `MarkerClusterer`로 클라이언트에서 뭉치기)과 집테리어
+  방식을 직접 코드로 비교.
+- **[확인 완료]** 집테리어는 `/api/v1/public/map/markers`(원본) 말고
+  **`/api/v1/public/map/viewport`**라는 별도 엔드포인트를 씀 — 줌 레벨에
+  맞는 격자 크기(`cluster_cell_degrees`)로 **서버에서 미리 SQL GROUP BY**
+  해서, 화면에 그릴 클러스터/마커 소수만 내려줌. 실측:
+  `zoom=8`(넓은 화면) 요청 시 원본 1,261건이 **클러스터 4개**로 줄어서
+  응답(`source_marker_count: 1261, total_items: 4`). 프론트(`map-provider.js`)
+  클라이언트 클러스터링도 카카오 공식 라이브러리가 아니라 격자 버킷팅만
+  하는 가벼운 자체 구현.
+- 이게 "5000개 넘어도 안 버벅이는" 진짜 이유 — 브라우저가 다루는 마커 수
+  자체가 원본이 아니라 클러스터 개수(보통 수십 개 이내)라서.
+
+### 진행 중
+- **[완료] 백엔드**: `apps/api/app/modules/integrations/`에
+  `ZipteriorViewportItem`/`ZipteriorViewportOut` 스키마,
+  `zipterior_client.get_interior_viewport()`,
+  `GET /integrations/zipterior/viewport` 엔드포인트 추가 — 집테리어의
+  `/api/v1/public/map/viewport`를 그대로 프록시(`marker_type`, `zoom`,
+  bbox, `has_portfolio`, `source_limit` 전달). 응답에 `source_marker_count`
+  (원본 총합, 카운트 배지용)도 포함.
+- **[완료] 프론트**: `apps/web/src/app/map/page.tsx`
+  - `interiorPortfolio`/`company_interior` 레이어를 이 새 엔드포인트로
+    전환. 카카오 `MarkerClusterer`를 이 두 레이어에서 뗌(서버가 이미
+    뭉쳐서 줘서 필요 없음) — `CLUSTERED_LAYERS`엔 이제 `listings`만 남음
+    (우리 매물 데이터는 아직 서버 클러스터링이 없어서 클라이언트
+    클러스터러 유지).
+  - 공용 렌더 함수(`renderViewportItems`) 추가 — 클러스터 항목은 숫자
+    뱃지가 있는 원(크기가 개수에 따라 살짝 커짐), 개별 항목은 기존처럼
+    작은 점. 클러스터 클릭 시 그 위치로 확대(레벨 2단계 축소).
+  - 레이어 카운트 배지는 이제 `source_marker_count`(원본 총합)를 보여줌 —
+    화면에 그려지는 클러스터/마커 개수(`items.length`, 보통 수십 개)가
+    아니라 실제 데이터 규모를 보여주는 게 맞다고 판단.
+  - `ZIPTERIOR_MARKER_FETCH_LIMIT` -> `ZIPTERIOR_SOURCE_LIMIT`(3000)로
+    이름 변경 — 이제 "화면에 그릴 개수"가 아니라 "서버가 클러스터링 전에
+    모을 원본 개수 상한"이라는 의미가 달라져서 이름도 맞춤.
+  - 더 이상 안 쓰는 `/integrations/zipterior/map-markers`,
+    `/integrations/zipterior/company-markers` 호출은 프론트에서 제거
+    (백엔드 엔드포인트 자체는 남겨둠, 필요하면 다른 곳에서 쓸 수 있음).
+- 로컬 `npm run build`, `ast.parse` 확인.
+
+### 남은 것 (참고용, 지금 당장 할 필요는 없음)
+- `listings`(매물) 레이어는 아직 우리 쪽에 이런 서버 클러스터링이 없음.
+  지금은 실제 등록된 매물이 적어서 클라이언트 클러스터러로 충분하지만,
+  나중에 매물이 많아지면 `apps/api/app/modules/listings`에도 집테리어의
+  `cluster_grid_summary`/`viewport`와 같은 방식(줌 레벨→격자 크기 매핑,
+  SQL GROUP BY로 집계)을 만드는 걸 고려할 만함.
+
+### 완료 후
+(진행 중 — 서버 배포 및 실제 확인은 사용자 요청 시.)
