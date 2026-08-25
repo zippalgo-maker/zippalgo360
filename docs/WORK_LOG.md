@@ -819,3 +819,31 @@ sudo systemctl restart zippalgo360-web
   브라우저 성능엔 영향이 없고, 집테리어 라우터의 실제 상한이 `le=5000`인
   걸 이미 확인해뒀어서 **[완료]** `ZIPTERIOR_SOURCE_LIMIT`를 3000 → 5000
   으로 상향. 로컬 빌드 확인, 서버 배포는 다음 요청 시.
+
+---
+
+## 2026-08-26 — 🚨 서버 디스크 100% 꽉 참, Postgres 연결 끊김 (긴급, 진행 중)
+
+### 시작 전
+- 사용자가 "지도 마커 또 안 나온다"고 보고. 진단해보니 우리 코드 문제가
+  아니라 **서버 자체가 위험한 상태**:
+  - `df -h /` → `/dev/vda2  100G  100G  20K  100%` — 디스크 완전히 꽉 참.
+  - `free -h` → 메모리 3.8Gi 중 3.0Gi 사용(여유 153Mi), **스왑도 3.8Gi
+    중 거의 다 참(여유 52Ki)**.
+  - `zippalgo360-api` 로그: `psycopg.OperationalError: connection failed:
+    ... server closed the connection unexpectedly` — Postgres가 디스크가
+    꽉 차서 WAL을 못 쓰고 연결을 끊은 것으로 추정.
+  - 매물/부동산 업체 마커(우리 DB 직접 조회)는 그래서 500, 집테리어
+    프록시(viewport)는 DB를 안 타서 200은 뜨지만 그 시점엔 `available:
+    false`로 응답(서버 전체가 자원 압박 상태라 집테리어 응답도 불안정
+    했을 가능성).
+  - `postgresql.service` 자체는 `active (exited)`로 떠 있지만, 이건
+    Debian/Ubuntu에서 메타 유닛이라 실제 클러스터 프로세스(`postgresql@
+    <version>-main.service`) 상태는 별도 확인 필요 — 아직 확인 못함.
+- **원인 파악 전이라 아직 아무것도 삭제하지 않음** — `/srv/zipterior/
+  backups`, `/srv/zipterior/releases`, `/tmp`에 과거 조사 때 본 버전별
+  백업 tarball이 많이 쌓여 있었던 게 유력한 원인 후보(집테리어 쪽 자산이라
+  함부로 지우면 안 됨, 확인 후 사용자 승인받고 처리).
+
+### 진행 중
+(다음 메시지에서 `du -sh`로 실제 공간을 많이 쓰는 위치 확인 예정.)
