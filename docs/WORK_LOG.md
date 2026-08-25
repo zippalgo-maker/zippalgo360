@@ -43,19 +43,45 @@
   - `sudo mkdir -p /srv/zippalgo360 && sudo chown zipterior:zipterior /srv/zippalgo360`
   - `git clone https://github.com/zippalgo-maker/zippalgo360.git /srv/zippalgo360`
   - 확인됨: `/srv/zippalgo360/apps/{api,web}` 존재
-- **[ ] 백엔드 설정** — venv, pip install, `.env` 작성, `alembic upgrade head`,
-  단지/평형 seed 데이터 로드(`seeds/zipterior_apartments_seed.sql`),
-  `zippalgo360-api.service` (포트 8001 예정, 8000은 집테리어가 사용 중)
-- **[ ] 프론트엔드 설정** — `npm install`, `.env.production.local`
-  (`NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_KAKAO_MAP_JS_KEY`), `npm run build`,
-  `zippalgo360-web.service` (포트 3000 예정)
-- **[ ] nginx** — `/etc/nginx/sites-available/zippalgo360` 새 서버블록
-  (`server_name zippalgo360.com www.zippalgo360.com`), `/api/` → 8001,
-  `/` → 3000. 집테리어 설정 파일은 수정하지 않음.
-- **[ ] SSL** — DNS 전파 확인 후 `certbot --nginx -d zippalgo360.com -d www.zippalgo360.com`
-- **[ ] 카카오 개발자 콘솔** — JS 키의 Web 플랫폼 허용 도메인에 `zippalgo360.com`,
-  `www.zippalgo360.com` 추가 필요 (안 하면 지도 마커 렌더링 실패)
+- **[완료] 백엔드 설정**
+  - `python3 -m venv venv && pip install -r requirements.txt`
+  - `.env` 작성 (`DATABASE_URL`은 `zippalgo_app` 계정, `CORS_ORIGINS`는
+    `https://zippalgo360.com,https://www.zippalgo360.com`,
+    `ZIPTERIOR_API_BASE_URL=https://zipterior.kr`)
+  - DB 비밀번호는 사용자가 직접 정함(숫자 6자리, 서버 `.env`에만 존재 — 여기 기록 안 함).
+    이 계정/DB는 집테리어의 `zipterior_app`/`zipterior_db`와 완전히 별개.
+  - `alembic upgrade head` 성공
+  - `seeds/zipterior_apartments_seed.sql` 로드 성공 → `apartment_complexes` 5,668건,
+    `apartment_types` 25,530건 확인됨 (로컬 개발 DB와 개수 일치)
+  - `zippalgo360-api.service` 등록, 포트 8001로 기동 (8000은 집테리어가 사용 중이라 회피).
+    `active (running)` 확인, `/api/apartments/complexes?keyword=역삼` curl 테스트 200 확인
+- **[완료] 프론트엔드 설정**
+  - `npm install` (Node 22.23.2 기준)
+  - `.env.production.local`: `NEXT_PUBLIC_API_URL=https://zippalgo360.com/api`,
+    `NEXT_PUBLIC_KAKAO_MAP_JS_KEY=502640f182ae8cf758ab171c38a3e4e7`
+  - `npm run build` 성공
+  - `zippalgo360-web.service` 등록, `npm run start -- --port 3000`으로 기동.
+    `active (running)` 확인, curl 로컬 200 확인
+- **[완료] nginx**
+  - `/etc/nginx/sites-available/zippalgo360` 새 서버블록 추가
+    (`server_name zippalgo360.com www.zippalgo360.com`, `/api/` → 127.0.0.1:8001,
+    `/` → 127.0.0.1:3000), `sites-enabled`에 심볼릭 링크, `nginx -t` 통과, reload 완료.
+    집테리어 설정 파일(`/etc/nginx/sites-available/zipterior`)은 전혀 수정하지 않음.
+- **[완료] SSL** — DNS 전파 확인(`dig +short zippalgo360.com` → `115.68.195.144`) 후
+  `sudo certbot --nginx -d zippalgo360.com -d www.zippalgo360.com` 성공.
+  인증서 만료일 2026-11-23, certbot이 자동 갱신 등록됨.
+- **[ ] 카카오 개발자 콘솔** — JS 키의 Web 플랫폼 허용 도메인에 `https://zippalgo360.com`,
+  `https://www.zippalgo360.com` 추가 아직 안 함 (사용자가 직접 developers.kakao.com에서
+  해야 함). 안 하면 `/map`에서 "카카오맵 스크립트를 불러오지 못했습니다" 상태로 남음.
 
 ### 완료 후
-(진행 중 — 배포가 끝나고 실제로 `https://zippalgo360.com` 접속이 확인되면 이 섹션에
-최종 상태와 검증 결과를 기록한다.)
+- `https://zippalgo360.com` — 200 확인 (curl)
+- `https://zippalgo360.com/api/apartments/complexes?keyword=역삼` — 200, 정상 응답 확인 (curl)
+- 브라우저 실접속 확인은 사용자가 진행 예정
+- **서버 최종 상태 요약**
+  - `/srv/zippalgo360` — git 클론, `apps/api`(venv 포함) + `apps/web`(빌드 완료)
+  - Postgres: `zippalgo_app` 계정 / `zippalgo360_db` (집테리어와 분리)
+  - systemd: `zippalgo360-api.service`(127.0.0.1:8001), `zippalgo360-web.service`(127.0.0.1:3000) — 둘 다 `enabled`라 재부팅해도 자동 기동
+  - nginx: `/etc/nginx/sites-available/zippalgo360` (zipterior 설정과 분리), SSL 적용됨
+  - 집테리어 쪽 설정/서비스/DB는 이번 작업 중 전혀 수정하지 않음
+- **남은 일**: 카카오 개발자 콘솔에 도메인 등록 (위 참고)
