@@ -57,6 +57,21 @@ def get_unlocked_listing_ids(conn: Connection, agent_company_id: int) -> set[int
     return {r[0] for r in rows}
 
 
+def list_purchases_by_listing(conn: Connection, listing_id: int) -> list[dict]:
+    rows = conn.execute(
+        text(
+            """
+            SELECT id, listing_id, agent_company_id, amount, status, paid_at
+            FROM listing_purchases
+            WHERE listing_id = :listing_id AND status = 'paid'
+            ORDER BY paid_at
+            """
+        ),
+        {"listing_id": listing_id},
+    ).mappings().all()
+    return [dict(r) for r in rows]
+
+
 def list_purchases_by_company(conn: Connection, agent_company_id: int) -> list[dict]:
     rows = conn.execute(
         text(

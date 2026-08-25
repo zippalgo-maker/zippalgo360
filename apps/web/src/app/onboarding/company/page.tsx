@@ -1,15 +1,17 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { apiFetch, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { useRequireRole } from "@/lib/use-require-role";
 import { cardClass, errorTextClass, inputClass, labelClass, primaryButtonClass } from "@/lib/ui";
 import type { Company } from "@/lib/types";
 
 export default function CompanyOnboardingPage() {
   const router = useRouter();
-  const { user, token, isLoading } = useAuth();
+  const { token } = useAuth();
+  useRequireRole("company");
 
   const [businessName, setBusinessName] = useState("");
   const [businessRegistrationNumber, setBusinessRegistrationNumber] = useState("");
@@ -19,12 +21,6 @@ export default function CompanyOnboardingPage() {
   const [regions, setRegions] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!isLoading && (!user || user.role !== "company")) {
-      router.replace("/login");
-    }
-  }, [isLoading, user, router]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();

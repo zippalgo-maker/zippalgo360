@@ -33,6 +33,11 @@ def create_complex(
     return service.create_complex(conn, payload)
 
 
+@router.get("/complexes/{complex_id}", response_model=ApartmentComplexOut)
+def get_complex(complex_id: int, conn: Connection = Depends(get_db)) -> ApartmentComplexOut:
+    return service.get_complex(conn, complex_id)
+
+
 @router.get("/complexes/{complex_id}/types", response_model=list[ApartmentTypeOut])
 def list_types(complex_id: int, conn: Connection = Depends(get_db)) -> list[ApartmentTypeOut]:
     return service.list_types_by_complex(conn, complex_id)
@@ -45,3 +50,8 @@ def create_type(
     conn: Connection = Depends(get_db),
 ) -> ApartmentTypeOut:
     return service.create_type(conn, payload)
+
+
+@router.get("/types/{type_id}", response_model=ApartmentTypeOut)
+def get_type(type_id: int, conn: Connection = Depends(get_db)) -> ApartmentTypeOut:
+    return service.get_type(conn, type_id)

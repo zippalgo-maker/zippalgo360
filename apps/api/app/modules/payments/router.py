@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import Connection
 
 from app.database import get_db
-from app.deps import require_company_type
+from app.deps import require_company_type, require_role
 from app.modules.payments import service
 from app.modules.payments.schemas import ListingPurchaseOut, ListingPurchaseResult
 
@@ -24,3 +24,12 @@ def my_purchases(
     conn: Connection = Depends(get_db),
 ) -> list[ListingPurchaseOut]:
     return service.list_my_purchases(conn, company["id"])
+
+
+@router.get("/listings/{listing_id}/purchases", response_model=list[ListingPurchaseOut])
+def list_purchases_for_listing(
+    listing_id: int,
+    user: dict = Depends(require_role("customer")),
+    conn: Connection = Depends(get_db),
+) -> list[ListingPurchaseOut]:
+    return service.list_purchases_for_seller(conn, user["id"], listing_id)

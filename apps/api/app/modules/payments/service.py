@@ -27,3 +27,13 @@ def purchase_listing_view(conn: Connection, agent_company_id: int, listing_id: i
 
 def list_my_purchases(conn: Connection, agent_company_id: int) -> list[ListingPurchaseOut]:
     return [ListingPurchaseOut(**p) for p in repository.list_purchases_by_company(conn, agent_company_id)]
+
+
+def list_purchases_for_seller(conn: Connection, seller_id: int, listing_id: int) -> list[ListingPurchaseOut]:
+    listing = listings_repository.get_listing_by_id(conn, listing_id)
+    if listing is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="매물을 찾을 수 없습니다.")
+    if listing["seller_id"] != seller_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="본인 매물만 조회할 수 있습니다.")
+
+    return [ListingPurchaseOut(**p) for p in repository.list_purchases_by_listing(conn, listing_id)]

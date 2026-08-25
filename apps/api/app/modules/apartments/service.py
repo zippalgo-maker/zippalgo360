@@ -31,3 +31,17 @@ def create_type(conn: Connection, payload: ApartmentTypeCreate) -> ApartmentType
 
 def list_types_by_complex(conn: Connection, complex_id: int) -> list[ApartmentTypeOut]:
     return [ApartmentTypeOut(**t) for t in repository.list_types_by_complex(conn, complex_id)]
+
+
+def get_complex(conn: Connection, complex_id: int) -> ApartmentComplexOut:
+    complex_row = repository.get_complex_by_id(conn, complex_id)
+    if complex_row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="단지를 찾을 수 없습니다.")
+    return ApartmentComplexOut(**complex_row)
+
+
+def get_type(conn: Connection, type_id: int) -> ApartmentTypeOut:
+    type_row = repository.get_type_by_id(conn, type_id)
+    if type_row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="평형 타입을 찾을 수 없습니다.")
+    return ApartmentTypeOut(**type_row)

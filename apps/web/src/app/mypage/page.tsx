@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { useRequireRole } from "@/lib/use-require-role";
 import { cardClass } from "@/lib/ui";
 
 const CUSTOMER_LINKS = [
@@ -18,14 +17,8 @@ const COMPANY_LINKS = [
 ];
 
 export default function MyPage() {
-  const router = useRouter();
-  const { user, isLoading, logout } = useAuth();
-
-  useEffect(() => {
-    if (!isLoading && !user) {
-      router.replace("/login");
-    }
-  }, [isLoading, user, router]);
+  const { logout } = useAuth();
+  const { user } = useRequireRole("customer", "company", "admin");
 
   if (!user) return null;
 
