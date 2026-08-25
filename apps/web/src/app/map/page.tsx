@@ -60,7 +60,12 @@ const COMPANY_LAYER_COLOR: Partial<Record<LayerKey, string>> = {
 // 클러스터링으로 렌더링을 빠르게 유지한다 — 개수 자체를 인위적으로 작게
 // 자르지 않는다.
 const CLUSTERED_LAYERS: ReadonlySet<LayerKey> = new Set(["listings", "interiorPortfolio"]);
+// 우리 DB(인덱스 있음, 직접 제어 가능)로 가는 요청은 넉넉하게.
 const MARKER_FETCH_LIMIT = 5000;
+// 집테리어로 프록시되는 요청은 그쪽 서버 사정을 모르므로 보수적으로 — 5000을
+// 넘기니 타임아웃/거부로 추정되는 실패가 발생해서 낮춰둠(docs/WORK_LOG.md
+// 참고, 집테리어 쪽 인덱싱/limit 상한 확인 필요).
+const ZIPTERIOR_MARKER_FETCH_LIMIT = 500;
 
 const KAKAO_APP_KEY = process.env.NEXT_PUBLIC_KAKAO_MAP_JS_KEY ?? "";
 const SEOUL_CENTER = { lat: 37.5665, lng: 126.978 };
@@ -190,7 +195,7 @@ function ServiceMapView() {
     const sw = bounds.getSouthWest();
     const ne = bounds.getNorthEast();
     const data = await apiFetch<ZipteriorMapMarkerListOut>(
-      `/integrations/zipterior/map-markers?north=${ne.getLat()}&south=${sw.getLat()}&east=${ne.getLng()}&west=${sw.getLng()}&limit=${MARKER_FETCH_LIMIT}`
+      `/integrations/zipterior/map-markers?north=${ne.getLat()}&south=${sw.getLat()}&east=${ne.getLng()}&west=${sw.getLng()}&limit=${ZIPTERIOR_MARKER_FETCH_LIMIT}`
     );
     if (!activeLayersRef.current.has("interiorPortfolio")) return;
     clearLayerMarkers("interiorPortfolio");
@@ -223,7 +228,7 @@ function ServiceMapView() {
     const sw = bounds.getSouthWest();
     const ne = bounds.getNorthEast();
     const data = await apiFetch<ZipteriorCompanyMapMarkerListOut>(
-      `/integrations/zipterior/company-markers?north=${ne.getLat()}&south=${sw.getLat()}&east=${ne.getLng()}&west=${sw.getLng()}&limit=${MARKER_FETCH_LIMIT}`
+      `/integrations/zipterior/company-markers?north=${ne.getLat()}&south=${sw.getLat()}&east=${ne.getLng()}&west=${sw.getLng()}&limit=${ZIPTERIOR_MARKER_FETCH_LIMIT}`
     );
     if (!activeLayersRef.current.has("company_interior")) return;
     clearLayerMarkers("company_interior");
