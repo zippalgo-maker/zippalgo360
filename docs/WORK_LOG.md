@@ -255,3 +255,24 @@ sudo systemctl restart zippalgo360-web
   `interior.zippalgo360.com`은 당장 유지)은 이 커밋 이후 진행 — 아래 참고.
   `interior.zippalgo360.com`은 유지되지만 더 이상 코드에서 참조되지 않음(정리는
   나중에, 급하지 않음).
+
+### 완료 후
+- **[완료] nginx** — `/etc/nginx/sites-available/zipterior.zippalgo360.com`
+  신규 생성(`interior.zippalgo360.com` 설정을 그대로 복제, `server_name`만
+  교체). `nginx -t` 통과, reload 완료.
+- **[완료] SSL** — `certbot --nginx -d zipterior.zippalgo360.com` 성공,
+  만료일 2026-11-23, 자동 갱신 등록됨.
+- **[완료] CORS** — `zipterior-api`의 `allow_origins`에
+  `https://zipterior.zippalgo360.com` 추가(기존 항목 유지, 백업
+  `main.py.bak_before_zipterior_subdomain`). 재시작 후 `/api/health` 200.
+- **[완료] 카카오 JS SDK 도메인** — 사용자가 카카오 개발자 콘솔에서 직접
+  `https://zipterior.zippalgo360.com`, `https://zippalgo.zippalgo360.com`(예정용),
+  `https://interior.zippalgo360.com` 등록. (배경: iframe 안에서 지도가 안 뜨는
+  문제가 있었는데, 원인이 카카오 JS SDK의 도메인 허용 목록에 새 서브도메인이
+  없어서였음 — 등록으로 해결)
+- **[완료] 앱 재배포** — `git pull` → `npm run build` →
+  `systemctl restart zippalgo360-web`. 빌드 성공, `/jipterior` 200, 응답 HTML에
+  `src="https://zipterior.zippalgo360.com"` 반영 확인. `zipterior.kr`,
+  `zippalgo360.com` 기존 사이트 모두 200 유지(영향 없음).
+- **남은 것**: 브라우저 실접속으로 iframe 안에서 카카오맵이 실제로 뜨는지,
+  로그인이 유지되는지 최종 확인 필요.
