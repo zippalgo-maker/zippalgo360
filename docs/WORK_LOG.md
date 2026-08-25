@@ -595,6 +595,26 @@ sudo systemctl restart zippalgo360-web
 - 로컬 `npm run build` 성공, `ast.parse`로 백엔드 파일 문법 확인.
 
 ### 완료 후
-(진행 중 — 서버 배포 및 실제 데이터 확인은 위 집테리어 쪽 엔드포인트 계약이
-확정된 뒤. 그 전까지는 "인테리어 업체" 레이어를 켜면 그냥 0건/불러올 수
-없음으로 표시될 뿐 지도 자체는 정상 작동함.)
+- **[완료] 서버 배포** — `alembic upgrade head`(마이그레이션 0003 적용),
+  `zippalgo360-api`/`zippalgo360-web` 재빌드·재시작 완료.
+  `GET /api/companies/map/markers`, `GET /api/integrations/zipterior/
+  company-markers` 둘 다 200 확인.
+- **⚠️ 데스크탑 세션 확인 필요 — 결과가 애매함**: 서버에서 bbox 없이
+  `curl https://zippalgo360.com/api/integrations/zipterior/company-markers`
+  호출 결과:
+  ```json
+  {"items":[],"total":0,"available":true}
+  ```
+  `available:true`(요청 자체는 성공)인데 `items`가 비어있음. 이게
+  (a) `marker_type=company`를 실제 지원하는데 지금 조건(검증됨+좌표 있음)에
+  맞는 업체가 아직 없어서인지, (b) `marker_type=company`라는 값을 그냥
+  인식 못 해서 무해하게 빈 결과를 돌려주고 있는 것뿐인지(즉 실제로는
+  구현 안 됨) 이 세션에서는 구분 불가 — 집테리어 소스를 볼 수 없음.
+  **데스크탑 세션이 확인**: `app/modules/*/router.py` 어딘가의
+  `/api/v1/public/map/markers` 핸들러가 `marker_type` 파라미터로
+  `company`(또는 다른 값)를 실제로 분기 처리하는지, 그렇다면 응답 스키마가
+  위에서 가정한 형태(`id`, `name`, `latitude`, `longitude`, `phone`)와
+  맞는지 확인 후 필요하면 구현/조정. 안 맞으면 이쪽(`zipterior_client.
+  get_interior_companies`, `docs/WORK_LOG.md`)도 같이 맞춰야 함.
+- 그 전까지 "인테리어 업체" 레이어는 켜면 0건으로 표시될 뿐 지도 자체는
+  정상 작동함(에러 없음, 사용자 확인: 최종 curl 결과 정상).
