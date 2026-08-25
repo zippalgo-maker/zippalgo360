@@ -45,7 +45,7 @@ def list_map_markers(
     limit: int = 1000,
     conn: Connection = Depends(get_db),
 ) -> list[ListingMapMarker]:
-    return service.list_map_markers(conn, north=north, south=south, east=east, west=west, limit=min(limit, 3000))
+    return service.list_map_markers(conn, north=north, south=south, east=east, west=west, limit=min(limit, 10000))
 
 
 @router.get("/{listing_id}", response_model=ListingOut)

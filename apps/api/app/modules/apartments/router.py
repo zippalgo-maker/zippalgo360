@@ -70,5 +70,5 @@ def list_map_markers(
     conn: Connection = Depends(get_db),
 ) -> MapMarkerListOut:
     return service.list_map_markers(
-        conn, north=north, south=south, east=east, west=west, sido=sido, sigungu=sigungu, limit=min(limit, 3000)
+        conn, north=north, south=south, east=east, west=west, sido=sido, sigungu=sigungu, limit=min(limit, 10000)
     )

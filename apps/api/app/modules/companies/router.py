@@ -37,5 +37,5 @@ def list_map_markers(
     conn: Connection = Depends(get_db),
 ) -> list[CompanyMapMarker]:
     return service.list_map_markers(
-        conn, company_type=company_type, north=north, south=south, east=east, west=west, limit=min(limit, 3000)
+        conn, company_type=company_type, north=north, south=south, east=east, west=west, limit=min(limit, 10000)
     )

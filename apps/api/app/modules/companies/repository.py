@@ -135,12 +135,15 @@ def list_map_markers(
 ) -> list[dict]:
     """지도 마커용 최소 컬럼만 단일 쿼리로 반환한다(업체당 추가 조회 없음).
 
-    검증(is_verified)되지 않은 업체는 지도에 노출하지 않는다.
+    `list_companies`와 동일하게 is_active만 필터한다 — is_verified로도
+    거르려 했으나, 이 코드베이스엔 아직 업체를 승인(is_verified=true로
+    전환)하는 관리자 기능이 없어서 그 필터를 넣으면 어떤 업체도 영원히
+    지도에 뜰 수 없었다. 승인 플로우가 생기면 그때 다시 필터를 추가한다.
     """
     query = """
         SELECT id, company_type, business_name, latitude, longitude
         FROM companies
-        WHERE is_active = true AND is_verified = true
+        WHERE is_active = true
           AND latitude IS NOT NULL AND longitude IS NOT NULL
     """
     params: dict = {}

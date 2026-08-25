@@ -56,6 +56,12 @@ const COMPANY_LAYER_COLOR: Partial<Record<LayerKey, string>> = {
   company_cleaner: "#2f9e6f",
 };
 
+// 마커가 많은 레이어(매물/인테리어 시공사례)는 뷰포트 안 전체를 가져오되
+// 클러스터링으로 렌더링을 빠르게 유지한다 — 개수 자체를 인위적으로 작게
+// 자르지 않는다.
+const CLUSTERED_LAYERS: ReadonlySet<LayerKey> = new Set(["listings", "interiorPortfolio"]);
+const MARKER_FETCH_LIMIT = 5000;
+
 const KAKAO_APP_KEY = process.env.NEXT_PUBLIC_KAKAO_MAP_JS_KEY ?? "";
 const SEOUL_CENTER = { lat: 37.5665, lng: 126.978 };
 
@@ -69,6 +75,8 @@ function ServiceMapView() {
   const mapRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const markersByLayerRef = useRef<Record<LayerKey, any[]>>({} as Record<LayerKey, any[]>);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const clusterersByLayerRef = useRef<Partial<Record<LayerKey, any>>>({});
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const infoWindowRef = useRef<any>(null);
 
@@ -102,6 +110,14 @@ function ServiceMapView() {
         });
         mapRef.current = map;
         infoWindowRef.current = new kakao.maps.InfoWindow({ removable: true });
+        CLUSTERED_LAYERS.forEach((layer) => {
+          clusterersByLayerRef.current[layer] = new kakao.maps.MarkerClusterer({
+            map,
+            averageCenter: true,
+            minLevel: 6,
+            disableClickZoom: false,
+          });
+        });
         setIsMapReady(true);
       })
       .catch((err) => setMapError(err instanceof Error ? err.message : "카카오맵을 불러오지 못했습니다."));
@@ -111,8 +127,13 @@ function ServiceMapView() {
   }, []);
 
   const clearLayerMarkers = useCallback((layer: LayerKey) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (markersByLayerRef.current[layer] ?? []).forEach((marker: any) => marker.setMap(null));
+    const clusterer = clusterersByLayerRef.current[layer];
+    if (clusterer) {
+      clusterer.clear();
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (markersByLayerRef.current[layer] ?? []).forEach((marker: any) => marker.setMap(null));
+    }
     markersByLayerRef.current[layer] = [];
   }, []);
 
@@ -133,15 +154,16 @@ function ServiceMapView() {
     const sw = bounds.getSouthWest();
     const ne = bounds.getNorthEast();
     const markers = await apiFetch<ListingMapMarker[]>(
-      `/listings/map/markers?north=${ne.getLat()}&south=${sw.getLat()}&east=${ne.getLng()}&west=${sw.getLng()}&limit=500`
+      `/listings/map/markers?north=${ne.getLat()}&south=${sw.getLat()}&east=${ne.getLng()}&west=${sw.getLng()}&limit=${MARKER_FETCH_LIMIT}`
     );
     // 응답이 오는 사이 사용자가 이 레이어를 껐을 수 있음 — 그새 꺼진
     // 레이어를 되살리지 않도록 렌더링 직전에 다시 확인한다.
     if (!activeLayersRef.current.has("listings")) return;
     clearLayerMarkers("listings");
-    markers.forEach((item) => {
+    // 클러스터러가 지도 부착을 관리하므로 마커 생성 시 map을 주지 않는다.
+    const kakaoMarkers = markers.map((item) => {
       const position = new kakao.maps.LatLng(item.latitude, item.longitude);
-      const marker = new kakao.maps.Marker({ position, map });
+      const marker = new kakao.maps.Marker({ position });
       kakao.maps.event.addListener(marker, "click", () => {
         infoWindowRef.current.setContent(
           `<div style="padding:10px 12px;min-width:180px;font-size:13px;line-height:1.6;">
@@ -152,8 +174,10 @@ function ServiceMapView() {
         );
         infoWindowRef.current.open(map, marker);
       });
-      markersByLayerRef.current.listings.push(marker);
+      return marker;
     });
+    markersByLayerRef.current.listings = kakaoMarkers;
+    clusterersByLayerRef.current.listings.addMarkers(kakaoMarkers);
     setLayerCounts((prev) => ({ ...prev, listings: markers.length }));
   }, [clearLayerMarkers]);
 
@@ -165,14 +189,14 @@ function ServiceMapView() {
     const sw = bounds.getSouthWest();
     const ne = bounds.getNorthEast();
     const data = await apiFetch<ZipteriorMapMarkerListOut>(
-      `/integrations/zipterior/map-markers?north=${ne.getLat()}&south=${sw.getLat()}&east=${ne.getLng()}&west=${sw.getLng()}&limit=500`
+      `/integrations/zipterior/map-markers?north=${ne.getLat()}&south=${sw.getLat()}&east=${ne.getLng()}&west=${sw.getLng()}&limit=${MARKER_FETCH_LIMIT}`
     );
     if (!activeLayersRef.current.has("interiorPortfolio")) return;
     clearLayerMarkers("interiorPortfolio");
     setLayerUnavailable("interiorPortfolio", !data.available);
-    data.items.forEach((item) => {
+    const kakaoMarkers = data.items.map((item) => {
       const position = new kakao.maps.LatLng(item.latitude, item.longitude);
-      const marker = new kakao.maps.Marker({ position, map });
+      const marker = new kakao.maps.Marker({ position });
       kakao.maps.event.addListener(marker, "click", () => {
         infoWindowRef.current.setContent(
           `<div style="padding:10px 12px;min-width:180px;font-size:13px;line-height:1.6;">
@@ -183,8 +207,10 @@ function ServiceMapView() {
         );
         infoWindowRef.current.open(map, marker);
       });
-      markersByLayerRef.current.interiorPortfolio.push(marker);
+      return marker;
     });
+    markersByLayerRef.current.interiorPortfolio = kakaoMarkers;
+    clusterersByLayerRef.current.interiorPortfolio.addMarkers(kakaoMarkers);
     setLayerCounts((prev) => ({ ...prev, interiorPortfolio: data.items.length }));
   }, [clearLayerMarkers, setLayerUnavailable]);
 
@@ -196,7 +222,7 @@ function ServiceMapView() {
     const sw = bounds.getSouthWest();
     const ne = bounds.getNorthEast();
     const data = await apiFetch<ZipteriorCompanyMapMarkerListOut>(
-      `/integrations/zipterior/company-markers?north=${ne.getLat()}&south=${sw.getLat()}&east=${ne.getLng()}&west=${sw.getLng()}&limit=500`
+      `/integrations/zipterior/company-markers?north=${ne.getLat()}&south=${sw.getLat()}&east=${ne.getLng()}&west=${sw.getLng()}&limit=${MARKER_FETCH_LIMIT}`
     );
     if (!activeLayersRef.current.has("company_interior")) return;
     clearLayerMarkers("company_interior");
@@ -230,7 +256,7 @@ function ServiceMapView() {
       const sw = bounds.getSouthWest();
       const ne = bounds.getNorthEast();
       const markers = await apiFetch<CompanyMapMarker[]>(
-        `/companies/map/markers?company_type=${companyType}&north=${ne.getLat()}&south=${sw.getLat()}&east=${ne.getLng()}&west=${sw.getLng()}&limit=500`
+        `/companies/map/markers?company_type=${companyType}&north=${ne.getLat()}&south=${sw.getLat()}&east=${ne.getLng()}&west=${sw.getLng()}&limit=${MARKER_FETCH_LIMIT}`
       );
       if (!activeLayersRef.current.has(layer)) return;
       clearLayerMarkers(layer);

@@ -618,3 +618,44 @@ sudo systemctl restart zippalgo360-web
   get_interior_companies`, `docs/WORK_LOG.md`)도 같이 맞춰야 함.
 - 그 전까지 "인테리어 업체" 레이어는 켜면 0건으로 표시될 뿐 지도 자체는
   정상 작동함(에러 없음, 사용자 확인: 최종 curl 결과 정상).
+
+---
+
+## 2026-08-25 — 카카오 REST 키 적용, 부동산 마커 버그 수정, 클러스터링 도입
+
+### 시작 전
+- 카카오 REST API 키를 사용자가 발급받아 서버 `.env`에 적용, 카카오 Local API로
+  직접 유효성 확인(주소 검색 curl 테스트 성공) — 완료.
+- 사용자가 테스트로 부동산 업체를 가입시켰는데 지도에 마커가 안 뜨는 문제와,
+  인테리어 시공사례가 실제로는 5,000건 이상인데 지도에 500건만 뜨는 문제
+  두 가지를 보고함.
+
+### 진행 중
+- **[완료] 버그 수정 — 부동산 업체 마커 안 뜨던 원인**: `companies/repository.
+  list_map_markers`에 넣었던 `is_verified = true` 필터가 원인. 이 코드베이스엔
+  업체를 승인(`is_verified`를 true로 바꾸는) 관리자 기능이 아예 없어서, 그
+  필터가 있으면 어떤 업체도 영원히 지도에 뜰 수 없었음(제가 만든 버그).
+  기존 `list_companies`(업체 목록 API)와 동일하게 `is_active = true`만
+  필터하도록 되돌림. 업체 승인 플로우가 나중에 생기면 그때 다시 검토.
+- **[완료] "500개 제한 풀어라" 요청 — 제한만 풀지 않고 클러스터링을 같이 넣음**:
+  단순히 limit을 키우기만 하면 5,000개 넘는 마커를 클러스터링 없이 그대로
+  그려서 브라우저가 느려짐(사용자가 이 세션 내내 강조한 "로딩 속도" 요구에
+  정면으로 위배). 대신:
+  - `apps/web/src/lib/kakao-maps.ts`: SDK 로드 시 `&libraries=clusterer` 추가.
+  - `apps/web/src/app/map/page.tsx`: 매물/인테리어 시공사례 레이어(마커 수가
+    많은 두 레이어)에 `kakao.maps.MarkerClusterer` 적용(`minLevel: 6`,
+    `averageCenter: true`) — 줌아웃 시 숫자 뭉치로, 줌인하면 개별 마커로.
+    마커 생성 시 `map`을 직접 주지 않고 클러스터러가 부착을 관리하도록 변경.
+  - 프론트 fetch limit을 500 → `MARKER_FETCH_LIMIT = 5000`으로 상향(상수화).
+  - 백엔드 각 지도 마커 엔드포인트(listings/apartments/companies/
+    integrations 4곳)의 상한을 `min(limit, 3000)`/`le=3000` →
+    `10000`으로 상향 — DB 인덱스가 이미 있어서(직전 작업) 이 정도 상한은
+    문제 없다고 판단.
+  - 업체 마커(부동산/인테리어) 레이어는 `CustomOverlay` 점이라 카카오
+    클러스터러 대상이 아님 — 지금 개수(0~수십 건)로는 문제 없어서 그대로
+    둠. 나중에 업체 수가 많아지면 그때 Marker+커스텀 이미지로 바꿔서
+    클러스터링 대상에 포함시키면 됨.
+- 로컬 `npm run build`(apps/web) 성공, `ast.parse`(apps/api 관련 파일) 확인.
+
+### 완료 후
+(진행 중 — 서버 배포는 사용자 요청 시 진행.)
