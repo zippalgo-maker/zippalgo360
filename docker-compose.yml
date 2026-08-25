@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: zippalgo360-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: zippalgo
+      POSTGRES_PASSWORD: zippalgo
+      POSTGRES_DB: zippalgo360_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - zippalgo360_db_data:/var/lib/postgresql/data
+
+volumes:
+  zippalgo360_db_data:

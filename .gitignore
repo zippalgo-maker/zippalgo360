@@ -1,0 +1,30 @@
+# Node / Next.js
+node_modules/
+.next/
+out/
+apps/web/.env*.local
+.turbo/
+
+# Python / FastAPI
+__pycache__/
+*.pyc
+.venv/
+venv/
+apps/api/.venv/
+*.egg-info/
+
+# Env files
+.env
+!.env.example
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# DB
+*.sqlite3
