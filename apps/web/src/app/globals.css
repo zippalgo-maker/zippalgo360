@@ -1,0 +1,37 @@
+@import "tailwindcss";
+@import "pretendard/dist/web/variable/pretendardvariable.css";
+
+:root {
+  --background: #ffffff;
+  --foreground: #202421;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  /* 집팔고360 브랜드 팔레트 — 집테리어와 통일된 딥그린 + 레드 포인트 톤 */
+  --color-brand-green: #21463b;
+  --color-brand-green-2: #2f5c4e;
+  --color-brand-green-3: #447466;
+  --color-brand-green-soft: #edf5f2;
+  --color-brand-red: #bb1730;
+  --color-brand-red-dark: #951125;
+  --color-brand-red-soft: #fff2f4;
+  --color-brand-blue: #427cff;
+  --color-ink: #202421;
+  --color-muted: #777e79;
+  --color-line: #e6e9e7;
+  --color-soft: #f5f6f5;
+
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+    "Noto Sans KR", "Segoe UI", sans-serif;
+
+  --shadow-brand: 0 14px 38px rgba(18, 45, 37, 0.16);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
