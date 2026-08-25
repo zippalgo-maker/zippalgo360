@@ -83,6 +83,7 @@ function ServiceMapView() {
   const [activeLayers, setActiveLayers] = useState<Set<LayerKey>>(initialLayers);
   const activeLayersRef = useRef(activeLayers);
   activeLayersRef.current = activeLayers;
+  const pendingLayersRef = useRef<Set<LayerKey>>(new Set());
   const [isMapReady, setIsMapReady] = useState(false);
   const [loadingLayers, setLoadingLayers] = useState<Set<LayerKey>>(new Set());
   const [layerCounts, setLayerCounts] = useState<Partial<Record<LayerKey, number>>>({});
@@ -296,25 +297,52 @@ function ServiceMapView() {
     const kakao = window.kakao;
     const map = mapRef.current;
 
-    const refresh = () => {
-      // 켜진 레이어만 병렬로 불러온다 — 꺼진 레이어는 요청 자체를 안 보내는
-      // 게 지도 반응 속도에 제일 중요하다.
-      activeLayers.forEach((layer) => {
-        setLoadingLayers((prev) => new Set(prev).add(layer));
-        loadLayer(layer).finally(() => {
+    const runLayer = (layer: LayerKey) => {
+      // 이 레이어에 이미 요청이 진행 중이면 또 쏘지 않는다 — 빠르게 연속
+      // 확대/축소하면 idle이 짧은 간격으로 여러 번 발생하는데, 매번 수천
+      // 개짜리 마커를 새로 fetch+렌더링하면 그게 그대로 쌓여서 버벅거림의
+      // 원인이 된다.
+      if (pendingLayersRef.current.has(layer)) return;
+      pendingLayersRef.current.add(layer);
+      setLoadingLayers((prev) => new Set(prev).add(layer));
+      loadLayer(layer)
+        .catch((err) => {
+          // API 응답 자체가 available:false를 주는 경우 말고, 요청/렌더링
+          // 도중 예외가 나서 조용히 실패하는 경우도 화면에 "불러올 수
+          // 없음"으로 드러나게 한다(그냥 0건으로 보이면 실제로 0건인지
+          // 에러인지 구분이 안 됨).
+          console.error(`[map] ${layer} 레이어 로딩 실패`, err);
+          setLayerUnavailable(layer, true);
+        })
+        .finally(() => {
+          pendingLayersRef.current.delete(layer);
           setLoadingLayers((prev) => {
             const next = new Set(prev);
             next.delete(layer);
             return next;
           });
         });
-      });
+    };
+
+    const refresh = () => {
+      // 켜진 레이어만 병렬로 불러온다 — 꺼진 레이어는 요청 자체를 안 보내는
+      // 게 지도 반응 속도에 제일 중요하다.
+      activeLayers.forEach(runLayer);
+    };
+
+    // idle이 연속으로 여러 번 발생해도(빠른 연속 확대/축소) 실제로는
+    // 한 번만 불러오도록 살짝 디바운스한다.
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedRefresh = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(refresh, 250);
     };
 
     refresh();
-    kakao.maps.event.addListener(map, "idle", refresh);
+    kakao.maps.event.addListener(map, "idle", debouncedRefresh);
     return () => {
-      kakao.maps.event.removeListener(map, "idle", refresh);
+      if (debounceTimer) clearTimeout(debounceTimer);
+      kakao.maps.event.removeListener(map, "idle", debouncedRefresh);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMapReady, activeLayers]);
