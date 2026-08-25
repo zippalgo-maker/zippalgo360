@@ -374,5 +374,42 @@ sudo systemctl restart zippalgo360-web
   확인 필요.
 - 집테리어 `company`(인테리어 업체) 신규 가입 온보딩 플로우를 SSO 경로에서
   어디까지 자동화할지.
-- 이 설계는 아직 **코드로 구현되지 않았음** — 데스크탑 세션이 이 문서를 읽고
-  구현을 진행하거나, 이 방향에 이견이 있으면 여기에 대안을 기록해주면 됨.
+- ~~이 설계는 아직 코드로 구현되지 않았음~~ → 집팔고360 쪽은 구현 완료(아래
+  참고). 데스크탑 세션이 집테리어 쪽(exchange 엔드포인트 + 부트스트랩 JS)을
+  구현하면 됨.
+
+### 진행 중 — 집팔고360 쪽 구현 (커밋 `34e1d37`)
+- **[완료]** `apps/api/app/modules/auth/sso.py` 신규 — 코드 발급/검증(메모리
+  저장, TTL 기본 30초, 조회 즉시 폐기). 단일 프로세스 전제(스케일 시 Redis로
+  교체 필요, 파일 상단 docstring에 명시해둠).
+  `apps/api/app/config.py`에 `sso_shared_secret`,
+  `sso_code_ttl_seconds` 추가(`.env.example`에도 반영, 기본값은 placeholder라
+  **운영 `.env`에 반드시 실제 값으로 덮어써야 함** — 아래 배포 안내 참고).
+- **[완료]** `POST /api/auth/sso/issue-code`(로그인 필요) /
+  `POST /api/auth/sso/verify`(서버 간 통신, `Authorization: Bearer
+  <SSO_SHARED_SECRET>` 필요, `secrets.compare_digest`로 타이밍 공격 방지)
+  엔드포인트를 `apps/api/app/modules/auth/router.py`에 추가.
+  응답/요청 스키마는 `apps/api/app/modules/users/schemas.py`에
+  `SsoCodeOut`/`SsoVerifyIn`/`SsoVerifyOut`으로 추가.
+- **[완료]** `apps/web/src/app/jipterior/page.tsx` — 로그인된 사용자는
+  iframe을 그리기 전에 `issue-code`를 호출해서 받은 코드를
+  `?sso=<code>`로 iframe src에 붙임. 코드 발급 실패 시(비로그인 포함)
+  조용히 기본 URL로 폴백. "새 탭에서 열기" 링크는 코드 없는 기본 URL을
+  그대로 사용(1회용 코드를 iframe이 먼저 소비했을 수 있어서 재사용 방지 겸
+  단순화).
+- 로컬 빌드 확인: `apps/web` `npm run build` 성공(`/jipterior` 정적 페이지
+  정상 생성), `apps/api`는 관련 파일 3개 `ast.parse`로 문법 확인(이 세션엔
+  Python 의존성 설치 환경이 없어 실제 서버 기동 테스트는 서버 배포 시
+  `zipterior-api`처럼 `zippalgo360-api` 재시작 후 `/api/health`로 확인 필요).
+
+### 서버 배포 시 필요한 조치 (아직 안 함 — 다음 서버 작업 때 같이)
+1. `/srv/zippalgo360/apps/api/.env`에 `SSO_SHARED_SECRET=<openssl rand -hex
+   32 등으로 생성한 실제 값>` 추가(현재 기본값 `change-this-in-production`은
+   반드시 교체). 이 값은 **집테리어 쪽에도 그대로 공유해야** `verify` 호출이
+   통과함 — 데스크탑 세션과 조율 필요.
+2. `git pull` → `zippalgo360-api`/`zippalgo360-web` 재빌드·재시작.
+3. `verify` 엔드포인트는 아직 집테리어 쪽에서 호출하지 않으므로(exchange
+   엔드포인트 미구현), 이 배포만으로는 로그인 통합이 실제로 동작하지 않음 —
+   `issue-code`가 정상 작동하는지만 우선 확인 가능
+   (`curl -X POST https://zippalgo360.com/api/auth/sso/issue-code -H
+   "Authorization: Bearer <로그인 토큰>"`).
