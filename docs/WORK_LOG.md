@@ -459,3 +459,88 @@ sudo systemctl restart zippalgo360-web
 ### 완료 후
 (진행 중 — 서버 배포는 사용자 요청 시 진행. 배포되면 브라우저에서 검색 동작
 실제 확인 필요.)
+
+---
+
+## 2026-08-25 — 지도를 다중 레이어 구조로 전환 + 업체 위치/인덱스 (집팔고360 플랫폼 통합 원칙 반영)
+
+### 시작 전
+- 사용자가 진행 전에 아키텍처 원칙을 명확히 함: 집팔고360 산하 서비스(집팔고/
+  집사고/집테리어/집이사/집청소)는 **정보를 서로 유기적으로 공유**해야
+  하고, 지도는 "매물보기 또는 인테리어보기 중 하나" 같은 모드 전환이 아니라
+  **하나의 지도 위에 매물/포트폴리오/부동산업체/인테리어업체/청소업체
+  마커가 동시에** 뜨는 구조여야 한다고 확인.
+- 추가로 명시한 핵심 요구사항: **마커 로딩 속도가 DB 구조를 억지로 붙여서
+  느려지면 안 됨.** 실제로 점검해보니 기존 마이그레이션(`0001`, `0002`) 전체에
+  `CREATE INDEX`가 4개뿐이고(`listings.status`, `listings(complex_id,
+  apartment_type_id)`, `purchase_requests.customer_id`,
+  `apartment_types.complex_id`), 지도 bounding-box 조회에 실제로 쓰이는
+  `apartment_complexes(latitude, longitude)`에는 인덱스가 없었음(지금 데이터
+  5,668건이라 체감은 안 되지만, 순차 스캔 구조는 그대로 두면 안 된다고 판단).
+  이번 작업에서 이것도 같이 고침.
+
+### 진행 중
+- **[완료] DB**: `apps/api/alembic/versions/0003_add_company_location_and_map_indexes.py`
+  - `companies`에 `latitude`/`longitude`(DOUBLE PRECISION, nullable) 추가.
+  - `idx_companies_type_location ON companies(company_type, latitude, longitude)
+    WHERE latitude IS NOT NULL AND longitude IS NOT NULL` — 레이어별 조회가
+    항상 `company_type` 등치 필터 + 좌표 범위 필터라 이 순서로 복합 인덱스,
+    좌표 없는(미지오코딩) 행은 partial index로 애초에 제외.
+  - `idx_apartment_complexes_location ON apartment_complexes(latitude, longitude)
+    WHERE ...` — 기존에 없던 것 추가(매물 지도 마커/단지 지도 마커 조회의
+    핵심 인덱스).
+  - **서버에 아직 미적용** — 배포 시 `alembic upgrade head` 필요.
+- **[완료] 업체 위치 지오코딩**: `apps/api/app/modules/companies/geocoding.py`
+  신규 — 카카오 Local REST API(주소 검색)로 `address` → 좌표 변환.
+  `kakao_rest_api_key` 설정 추가(`.env.example`에 안내 포함, **JS 키와는
+  다른 REST API 키** — 카카오 콘솔에서 별도 발급 필요, 서버에 아직 미설정).
+  키가 없거나 지오코딩 실패해도 업체 가입 자체는 막지 않고 좌표만 비워둠
+  (조용한 폴백 — 기존 `zipterior_client.py`의 실패 처리 패턴과 동일한 원칙).
+  `companies.service.register_company`가 가입 시 자동으로 지오코딩 호출.
+- **[완료] 업체 지도 마커 API**: `GET /companies/map/markers?company_type=&
+  north=&south=&east=&west=&limit=` 추가. 업체당 추가 쿼리 없이 단일
+  쿼리로만 반환(기존 `list_companies`가 업체마다 `get_service_regions`를
+  또 조회하는 N+1 패턴이 있는데, 마커 API는 그 패턴을 반복하지 않도록
+  최소 컬럼만 별도 쿼리로 작성 — `service_regions`는 마커에 필요 없음).
+  `is_verified = true`인 업체만 노출(미검증 업체가 공개 지도에 뜨지 않게).
+- **[완료] 프론트 `/map` 리팩터링**: 라디오 토글(매물 vs 인테리어) →
+  **체크박스 다중 레이어**로 전면 교체.
+  - 레이어: 매물(집팔고, 기존 유지) / 인테리어 시공사례(집테리어, 기존 유지) /
+    부동산 업체(신규, 실제 데이터 있음) / 인테리어업체·이사업체·청소업체
+    (신규 API는 준비됐지만 **체크박스 비활성 "준비중"**으로 처리 — 이유는
+    아래 "확인 필요" 참고).
+  - 켜진 레이어만 API 요청을 보냄(꺼진 레이어는 요청 자체가 안 나감) —
+    로딩 속도를 위한 핵심 설계.
+  - 지도 이동(`idle` 이벤트)마다 켜진 레이어들을 병렬로 새로고침. 요청
+    도중 사용자가 레이어를 꺼버리는 경우를 대비해, 응답이 돌아온 시점에
+    그 레이어가 여전히 켜져 있는지 다시 확인 후에만 렌더링(꺼진 레이어가
+    뒤늦게 살아나는 레이스 컨디션 방지).
+  - 부동산/인테리어/이사/청소업체 마커는 기존 매물/포트폴리오 마커(빨간
+    핀)와 구분되도록 `CustomOverlay`로 색깔 있는 원형 점으로 표시(이미지
+    에셋 없이 CSS만으로 구현) — 부동산은 파란색(`#427cff`, 집테리어 팔레트의
+    `--blue`와 동일).
+- 로컬 `npm run build`(apps/web), `ast.parse`(apps/api 관련 파일 전부) 확인.
+
+### 확인 필요 — "인테리어업체" 레이어를 비활성으로 둔 이유
+- API 자체는 `company_type=interior`로도 똑같이 동작하도록 만들었지만,
+  `apps/web/src/app/onboarding/company/page.tsx`가 지금 `company_type:
+  "real_estate"`로 **하드코딩**되어 있어서, 집팔고360 자체 가입 경로로는
+  인테리어/이사/청소 업체가 아예 가입할 방법이 없음(부동산만 가능).
+  그래서 이번엔 "부동산 업체" 레이어만 활성화하고 나머지 셋은 준비중으로
+  표시함. 인테리어 업체 데이터는 애초에 집테리어 자체 DB(`zipterior_db`)에
+  있으므로, 실제로 채우려면 (a) 온보딩 페이지에 업체 유형 선택 UI를
+  추가하거나 (b) 집테리어 쪽 업체 위치를 API로 공유받는 방법 중 하나가
+  필요 — 사용자 확인 후 다음 작업으로 진행.
+
+### 서버 배포 시 필요한 조치 (아직 안 함)
+1. `git pull` → `apps/api`에서 `alembic upgrade head` (마이그레이션 0003 적용).
+2. `apps/api/.env`에 `KAKAO_REST_API_KEY=<카카오 콘솔에서 발급한 REST API 키>`
+   추가 — 안 넣으면 지오코딩만 조용히 건너뛰고 나머지는 정상 작동(신규 가입
+   업체가 지도에 안 뜰 뿐).
+3. `zippalgo360-api`/`zippalgo360-web` 재빌드·재시작.
+4. 기존에 이미 가입된 업체(있다면)는 이번 마이그레이션으로 좌표가 채워지지
+   않음(가입 시점에만 지오코딩) — 필요하면 나중에 일괄 지오코딩 스크립트
+   별도 작성.
+
+### 완료 후
+(진행 중 — 서버 배포는 사용자 요청 시 진행.)

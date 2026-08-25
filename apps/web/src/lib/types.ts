@@ -27,6 +27,8 @@ export interface Company {
   representative_name: string;
   address: string;
   phone: string;
+  latitude: number | null;
+  longitude: number | null;
   is_verified: boolean;
   is_active: boolean;
   created_at: string;
@@ -109,6 +111,14 @@ export interface ListingMapMarker {
   asking_price: number;
   view_price: number;
   status: ListingStatus;
+}
+
+export interface CompanyMapMarker {
+  id: number;
+  company_type: CompanyType;
+  business_name: string;
+  latitude: number;
+  longitude: number;
 }
 
 export interface ListingPurchase {

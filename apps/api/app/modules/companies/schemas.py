@@ -30,7 +30,17 @@ class CompanyOut(BaseModel):
     representative_name: str
     address: str
     phone: str
+    latitude: float | None = None
+    longitude: float | None = None
     is_verified: bool
     is_active: bool
     created_at: datetime
     service_regions: list[str] = []
+
+
+class CompanyMapMarker(BaseModel):
+    id: int
+    company_type: CompanyType
+    business_name: str
+    latitude: float
+    longitude: float

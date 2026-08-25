@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     zipterior_api_base_url: str = "https://zipterior.kr"
     sso_shared_secret: str = "change-this-in-production"
     sso_code_ttl_seconds: int = 30
+    kakao_rest_api_key: str = ""
 
     @property
     def cors_origin_list(self) -> list[str]:
