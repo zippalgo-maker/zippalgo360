@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
     upload_dir: str = "./uploads"
     zipterior_api_base_url: str = "https://zipterior.kr"
+    sso_shared_secret: str = "change-this-in-production"
+    sso_code_ttl_seconds: int = 30
 
     @property
     def cors_origin_list(self) -> list[str]:

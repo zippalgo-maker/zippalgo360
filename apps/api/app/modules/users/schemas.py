@@ -37,3 +37,19 @@ class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserOut
+
+
+class SsoCodeOut(BaseModel):
+    code: str
+    expires_in: int
+
+
+class SsoVerifyIn(BaseModel):
+    code: str
+
+
+class SsoVerifyOut(BaseModel):
+    user_id: int
+    email: str
+    name: str
+    role: UserRole
