@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { inputClass, labelClass } from "@/lib/ui";
 import type { ApartmentComplex, ApartmentType } from "@/lib/types";
@@ -17,6 +17,13 @@ export default function ComplexTypePicker({ complexId, apartmentTypeId, onChange
   const [isSearching, setIsSearching] = useState(false);
   const [selectedComplex, setSelectedComplex] = useState<ApartmentComplex | null>(null);
   const [types, setTypes] = useState<ApartmentType[]>([]);
+
+  useEffect(() => {
+    if (!complexId || selectedComplex) return;
+    apiFetch<ApartmentComplex>(`/apartments/complexes/${complexId}`).then(setSelectedComplex);
+    apiFetch<ApartmentType[]>(`/apartments/complexes/${complexId}/types`).then(setTypes);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [complexId]);
 
   async function handleSearch() {
     if (!keyword.trim()) return;

@@ -170,3 +170,33 @@ export interface PurchaseRequestAssignment {
   responded_at: string | null;
   created_at: string;
 }
+
+export interface ZipteriorCompanySummary {
+  id: number;
+  name: string;
+  logo_path: string | null;
+  phone: string | null;
+}
+
+export interface ZipteriorPortfolioCard {
+  id: number;
+  title: string;
+  summary: string | null;
+  company: ZipteriorCompanySummary;
+  complex_id: number | null;
+  complex_name: string | null;
+  apartment_type_id: number | null;
+  apartment_type_name: string | null;
+  pyeong_label: string | null;
+  thumbnail_url: string | null;
+  view_count: number;
+  like_count: number;
+  published_at: string;
+  detail_url: string;
+}
+
+export interface ZipteriorPortfolioListOut {
+  items: ZipteriorPortfolioCard[];
+  total: number;
+  available: boolean;
+}

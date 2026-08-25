@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState, type FormEvent } from "react";
 import { apiFetch, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useRequireRole } from "@/lib/use-require-role";
@@ -9,16 +9,21 @@ import { cardClass, errorTextClass, inputClass, labelClass, primaryButtonClass }
 import ComplexTypePicker from "@/components/ComplexTypePicker";
 import type { PurchaseRequest } from "@/lib/types";
 
-export default function NewPurchaseRequestPage() {
+function NewPurchaseRequestForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { token } = useAuth();
   useRequireRole("customer");
 
-  const [title, setTitle] = useState("");
-  const [sido, setSido] = useState("");
-  const [sigungu, setSigungu] = useState("");
-  const [complexId, setComplexId] = useState<number | null>(null);
-  const [apartmentTypeId, setApartmentTypeId] = useState<number | null>(null);
+  const [title, setTitle] = useState(searchParams.get("title") ?? "");
+  const [sido, setSido] = useState(searchParams.get("sido") ?? "");
+  const [sigungu, setSigungu] = useState(searchParams.get("sigungu") ?? "");
+  const [complexId, setComplexId] = useState<number | null>(
+    searchParams.get("complex_id") ? Number(searchParams.get("complex_id")) : null
+  );
+  const [apartmentTypeId, setApartmentTypeId] = useState<number | null>(
+    searchParams.get("apartment_type_id") ? Number(searchParams.get("apartment_type_id")) : null
+  );
   const [budgetMin, setBudgetMin] = useState("");
   const [budgetMax, setBudgetMax] = useState("");
   const [moveInDate, setMoveInDate] = useState("");
@@ -214,5 +219,13 @@ export default function NewPurchaseRequestPage() {
         </button>
       </form>
     </div>
+  );
+}
+
+export default function NewPurchaseRequestPage() {
+  return (
+    <Suspense>
+      <NewPurchaseRequestForm />
+    </Suspense>
   );
 }
