@@ -89,3 +89,29 @@
   - nginx: `/etc/nginx/sites-available/zippalgo360` (zipterior 설정과 분리), SSL 적용됨
   - 집테리어 쪽 설정/서비스/DB는 이번 작업 중 전혀 수정하지 않음
 - **남은 일 없음** — zippalgo360.com 프로덕션 배포 완료 (2026-08-25)
+
+---
+
+## 2026-08-25 — 집테리어 nav 링크 원복 (실제 zipterior.kr로 이동)
+
+### 시작 전
+- 사용자 요청: "집팔고360에서 집테리어를 누르면 원래 집테리어 페이지가 나오고 그
+  안에서 기능을 이상없이 쓸수 있어야해" — task #12에서 `/map?mode=interior`
+  (내부 지도, 단지별 마커+포트폴리오 개수만 표시)로 바꿨던 걸 되돌려야 함.
+  그 내부 지도는 실제 포트폴리오 열람/업체 프로필/견적문의/로그인 등 zipterior.kr의
+  기능을 대체하지 못하므로, 상단 네비게이션의 "집테리어"는 반드시 실제
+  zipterior.kr로 이동해야 함.
+
+### 진행 중
+- **[완료]** `apps/web/src/lib/services.ts`의 `jipterior` 항목 `href`를
+  `/map?mode=interior` → `https://zipterior.kr`로 원복. 로컬 빌드 성공 확인.
+  git 커밋/푸시 완료 (`af34ebc`).
+- `/map` 페이지 자체는 그대로 유지 — 집팔고 쪽에서 "지도에서 매물 보기"로
+  접근하는 자체 지도(매물+인테리어 마커 토글)로는 여전히 유효한 기능.
+- **[ ] 서버 재배포** — 로컬 소스만 수정했고, 이미 라이브인 zippalgo360.com에는
+  아직 반영 안 됨. 사용자에게 서버에서 `git pull` → `npm run build` →
+  `systemctl restart zippalgo360-web` 요청함. 결과 확인 대기 중.
+
+### 완료 후
+(진행 중 — 서버 재배포 후 실제로 집테리어 메뉴가 zipterior.kr로 이동하는지
+확인되면 기록)
