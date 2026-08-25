@@ -9,6 +9,7 @@ from app.modules.apartments.schemas import (
     ApartmentComplexOut,
     ApartmentTypeCreate,
     ApartmentTypeOut,
+    MapMarkerListOut,
 )
 
 router = APIRouter(prefix="/apartments", tags=["apartments"])
@@ -55,3 +56,19 @@ def create_type(
 @router.get("/types/{type_id}", response_model=ApartmentTypeOut)
 def get_type(type_id: int, conn: Connection = Depends(get_db)) -> ApartmentTypeOut:
     return service.get_type(conn, type_id)
+
+
+@router.get("/map/markers", response_model=MapMarkerListOut)
+def list_map_markers(
+    north: float | None = None,
+    south: float | None = None,
+    east: float | None = None,
+    west: float | None = None,
+    sido: str | None = None,
+    sigungu: str | None = None,
+    limit: int = 1000,
+    conn: Connection = Depends(get_db),
+) -> MapMarkerListOut:
+    return service.list_map_markers(
+        conn, north=north, south=south, east=east, west=west, sido=sido, sigungu=sigungu, limit=min(limit, 3000)
+    )

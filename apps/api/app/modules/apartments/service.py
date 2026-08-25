@@ -7,6 +7,8 @@ from app.modules.apartments.schemas import (
     ApartmentComplexOut,
     ApartmentTypeCreate,
     ApartmentTypeOut,
+    MapMarker,
+    MapMarkerListOut,
 )
 
 
@@ -45,3 +47,20 @@ def get_type(conn: Connection, type_id: int) -> ApartmentTypeOut:
     if type_row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="평형 타입을 찾을 수 없습니다.")
     return ApartmentTypeOut(**type_row)
+
+
+def list_map_markers(
+    conn: Connection,
+    *,
+    north: float | None,
+    south: float | None,
+    east: float | None,
+    west: float | None,
+    sido: str | None,
+    sigungu: str | None,
+    limit: int,
+) -> MapMarkerListOut:
+    markers = repository.list_map_markers(
+        conn, north=north, south=south, east=east, west=west, sido=sido, sigungu=sigungu, limit=limit
+    )
+    return MapMarkerListOut(items=[MapMarker(**m) for m in markers], total=len(markers))

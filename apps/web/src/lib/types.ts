@@ -37,20 +37,31 @@ export interface ApartmentComplex {
   id: number;
   name: string;
   sido: string;
-  sigungu: string;
+  sigungu: string | null;
   eupmyeondong: string;
   road_address: string;
+  jibun_address: string | null;
+  latitude: number | null;
+  longitude: number | null;
   completion_year: number | null;
   household_count: number | null;
+  building_count: number | null;
+  parking_count: number | null;
+  heating_type: string | null;
   builder_name: string | null;
+  complex_type: string | null;
+  representative_image_path: string | null;
+  representative_thumbnail_path: string | null;
+  apartment_type_count: number;
 }
 
 export interface ApartmentType {
   id: number;
   complex_id: number;
   type_name: string;
-  exclusive_area: number;
-  supply_area: number | null;
+  exclusive_area_m2: number;
+  supply_area_m2: number | null;
+  pyeong_label: string | null;
   room_count: number | null;
   bathroom_count: number | null;
 }

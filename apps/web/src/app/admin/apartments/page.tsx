@@ -28,7 +28,7 @@ export default function AdminApartmentsPage() {
 
   const [typeForm, setTypeForm] = useState({
     type_name: "",
-    exclusive_area: "",
+    exclusive_area_m2: "",
     room_count: "",
     bathroom_count: "",
   });
@@ -85,12 +85,12 @@ export default function AdminApartmentsPage() {
         body: {
           complex_id: selectedComplexId,
           type_name: typeForm.type_name,
-          exclusive_area: Number(typeForm.exclusive_area),
+          exclusive_area_m2: Number(typeForm.exclusive_area_m2),
           room_count: typeForm.room_count ? Number(typeForm.room_count) : null,
           bathroom_count: typeForm.bathroom_count ? Number(typeForm.bathroom_count) : null,
         },
       });
-      setTypeForm({ type_name: "", exclusive_area: "", room_count: "", bathroom_count: "" });
+      setTypeForm({ type_name: "", exclusive_area_m2: "", room_count: "", bathroom_count: "" });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "평형 타입 등록에 실패했습니다.");
     }
@@ -126,9 +126,8 @@ export default function AdminApartmentsPage() {
           />
         </div>
         <div className="space-y-1.5">
-          <label className={labelClass}>시/군/구</label>
+          <label className={labelClass}>시/군/구 (세종시 등은 비워두세요)</label>
           <input
-            required
             className={inputClass}
             value={complexForm.sigungu}
             onChange={(e) => setComplexForm({ ...complexForm, sigungu: e.target.value })}
@@ -222,8 +221,8 @@ export default function AdminApartmentsPage() {
                 type="number"
                 step="0.01"
                 className={inputClass}
-                value={typeForm.exclusive_area}
-                onChange={(e) => setTypeForm({ ...typeForm, exclusive_area: e.target.value })}
+                value={typeForm.exclusive_area_m2}
+                onChange={(e) => setTypeForm({ ...typeForm, exclusive_area_m2: e.target.value })}
               />
             </div>
             <div className="space-y-1.5">

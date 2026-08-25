@@ -41,6 +41,10 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
 alembic upgrade head
+
+# 단지/평형 마스터 데이터 로드 (집테리어 실 운영 DB에서 가져온 데이터, 5,668개 단지)
+psql "$DATABASE_URL" -f seeds/zipterior_apartments_seed.sql
+
 uvicorn app.main:app --reload --port 8000
 ```
 

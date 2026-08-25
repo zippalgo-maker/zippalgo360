@@ -133,7 +133,7 @@ export default function ComplexTypePicker({ complexId, apartmentTypeId, onChange
                     : "border-line text-ink hover:border-brand-red"
                 }`}
               >
-                {type.type_name} ({type.exclusive_area}㎡)
+                {type.type_name} ({type.exclusive_area_m2}㎡{type.pyeong_label ? ` · ${type.pyeong_label}평` : ""})
               </button>
             ))}
           </div>
