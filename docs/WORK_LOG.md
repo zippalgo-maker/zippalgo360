@@ -413,3 +413,16 @@ sudo systemctl restart zippalgo360-web
    `issue-code`가 정상 작동하는지만 우선 확인 가능
    (`curl -X POST https://zippalgo360.com/api/auth/sso/issue-code -H
    "Authorization: Bearer <로그인 토큰>"`).
+
+### 완료 후
+- **[완료]** 위 배포 실행됨. `SSO_SHARED_SECRET`을 `apps/api/.env`에 새로
+  생성해 추가함(값은 서버에만 있음, 여기 기록 안 함 — 집테리어 쪽 구현 시
+  같은 값을 공유해야 함, 데스크탑 세션과 조율 필요).
+  `zippalgo360-api`/`zippalgo360-web` 재시작, 둘 다 `active` 확인.
+  `POST /api/auth/sso/issue-code`를 인증 없이 호출 → 401 정상 확인(엔드포인트가
+  실제로 떠서 인증을 요구하고 있음을 검증).
+- **다음 단계는 이 세션 범위 밖** — 데스크탑 세션이 집테리어 쪽에
+  `POST /api/auth/sso/exchange` 엔드포인트와 부트스트랩 JS의 `?sso=` 파라미터
+  처리를 구현하고, 위에서 생성한 `SSO_SHARED_SECRET`을 집테리어 `.env`에
+  넣어야 로그인 통합이 실제로 동작함. 그 전까지 `/jipterior`는 지금처럼
+  정상 작동하되(폴백), 로그인은 여전히 집테리어 자체 로그인으로 이루어짐.
