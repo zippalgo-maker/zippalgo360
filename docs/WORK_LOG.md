@@ -70,18 +70,22 @@
 - **[완료] SSL** — DNS 전파 확인(`dig +short zippalgo360.com` → `115.68.195.144`) 후
   `sudo certbot --nginx -d zippalgo360.com -d www.zippalgo360.com` 성공.
   인증서 만료일 2026-11-23, certbot이 자동 갱신 등록됨.
-- **[ ] 카카오 개발자 콘솔** — JS 키의 Web 플랫폼 허용 도메인에 `https://zippalgo360.com`,
-  `https://www.zippalgo360.com` 추가 아직 안 함 (사용자가 직접 developers.kakao.com에서
-  해야 함). 안 하면 `/map`에서 "카카오맵 스크립트를 불러오지 못했습니다" 상태로 남음.
+- **[완료] 카카오 개발자 콘솔** — 집테리어와 같은 카카오 앱(앱 설정 → 앱 →
+  플랫폼 키 → JavaScript 키 → Default JS Key)의 Web 플랫폼 도메인에
+  `https://zippalgo360.com`, `https://www.zippalgo360.com` 추가 완료.
+  (주의: 도중에 "앱 → 일반" 페이지의 "앱 대표 도메인" 필드를 잘못 열어서
+  zipterior.kr → zippalgo360.com으로 덮어쓸 뻔했으나 저장 전에 취소함 — 이건
+  Web 플랫폼 도메인 목록과 무관한, 앱 전체에 하나만 있는 다른 설정이라 건드리면
+  안 됨.)
 
 ### 완료 후
 - `https://zippalgo360.com` — 200 확인 (curl)
 - `https://zippalgo360.com/api/apartments/complexes?keyword=역삼` — 200, 정상 응답 확인 (curl)
-- 브라우저 실접속 확인은 사용자가 진행 예정
+- 브라우저 실접속 확인 완료 (사용자 확인: "zippalgo360.com 접속 하니까 잘 되네")
 - **서버 최종 상태 요약**
   - `/srv/zippalgo360` — git 클론, `apps/api`(venv 포함) + `apps/web`(빌드 완료)
   - Postgres: `zippalgo_app` 계정 / `zippalgo360_db` (집테리어와 분리)
   - systemd: `zippalgo360-api.service`(127.0.0.1:8001), `zippalgo360-web.service`(127.0.0.1:3000) — 둘 다 `enabled`라 재부팅해도 자동 기동
   - nginx: `/etc/nginx/sites-available/zippalgo360` (zipterior 설정과 분리), SSL 적용됨
   - 집테리어 쪽 설정/서비스/DB는 이번 작업 중 전혀 수정하지 않음
-- **남은 일**: 카카오 개발자 콘솔에 도메인 등록 (위 참고)
+- **남은 일 없음** — zippalgo360.com 프로덕션 배포 완료 (2026-08-25)
