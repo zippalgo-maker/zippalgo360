@@ -65,9 +65,10 @@ const MARKER_FETCH_LIMIT = 5000;
 // 집테리어가 줌 레벨에 맞춰 미리 클러스터링해서 내려주는
 // /api/v1/public/map/viewport를 쓴다(집테리어 자체 지도와 같은 방식,
 // 2026-08-25 소스 확인) — 그래서 여기 보내는 source_limit은 "화면에
-// 그릴 개수"가 아니라 "서버가 클러스터링 전에 얼마나 원본을 모을지"라
-// 3000(집테리어 쪽 실제 상한)으로 넉넉히 잡아도 렌더링 비용은 낮다.
-const ZIPTERIOR_SOURCE_LIMIT = 3000;
+// 그릴 개수"가 아니라 "서버가 클러스터링 전에 얼마나 원본을 모을지"라,
+// 서버 클러스터링 덕에 브라우저 성능과 무관함. 집테리어 라우터의 실제
+// 상한(le=5000)까지 그대로 씀.
+const ZIPTERIOR_SOURCE_LIMIT = 5000;
 
 const KAKAO_APP_KEY = process.env.NEXT_PUBLIC_KAKAO_MAP_JS_KEY ?? "";
 const SEOUL_CENTER = { lat: 37.5665, lng: 126.978 };
