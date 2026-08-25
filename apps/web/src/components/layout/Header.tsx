@@ -11,8 +11,8 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-line bg-background/90 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
-        <Link href="/" className="flex items-center gap-1 text-xl font-extrabold tracking-tight text-brand-green">
+      <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-5 sm:px-10">
+        <Link href="/" className="flex items-center gap-1 text-xl font-extrabold tracking-tight text-ink">
           집팔고<span className="text-brand-red">360</span>
         </Link>
 
@@ -21,26 +21,29 @@ export default function Header() {
             <Link
               key={service.slug}
               href={service.href}
-              className="text-sm font-medium text-ink/80 transition hover:text-brand-green"
+              className="text-sm font-medium text-ink/80 transition hover:text-brand-red"
             >
               {service.name}
             </Link>
           ))}
         </nav>
 
-        <div className="hidden items-center gap-3 md:flex">
+        <div className="hidden items-center gap-4 md:flex">
+          <Link href="/partners" className="text-sm font-semibold text-ink/80 transition hover:text-brand-red">
+            파트너 센터
+          </Link>
           {isLoading ? null : user ? (
             <>
               <Link
                 href="/mypage"
-                className="text-sm font-medium text-ink/80 transition hover:text-brand-green"
+                className="text-sm font-medium text-ink/80 transition hover:text-brand-red"
               >
                 {user.name}님
               </Link>
               <button
                 type="button"
                 onClick={logout}
-                className="rounded-full border border-line px-4 py-2 text-sm font-semibold text-ink transition hover:border-brand-green hover:text-brand-green"
+                className="rounded-full border border-line px-4 py-2 text-sm font-semibold text-ink transition hover:border-brand-red hover:text-brand-red"
               >
                 로그아웃
               </button>
@@ -49,13 +52,13 @@ export default function Header() {
             <>
               <Link
                 href="/login"
-                className="text-sm font-medium text-ink/80 transition hover:text-brand-green"
+                className="text-sm font-medium text-ink/80 transition hover:text-brand-red"
               >
                 로그인
               </Link>
               <Link
                 href="/register"
-                className="rounded-full bg-brand-green px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-green-2"
+                className="rounded-full bg-brand-red px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-red-dark"
               >
                 회원가입
               </Link>
@@ -92,6 +95,15 @@ export default function Header() {
                 </Link>
               </li>
             ))}
+            <li>
+              <Link
+                href="/partners"
+                className="block py-1 text-sm font-semibold text-ink/80"
+                onClick={() => setMenuOpen(false)}
+              >
+                파트너 센터
+              </Link>
+            </li>
             <li className="flex gap-3 pt-2">
               {user ? (
                 <>
@@ -108,7 +120,7 @@ export default function Header() {
                       logout();
                       setMenuOpen(false);
                     }}
-                    className="flex-1 rounded-full bg-brand-green py-2 text-center text-sm font-semibold text-white"
+                    className="flex-1 rounded-full bg-brand-red py-2 text-center text-sm font-semibold text-white"
                   >
                     로그아웃
                   </button>
@@ -124,7 +136,7 @@ export default function Header() {
                   </Link>
                   <Link
                     href="/register"
-                    className="flex-1 rounded-full bg-brand-green py-2 text-center text-sm font-semibold text-white"
+                    className="flex-1 rounded-full bg-brand-red py-2 text-center text-sm font-semibold text-white"
                     onClick={() => setMenuOpen(false)}
                   >
                     회원가입

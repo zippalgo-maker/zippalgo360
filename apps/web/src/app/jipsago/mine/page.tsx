@@ -22,8 +22,8 @@ const REQUEST_STATUS_LABEL: Record<PurchaseRequestStatus, string> = {
 
 const REQUEST_STATUS_COLOR: Record<PurchaseRequestStatus, string> = {
   submitted: "bg-soft text-muted",
-  in_progress: "bg-brand-green-soft text-brand-green",
-  matched: "bg-brand-green text-white",
+  in_progress: "bg-brand-red-soft text-brand-red",
+  matched: "bg-brand-red text-white",
   closed: "bg-soft text-muted",
 };
 
@@ -76,7 +76,7 @@ export default function MyPurchaseRequestsPage() {
     <div className="mx-auto max-w-2xl px-5 py-16">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-ink">내 구매의뢰</h1>
-        <Link href="/jipsago/new" className="text-sm font-semibold text-brand-green">
+        <Link href="/jipsago/new" className="text-sm font-semibold text-brand-red">
           + 구매의뢰 등록
         </Link>
       </div>
@@ -108,7 +108,7 @@ export default function MyPurchaseRequestsPage() {
             <button
               type="button"
               onClick={() => setExpanded(expanded === req.id ? null : req.id)}
-              className="mt-3 text-sm font-semibold text-brand-green"
+              className="mt-3 text-sm font-semibold text-brand-red"
             >
               {expanded === req.id ? "배정 현황 접기 ▲" : "배정 현황 보기 ▼"}
             </button>

@@ -39,7 +39,7 @@ export default function PayoutsPage() {
         </div>
         <div className={cardClass}>
           <p className="text-sm text-muted">누적 지급</p>
-          <p className="mt-1 text-xl font-bold text-brand-green">{totalPaid.toLocaleString()}원</p>
+          <p className="mt-1 text-xl font-bold text-brand-red">{totalPaid.toLocaleString()}원</p>
         </div>
       </div>
 

@@ -24,7 +24,7 @@ const STEPS = [
 export default function DoubleBenefit() {
   return (
     <section className="border-y border-line bg-soft">
-      <div className="mx-auto max-w-6xl px-5 py-20">
+      <div className="mx-auto max-w-[1600px] px-5 py-20 sm:px-10">
         <div className="max-w-2xl">
           <p className="text-sm font-semibold text-brand-red">집팔고의 핵심 · 더블베네핏</p>
           <h2 className="mt-3 text-3xl font-bold text-ink sm:text-4xl">
@@ -40,7 +40,7 @@ export default function DoubleBenefit() {
         <ol className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {STEPS.map((step, i) => (
             <li key={step.n} className="relative rounded-2xl border border-line bg-white p-6">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-green text-sm font-bold text-white">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-red text-sm font-bold text-white">
                 {step.n}
               </span>
               <p className="mt-4 font-semibold text-ink">{step.title}</p>

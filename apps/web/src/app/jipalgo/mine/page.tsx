@@ -24,9 +24,9 @@ const STATUS_LABEL: Record<ListingStatus, string> = {
 };
 
 const STATUS_COLOR: Record<ListingStatus, string> = {
-  active: "bg-brand-green-soft text-brand-green",
+  active: "bg-brand-red-soft text-brand-red",
   reserved: "bg-amber-100 text-amber-700",
-  sold: "bg-brand-green text-white",
+  sold: "bg-brand-red text-white",
   cancelled: "bg-soft text-muted",
 };
 
@@ -144,7 +144,7 @@ export default function MyListingsPage() {
     <div className="mx-auto max-w-2xl px-5 py-16">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-ink">내 매물</h1>
-        <Link href="/jipalgo/new" className="text-sm font-semibold text-brand-green">
+        <Link href="/jipalgo/new" className="text-sm font-semibold text-brand-red">
           + 매물 등록
         </Link>
       </div>
@@ -164,7 +164,7 @@ export default function MyListingsPage() {
                     {complex ? complex.name : `단지 #${listing.complex_id}`} {type && `· ${type.type_name}`}
                     {listing.dong && ` · ${listing.dong}동 ${listing.ho}호`}
                   </p>
-                  <p className="mt-1 text-lg font-bold text-brand-green">
+                  <p className="mt-1 text-lg font-bold text-brand-red">
                     {listing.asking_price.toLocaleString()}원
                   </p>
                 </div>
@@ -191,7 +191,7 @@ export default function MyListingsPage() {
               )}
 
               {listing.status === "sold" && (
-                <Link href="/jipalgo/payouts" className="mt-3 inline-block text-sm font-semibold text-brand-green">
+                <Link href="/jipalgo/payouts" className="mt-3 inline-block text-sm font-semibold text-brand-red">
                   정산 내역 확인하기 →
                 </Link>
               )}

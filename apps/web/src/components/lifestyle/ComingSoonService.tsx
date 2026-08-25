@@ -46,12 +46,12 @@ export default function ComingSoonService({ serviceType, badge, title, descripti
   }
 
   return (
-    <section className="bg-brand-green-soft">
+    <section className="bg-brand-red-soft">
       <div className="mx-auto max-w-xl px-5 py-20">
         <p className="text-sm font-semibold text-brand-red">{badge}</p>
-        <h1 className="mt-3 text-3xl font-extrabold text-brand-green sm:text-4xl">{title}</h1>
+        <h1 className="mt-3 text-3xl font-extrabold text-brand-red sm:text-4xl">{title}</h1>
         <p className="mt-4 text-base leading-relaxed text-ink/70">{description}</p>
-        <p className="mt-2 text-sm font-medium text-brand-green">
+        <p className="mt-2 text-sm font-medium text-brand-red">
           아직 준비 중인 서비스예요. 관심 등록을 남겨주시면 오픈 소식을 가장 먼저 안내드릴게요.
         </p>
 

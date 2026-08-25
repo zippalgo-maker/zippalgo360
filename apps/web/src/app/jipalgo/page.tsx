@@ -10,10 +10,10 @@ export default function JipalgoPage() {
 
   return (
     <>
-      <section className="bg-brand-green-soft">
+      <section className="bg-brand-red-soft">
         <div className="mx-auto max-w-6xl px-5 py-16">
           <p className="text-sm font-semibold text-brand-red">집팔고</p>
-          <h1 className="mt-3 max-w-xl text-3xl font-extrabold text-brand-green sm:text-4xl">
+          <h1 className="mt-3 max-w-xl text-3xl font-extrabold text-brand-red sm:text-4xl">
             매물을 올리면, 팔릴 때 보상받는다
           </h1>
           <p className="mt-4 max-w-xl text-base leading-relaxed text-ink/70">

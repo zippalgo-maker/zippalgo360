@@ -70,7 +70,7 @@ export default function BrowseListingsPage() {
       {needsOnboarding && (
         <div className={`${cardClass} mt-6`}>
           <p className="text-sm text-ink">매물을 열람하려면 먼저 공인중개사무소 정보를 등록해주세요.</p>
-          <Link href="/onboarding/company" className="mt-3 inline-block text-sm font-semibold text-brand-green">
+          <Link href="/onboarding/company" className="mt-3 inline-block text-sm font-semibold text-brand-red">
             업체 정보 등록하러 가기 →
           </Link>
         </div>
@@ -92,13 +92,13 @@ export default function BrowseListingsPage() {
                 {complex ? complex.name : `단지 #${listing.complex_id}`} {type && `· ${type.type_name}`}
                 {isUnlocked && detail?.dong && ` · ${detail.dong}동 ${detail.ho}호`}
               </p>
-              <p className="mt-1 text-lg font-bold text-brand-green">
+              <p className="mt-1 text-lg font-bold text-brand-red">
                 {listing.asking_price.toLocaleString()}원
               </p>
               <p className="mt-2 text-sm text-muted">{listing.description}</p>
 
               {isUnlocked ? (
-                <p className="mt-3 text-sm font-semibold text-brand-green">열람 완료 · 동/호 정보 공개됨</p>
+                <p className="mt-3 text-sm font-semibold text-brand-red">열람 완료 · 동/호 정보 공개됨</p>
               ) : (
                 <button
                   type="button"

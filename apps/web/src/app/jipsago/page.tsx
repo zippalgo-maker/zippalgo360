@@ -16,10 +16,10 @@ export default function JipsagoPage() {
 
   return (
     <>
-      <section className="bg-brand-green-soft">
+      <section className="bg-brand-red-soft">
         <div className="mx-auto max-w-6xl px-5 py-16">
           <p className="text-sm font-semibold text-brand-red">집사고</p>
-          <h1 className="mt-3 max-w-xl text-3xl font-extrabold text-brand-green sm:text-4xl">
+          <h1 className="mt-3 max-w-xl text-3xl font-extrabold text-brand-red sm:text-4xl">
             원하는 조건을 의뢰하면, 중개사가 찾아드립니다
           </h1>
           <p className="mt-4 max-w-xl text-base leading-relaxed text-ink/70">
@@ -74,13 +74,13 @@ export default function JipsagoPage() {
       </section>
 
       <section className="mx-auto max-w-6xl px-5 py-20">
-        <p className="text-sm font-semibold text-brand-green">HOW IT WORKS</p>
+        <p className="text-sm font-semibold text-brand-red">HOW IT WORKS</p>
         <h2 className="mt-3 text-3xl font-bold text-ink">집사고는 이렇게 진행돼요</h2>
 
         <ol className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {STEPS.map((step) => (
             <li key={step.n} className="rounded-2xl border border-line bg-white p-6">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-green text-sm font-bold text-white">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-red text-sm font-bold text-white">
                 {step.n}
               </span>
               <p className="mt-4 font-semibold text-ink">{step.title}</p>

@@ -47,7 +47,7 @@ function RegisterForm() {
           type="button"
           onClick={() => setRole("customer")}
           className={`flex-1 rounded-full py-2 text-sm font-semibold transition ${
-            role === "customer" ? "bg-brand-green text-white" : "text-muted"
+            role === "customer" ? "bg-brand-red text-white" : "text-muted"
           }`}
         >
           일반회원
@@ -56,7 +56,7 @@ function RegisterForm() {
           type="button"
           onClick={() => setRole("company")}
           className={`flex-1 rounded-full py-2 text-sm font-semibold transition ${
-            role === "company" ? "bg-brand-green text-white" : "text-muted"
+            role === "company" ? "bg-brand-red text-white" : "text-muted"
           }`}
         >
           공인중개사(업체)
@@ -131,7 +131,7 @@ function RegisterForm() {
 
       <p className="mt-6 text-center text-sm text-muted">
         이미 계정이 있으신가요?{" "}
-        <Link href="/login" className="font-semibold text-brand-green">
+        <Link href="/login" className="font-semibold text-brand-red">
           로그인
         </Link>
       </p>

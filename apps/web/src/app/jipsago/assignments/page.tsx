@@ -81,7 +81,7 @@ export default function MyAssignmentsPage() {
       {needsOnboarding && (
         <div className={`${cardClass} mt-6`}>
           <p className="text-sm text-ink">구매의뢰를 받으려면 먼저 공인중개사무소 정보를 등록해주세요.</p>
-          <Link href="/onboarding/company" className="mt-3 inline-block text-sm font-semibold text-brand-green">
+          <Link href="/onboarding/company" className="mt-3 inline-block text-sm font-semibold text-brand-red">
             업체 정보 등록하러 가기 →
           </Link>
         </div>

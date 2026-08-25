@@ -49,7 +49,7 @@ export default function ComplexTypePicker({ complexId, apartmentTypeId, onChange
   if (complexId && apartmentTypeId && selectedComplex) {
     const type = types.find((t) => t.id === apartmentTypeId);
     return (
-      <div className="rounded-xl border border-brand-green-soft bg-brand-green-soft/40 p-4">
+      <div className="rounded-xl border border-brand-red-soft bg-brand-red-soft/40 p-4">
         <p className="text-sm font-semibold text-ink">
           {selectedComplex.name} · {type?.type_name}
         </p>
@@ -59,7 +59,7 @@ export default function ComplexTypePicker({ complexId, apartmentTypeId, onChange
         <button
           type="button"
           onClick={handleReset}
-          className="mt-2 text-xs font-semibold text-brand-green underline"
+          className="mt-2 text-xs font-semibold text-brand-red underline"
         >
           다시 선택하기
         </button>
@@ -88,7 +88,7 @@ export default function ComplexTypePicker({ complexId, apartmentTypeId, onChange
             type="button"
             onClick={handleSearch}
             disabled={isSearching}
-            className="shrink-0 rounded-xl bg-brand-green px-4 text-sm font-semibold text-white disabled:opacity-50"
+            className="shrink-0 rounded-xl bg-brand-red px-4 text-sm font-semibold text-white disabled:opacity-50"
           >
             검색
           </button>
@@ -102,7 +102,7 @@ export default function ComplexTypePicker({ complexId, apartmentTypeId, onChange
               <button
                 type="button"
                 onClick={() => handleSelectComplex(complex)}
-                className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-brand-green-soft"
+                className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-brand-red-soft"
               >
                 <span className="font-medium text-ink">{complex.name}</span>
                 <span className="ml-2 text-xs text-muted">
@@ -129,8 +129,8 @@ export default function ComplexTypePicker({ complexId, apartmentTypeId, onChange
                 onClick={() => onChange(selectedComplex.id, type.id)}
                 className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
                   apartmentTypeId === type.id
-                    ? "border-brand-green bg-brand-green text-white"
-                    : "border-line text-ink hover:border-brand-green"
+                    ? "border-brand-red bg-brand-red text-white"
+                    : "border-line text-ink hover:border-brand-red"
                 }`}
               >
                 {type.type_name} ({type.exclusive_area}㎡)
