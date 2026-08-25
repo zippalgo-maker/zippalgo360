@@ -8,14 +8,16 @@ import type {
   ApartmentComplex,
   CompanyMapMarker,
   ListingMapMarker,
+  ZipteriorCompanyMapMarkerListOut,
   ZipteriorMapMarkerListOut,
 } from "@/lib/types";
 
 // 집팔고360은 집팔고/집사고/집테리어/집이사/집청소가 신원(로그인)뿐 아니라
 // 이 지도도 공유하는 통합 플랫폼이다 — 그래서 지도는 "모드 전환"이 아니라
-// 여러 레이어를 동시에 켤 수 있는 구조로 만든다. 데이터가 아직 없는
-// 서비스(집이사/집청소, 그리고 집팔고360 자체 온보딩에 아직 회원가입
-// 경로가 없는 인테리어 업체)는 레이어 자리만 만들어두고 비활성 처리한다.
+// 여러 레이어를 동시에 켤 수 있는 구조로 만든다. 인테리어 업체는 집테리어
+// 자체 DB에 데이터가 있어서 zipterior_client 프록시로 가져온다(집팔고360
+// 자기 companies 테이블은 온보딩이 real_estate만 지원해서 비어있음).
+// 이사/청소업체는 그 서비스 자체가 아직 준비 중이라 레이어 자리만 둔다.
 type LayerKey =
   | "listings"
   | "interiorPortfolio"
@@ -34,14 +36,15 @@ const LAYER_DEFS: LayerDef[] = [
   { key: "listings", label: "매물(집팔고)", available: true },
   { key: "interiorPortfolio", label: "인테리어 시공사례(집테리어)", available: true },
   { key: "company_real_estate", label: "부동산 업체", available: true },
-  { key: "company_interior", label: "인테리어 업체", available: false },
+  { key: "company_interior", label: "인테리어 업체", available: true },
   { key: "company_mover", label: "이사업체", available: false },
   { key: "company_cleaner", label: "청소업체", available: false },
 ];
 
+// 집팔고360 자체 companies 테이블에서 바로 조회하는 레이어만 여기 둔다.
+// company_interior는 집테리어 프록시(loadInteriorCompanyMarkers)로 별도 처리.
 const COMPANY_LAYER_TYPE: Partial<Record<LayerKey, string>> = {
   company_real_estate: "real_estate",
-  company_interior: "interior",
   company_mover: "mover",
   company_cleaner: "cleaner",
 };
@@ -75,7 +78,7 @@ function ServiceMapView() {
   const [isMapReady, setIsMapReady] = useState(false);
   const [loadingLayers, setLoadingLayers] = useState<Set<LayerKey>>(new Set());
   const [layerCounts, setLayerCounts] = useState<Partial<Record<LayerKey, number>>>({});
-  const [interiorUnavailable, setInteriorUnavailable] = useState(false);
+  const [unavailableLayers, setUnavailableLayers] = useState<Set<LayerKey>>(new Set());
   const [mapError, setMapError] = useState<string | null>(null);
 
   const [query, setQuery] = useState("");
@@ -111,6 +114,15 @@ function ServiceMapView() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (markersByLayerRef.current[layer] ?? []).forEach((marker: any) => marker.setMap(null));
     markersByLayerRef.current[layer] = [];
+  }, []);
+
+  const setLayerUnavailable = useCallback((layer: LayerKey, unavailable: boolean) => {
+    setUnavailableLayers((prev) => {
+      const next = new Set(prev);
+      if (unavailable) next.add(layer);
+      else next.delete(layer);
+      return next;
+    });
   }, []);
 
   const loadListingMarkers = useCallback(async () => {
@@ -157,7 +169,7 @@ function ServiceMapView() {
     );
     if (!activeLayersRef.current.has("interiorPortfolio")) return;
     clearLayerMarkers("interiorPortfolio");
-    setInteriorUnavailable(!data.available);
+    setLayerUnavailable("interiorPortfolio", !data.available);
     data.items.forEach((item) => {
       const position = new kakao.maps.LatLng(item.latitude, item.longitude);
       const marker = new kakao.maps.Marker({ position, map });
@@ -174,7 +186,39 @@ function ServiceMapView() {
       markersByLayerRef.current.interiorPortfolio.push(marker);
     });
     setLayerCounts((prev) => ({ ...prev, interiorPortfolio: data.items.length }));
-  }, [clearLayerMarkers]);
+  }, [clearLayerMarkers, setLayerUnavailable]);
+
+  const loadInteriorCompanyMarkers = useCallback(async () => {
+    const kakao = window.kakao;
+    const map = mapRef.current;
+    if (!kakao || !map) return;
+    const bounds = map.getBounds();
+    const sw = bounds.getSouthWest();
+    const ne = bounds.getNorthEast();
+    const data = await apiFetch<ZipteriorCompanyMapMarkerListOut>(
+      `/integrations/zipterior/company-markers?north=${ne.getLat()}&south=${sw.getLat()}&east=${ne.getLng()}&west=${sw.getLng()}&limit=500`
+    );
+    if (!activeLayersRef.current.has("company_interior")) return;
+    clearLayerMarkers("company_interior");
+    setLayerUnavailable("company_interior", !data.available);
+    const color = COMPANY_LAYER_COLOR.company_interior ?? "#21463b";
+    data.items.forEach((item) => {
+      const position = new kakao.maps.LatLng(item.latitude, item.longitude);
+      const dot = document.createElement("div");
+      dot.style.cssText = `width:14px;height:14px;border-radius:9999px;background:${color};border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:pointer;`;
+      const overlay = new kakao.maps.CustomOverlay({ position, content: dot, map, yAnchor: 0.5, xAnchor: 0.5 });
+      dot.addEventListener("click", () => {
+        infoWindowRef.current.setContent(
+          `<div style="padding:10px 12px;min-width:160px;font-size:13px;line-height:1.6;">
+            <strong>${item.name}</strong>${item.phone ? `<br/>${item.phone}` : ""}
+          </div>`
+        );
+        infoWindowRef.current.open(map, overlay);
+      });
+      markersByLayerRef.current.company_interior.push(overlay);
+    });
+    setLayerCounts((prev) => ({ ...prev, company_interior: data.items.length }));
+  }, [clearLayerMarkers, setLayerUnavailable]);
 
   const loadCompanyMarkers = useCallback(
     async (layer: LayerKey) => {
@@ -215,9 +259,10 @@ function ServiceMapView() {
     (layer: LayerKey) => {
       if (layer === "listings") return loadListingMarkers();
       if (layer === "interiorPortfolio") return loadInteriorMarkers();
+      if (layer === "company_interior") return loadInteriorCompanyMarkers();
       return loadCompanyMarkers(layer);
     },
-    [loadListingMarkers, loadInteriorMarkers, loadCompanyMarkers]
+    [loadListingMarkers, loadInteriorMarkers, loadInteriorCompanyMarkers, loadCompanyMarkers]
   );
 
   useEffect(() => {
@@ -354,7 +399,7 @@ function ServiceMapView() {
                   <span className="text-xs text-muted">준비중</span>
                 ) : activeLayers.has(layer.key) ? (
                   <span className="text-xs text-muted">
-                    {layer.key === "interiorPortfolio" && interiorUnavailable
+                    {unavailableLayers.has(layer.key)
                       ? "불러올 수 없음"
                       : (layerCounts[layer.key] ?? 0).toLocaleString()}
                   </span>

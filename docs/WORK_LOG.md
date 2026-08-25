@@ -544,3 +544,57 @@ sudo systemctl restart zippalgo360-web
 
 ### 완료 후
 (진행 중 — 서버 배포는 사용자 요청 시 진행.)
+
+---
+
+## 2026-08-25 — 인테리어 업체 마커: 집테리어 API 연동 방식 확정 + 아키텍처 원칙 정리
+
+### 시작 전
+- 사용자 확인: "인테리어 업체 정보는 집테리어 쪽에 이미 데이터가 있으니
+  (b) 집테리어 API로 받아오는 방식으로 간다." 자체 companies 테이블에
+  인테리어 업체를 새로 가입시키는 방식(a)은 폐기.
+- 추가로 "앞으로도 각 서비스 데이터를 API로 주고받는 방식이면 괜찮은가"
+  라는 아키텍처 질문에 답변 정리:
+  - **1회성/상세 조회**(매물 상세페이지의 포트폴리오 보여주기 같은 것)는
+    지금처럼 실시간 API 프록시로 충분하고 적절함.
+  - **지도처럼 반복 조회되는 마커류**는 매 pan/zoom마다 여러 서비스에
+    동시에 살아있는 API 호출을 날리는 구조로 계속 확장하면 안 됨 — 한
+    서비스가 느려지거나 죽으면 지도 전체가 느려지는 구조가 되고, 이번에
+    고친 DB 인덱스 문제와 같은 종류의 함정이 네트워크 레벨에서 반복됨.
+  - 결론: 지금 규모에선 기존 `zipterior_client.py` 프록시 패턴(짧은
+    타임아웃 + 실패 시 `available=false`로 조용히 폴백)을 그대로
+    확장하되, 트래픽이 늘면 "각 서비스가 위치 데이터를 우리 쪽에 주기적으로
+    동기화(webhook/배치)해서 우리가 인덱스 걸어놓고 서빙"하는 캐시 구조로
+    전환하는 걸 다음 단계로 남겨둠(지금 당장 만들 정도는 아니라고 판단).
+
+### 진행 중
+- **[완료]** `apps/api/app/modules/integrations/zipterior_client.py`에
+  `get_interior_companies()` 추가 — 기존 `get_interior_map_markers()`가 쓰는
+  `GET {ZIPTERIOR_API_BASE_URL}/api/v1/public/map/markers` 엔드포인트를
+  `marker_type=company`로 호출하도록 만듦.
+  **⚠️ 이건 확인된 계약이 아니라 가정임** — 기존 엔드포인트가
+  `marker_type=complex&has_portfolio=true`로 단지 마커를 주는 걸 보고
+  "아마 `marker_type=company`도 같은 엔드포인트에서 확장 가능하지 않을까"
+  하고 대칭적으로 설계한 것. **데스크탑 세션 확인/구현 필요**:
+  - 요청: `GET /api/v1/public/map/markers?marker_type=company&north=&south=
+    &east=&west=&limit=`
+  - 기대 응답 형태: `{"items": [{"id": int, "name": str, "latitude": float,
+    "longitude": float, "phone": str|null}], "total": int}` — 업체
+    `is_verified`/`is_active` 필터링은 집테리어 쪽에서 이미 하고 있을
+    것으로 가정(공개 API이므로).
+  - 이 형태가 아니거나 다른 파라미터명이면 여기(`get_interior_companies`)와
+    `docs/WORK_LOG.md`를 맞춰서 조정하면 됨. 계약이 안 맞아도 그냥
+    `available=false`로 빈 목록만 돌아오고 지도 자체는 안 깨짐.
+- **[완료]** `GET /api/integrations/zipterior/company-markers` 신규 엔드포인트
+  (`apps/api/app/modules/integrations/router.py`).
+- **[완료]** `/map` 페이지의 "인테리어 업체" 레이어를 비활성 → **활성화**.
+  집팔고360 자체 `/companies/map/markers?company_type=interior`(항상
+  비어있을 구조)가 아니라 위 집테리어 프록시로 라우팅하도록 전환.
+  마커는 `company_real_estate`와 마찬가지로 색깔 있는 원형 점(CustomOverlay),
+  집테리어 팔레트의 딥그린(`#21463b`) 사용.
+- 로컬 `npm run build` 성공, `ast.parse`로 백엔드 파일 문법 확인.
+
+### 완료 후
+(진행 중 — 서버 배포 및 실제 데이터 확인은 위 집테리어 쪽 엔드포인트 계약이
+확정된 뒤. 그 전까지는 "인테리어 업체" 레이어를 켜면 그냥 0건/불러올 수
+없음으로 표시될 뿐 지도 자체는 정상 작동함.)

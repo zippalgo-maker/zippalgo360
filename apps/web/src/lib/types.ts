@@ -240,3 +240,17 @@ export interface ZipteriorMapMarkerListOut {
   total: number;
   available: boolean;
 }
+
+export interface ZipteriorCompanyMapMarker {
+  id: number;
+  name: string;
+  latitude: number;
+  longitude: number;
+  phone: string | null;
+}
+
+export interface ZipteriorCompanyMapMarkerListOut {
+  items: ZipteriorCompanyMapMarker[];
+  total: number;
+  available: boolean;
+}

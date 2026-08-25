@@ -2,6 +2,8 @@ import httpx
 
 from app.config import get_settings
 from app.modules.integrations.schemas import (
+    ZipteriorCompanyMapMarker,
+    ZipteriorCompanyMapMarkerListOut,
     ZipteriorCompanySummary,
     ZipteriorMapMarker,
     ZipteriorMapMarkerListOut,
@@ -143,3 +145,53 @@ def get_interior_map_markers(
         return ZipteriorMapMarkerListOut(items=[], total=0, available=False)
 
     return ZipteriorMapMarkerListOut(items=items, total=data.get("total", len(items)), available=True)
+
+
+def get_interior_companies(
+    *,
+    north: float | None = None,
+    south: float | None = None,
+    east: float | None = None,
+    west: float | None = None,
+    limit: int = 1000,
+) -> ZipteriorCompanyMapMarkerListOut:
+    """인테리어 업체(사무실) 위치 마커.
+
+    집테리어의 공개 지도 마커 API가 `marker_type=complex`(단지)만이 아니라
+    `marker_type=company`(업체)도 지원한다는 전제로 만들었다 — 아직 집테리어
+    쪽에서 확정된 계약은 아니고, docs/WORK_LOG.md에 남긴 확인 요청에 대한
+    응답 대기 중(데스크탑 세션). 지원하지 않으면 그냥 available=False로
+    빈 목록이 돌아오므로 지도 자체는 깨지지 않는다.
+    """
+    params: dict = {"marker_type": "company", "limit": limit}
+    if north is not None:
+        params["north"] = north
+    if south is not None:
+        params["south"] = south
+    if east is not None:
+        params["east"] = east
+    if west is not None:
+        params["west"] = west
+
+    try:
+        response = httpx.get(
+            f"{settings.zipterior_api_base_url}/api/v1/public/map/markers",
+            params=params,
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        data = response.json()
+        items = [
+            ZipteriorCompanyMapMarker(
+                id=item["id"],
+                name=item["name"],
+                latitude=float(item["latitude"]),
+                longitude=float(item["longitude"]),
+                phone=item.get("phone"),
+            )
+            for item in data["items"]
+        ]
+    except (httpx.HTTPError, ValueError, KeyError, TypeError):
+        return ZipteriorCompanyMapMarkerListOut(items=[], total=0, available=False)
+
+    return ZipteriorCompanyMapMarkerListOut(items=items, total=data.get("total", len(items)), available=True)

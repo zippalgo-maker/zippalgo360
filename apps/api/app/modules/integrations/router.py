@@ -1,7 +1,11 @@
 from fastapi import APIRouter, Query
 
 from app.modules.integrations import zipterior_client
-from app.modules.integrations.schemas import ZipteriorMapMarkerListOut, ZipteriorPortfolioListOut
+from app.modules.integrations.schemas import (
+    ZipteriorCompanyMapMarkerListOut,
+    ZipteriorMapMarkerListOut,
+    ZipteriorPortfolioListOut,
+)
 
 router = APIRouter(prefix="/integrations/zipterior", tags=["integrations"])
 
@@ -30,3 +34,14 @@ def get_interior_map_markers(
     return zipterior_client.get_interior_map_markers(
         north=north, south=south, east=east, west=west, sido=sido, sigungu=sigungu, limit=limit
     )
+
+
+@router.get("/company-markers", response_model=ZipteriorCompanyMapMarkerListOut)
+def get_interior_companies(
+    north: float | None = None,
+    south: float | None = None,
+    east: float | None = None,
+    west: float | None = None,
+    limit: int = Query(1000, ge=1, le=3000),
+) -> ZipteriorCompanyMapMarkerListOut:
+    return zipterior_client.get_interior_companies(north=north, south=south, east=east, west=west, limit=limit)

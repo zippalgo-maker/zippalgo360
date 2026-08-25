@@ -49,3 +49,18 @@ class ZipteriorMapMarkerListOut(BaseModel):
     total: int
     available: bool
     """집테리어 API에 접속할 수 없을 때 False. 이 경우 items는 빈 배열."""
+
+
+class ZipteriorCompanyMapMarker(BaseModel):
+    id: int
+    name: str
+    latitude: float
+    longitude: float
+    phone: str | None = None
+
+
+class ZipteriorCompanyMapMarkerListOut(BaseModel):
+    items: list[ZipteriorCompanyMapMarker]
+    total: int
+    available: bool
+    """집테리어 API에 접속할 수 없거나 아직 이 마커 종류를 지원하지 않을 때 False."""
