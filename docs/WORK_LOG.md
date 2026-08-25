@@ -225,3 +225,33 @@ sudo systemctl restart zippalgo360-web
   다음 후보는 `zipterior-api`의 세션 쿠키에 `Domain=.zippalgo360.com`을
   명시하는 것(단, 이건 zipterior.kr 자체 접속 시의 쿠키 동작에도 영향을
   주므로 데스크탑 세션과 조율 필요).
+- 브라우저 실접속 결과: iframe 자체는 정상 로드되지만 **카카오맵이 안 뜸**
+  (지도/마커 모두 안 보임). 원인: 집테리어와 집팔고360이 같은 카카오 앱
+  JS 키를 공유하는데, 그 앱의 Web 플랫폼 허용 도메인 목록에
+  `interior.zippalgo360.com`이 등록되어 있지 않았음(SDK가 미등록 도메인의
+  요청을 차단). 사용자가 카카오 개발자 콘솔에서 해당 앱의 JavaScript SDK
+  도메인 목록에 `https://interior.zippalgo360.com`을 추가함 — 이 시점에
+  아래 네이밍 규칙 변경 결정도 함께 이루어져 사용 도메인 자체가 바뀜(다음
+  섹션 참고).
+
+---
+
+## 2026-08-25 — 서브도메인을 `<서비스>.zippalgo360.com` 규칙으로 통일 (zipterior.zippalgo360.com)
+
+### 시작 전
+- 사용자 결정: 임시로 만든 `interior.zippalgo360.com` 대신, 앞으로 이 서버에
+  붙일 모든 하위 서비스를 `<서비스명>.zippalgo360.com` 규칙으로 통일하기로 함.
+  - 집테리어 → `zipterior.zippalgo360.com` (이번 작업)
+  - 집팔고(별도 앱으로 분리될 경우) → `zippalgo.zippalgo360.com` (예정, 이번
+    작업 범위 아님)
+- 사용자가 카카오 개발자 콘솔에 `https://zipterior.zippalgo360.com`,
+  `https://zippalgo.zippalgo360.com`을 미리 등록해둠(`https://interior.zippalgo360.com`도
+  남겨둠, 당장 삭제하지 않음).
+
+### 진행 중
+- **[완료]** `apps/web/src/app/jipterior/page.tsx`의 `ZIPTERIOR_URL`을
+  `https://interior.zippalgo360.com` → `https://zipterior.zippalgo360.com`으로 변경.
+- 서버 작업(`zipterior.zippalgo360.com` nginx 서버블록 + SSL + CORS 추가,
+  `interior.zippalgo360.com`은 당장 유지)은 이 커밋 이후 진행 — 아래 참고.
+  `interior.zippalgo360.com`은 유지되지만 더 이상 코드에서 참조되지 않음(정리는
+  나중에, 급하지 않음).
