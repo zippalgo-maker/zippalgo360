@@ -113,5 +113,52 @@
   `systemctl restart zippalgo360-web` 요청함. 결과 확인 대기 중.
 
 ### 완료 후
-(진행 중 — 서버 재배포 후 실제로 집테리어 메뉴가 zipterior.kr로 이동하는지
-확인되면 기록)
+- 이 방식(외부 링크로 완전히 이동)은 서버 재배포도 하기 전에 사용자가 정정함 —
+  아래 다음 섹션 참고. **이 커밋(`af34ebc`)은 그 다음 커밋(`9b7d4ea`)으로 대체됨.**
+
+---
+
+## 2026-08-25 — 집테리어를 집팔고360 헤더 아래 iframe으로 임베드
+
+### 시작 전
+- 사용자 정정: "이렇게 연결은 아니고 집팔고360 메인 메뉴는 그대로 두고 그 아래
+  화면에 집테리어를 노출시키는거야" — 완전히 다른 사이트로 이동(외부 링크)하는
+  게 아니라, 집팔고360의 헤더/메뉴는 유지한 채 그 아래 콘텐츠 영역에 실제
+  zipterior.kr을 보여줘야 함.
+- 구현 방법: iframe으로 zipterior.kr을 그대로 임베드.
+- 사전 확인 필요 사항 2가지:
+  1. zipterior.kr이 `X-Frame-Options`/CSP `frame-ancestors`로 프레임 삽입을
+     막고 있는지 → 사용자가 `curl.exe -sI https://zipterior.kr`로 확인,
+     두 헤더 모두 없음 확인됨 (현재는 막혀있지 않음).
+  2. 로그인 등 쿠키 기반 기능이 iframe(제3자 컨텍스트) 안에서도 유지되는지 →
+     브라우저에서 직접 확인해야 알 수 있음, 이 세션에서는 zipterior.kr에
+     네트워크 접근이 안 돼서 직접 테스트 불가.
+
+### 진행 중
+- **[완료]** `apps/web/src/app/jipterior/page.tsx` 새로 만듦 — 헤더/푸터가
+  유지되는 일반 페이지 레이아웃 안에서, 콘텐츠 영역 전체를 `<iframe
+  src="https://zipterior.kr">`로 채움. 오른쪽 위에 "새 탭에서 열기" 탈출구
+  링크 추가(iframe 안에서 문제 생기면 새 탭으로 우회 가능하도록).
+- **[완료]** `apps/web/src/lib/services.ts`의 `jipterior` href를
+  `https://zipterior.kr` → `/jipterior`(내부 라우트)로 변경.
+- **[완료]** 로컬 빌드 성공, `/jipterior` 라우트가 정적 페이지로 생성됨,
+  응답 HTML에 `src="https://zipterior.kr"` 정상 포함 확인 (curl).
+  이 세션에서는 zipterior.kr 자체에 네트워크 접근이 안 돼서 iframe이 실제로
+  콘텐츠를 렌더링하는지, 로그인이 iframe 안에서 되는지는 검증 못함 —
+  **반드시 실제 브라우저에서 사용자가 확인 필요**.
+  git 커밋/푸시 완료 (`9b7d4ea`).
+- **[ ] 서버 재배포** — 아래 명령어 사용자에게 요청함, 결과 대기 중.
+
+```bash
+cd /srv/zippalgo360
+git pull origin claude/jippalgo360-platform-6bvrfh
+cd apps/web
+npm run build
+sudo systemctl restart zippalgo360-web
+```
+
+### 완료 후
+(진행 중 — 서버 재배포 후 브라우저에서 `/jipterior`가 실제로 집테리어를
+보여주는지, 특히 로그인 등 쿠키 필요한 기능이 iframe 안에서 정상 동작하는지
+확인되면 기록. 만약 로그인이 iframe 안에서 안 되면 → zipterior 백엔드의 세션
+쿠키를 `SameSite=None; Secure`로 바꿔야 함 — 이건 데스크탑 세션과 조율 필요.)
