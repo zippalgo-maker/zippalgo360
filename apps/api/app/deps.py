@@ -28,6 +28,20 @@ def get_current_user(
     return user
 
 
+def get_optional_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    conn: Connection = Depends(get_db),
+) -> dict | None:
+    if credentials is None:
+        return None
+
+    payload = decode_access_token(credentials.credentials)
+    if payload is None:
+        return None
+
+    return get_user_by_id(conn, int(payload["sub"]))
+
+
 def require_role(*roles: str):
     def _check(user: dict = Depends(get_current_user)) -> dict:
         if user["role"] not in roles:

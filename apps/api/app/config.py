@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 60 * 24
     cors_origins: str = "http://localhost:3000"
     upload_dir: str = "./uploads"
+    zipterior_api_base_url: str = "https://zipterior.kr"
 
     @property
     def cors_origin_list(self) -> list[str]:

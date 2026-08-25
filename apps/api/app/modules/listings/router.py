@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import Connection
 
 from app.database import get_db
-from app.deps import get_current_user, require_company_type, require_role
+from app.deps import get_optional_current_user, require_company_type, require_role
 from app.modules.listings import service
 from app.modules.listings.schemas import ListingCreate, ListingOut, ListingSummary
 from app.modules.payments.repository import get_unlocked_listing_ids
@@ -27,9 +27,22 @@ def my_listings(
     return service.list_my_listings(conn, user["id"])
 
 
+@router.get("/public/active", response_model=list[ListingSummary])
+def list_public_listings(
+    complex_id: int | None = None,
+    apartment_type_id: int | None = None,
+    conn: Connection = Depends(get_db),
+) -> list[ListingSummary]:
+    return service.list_public_listings(conn, complex_id=complex_id, apartment_type_id=apartment_type_id)
+
+
 @router.get("/{listing_id}", response_model=ListingOut)
-def get_listing(listing_id: int, conn: Connection = Depends(get_db)) -> ListingOut:
-    return service.get_listing(conn, listing_id)
+def get_listing(
+    listing_id: int,
+    viewer: dict | None = Depends(get_optional_current_user),
+    conn: Connection = Depends(get_db),
+) -> ListingOut:
+    return service.get_listing(conn, listing_id, viewer)
 
 
 @router.post("/{listing_id}/cancel", response_model=ListingOut)
