@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { loadKakaoMaps } from "@/lib/kakao-maps";
-import type { ListingMapMarker, ZipteriorMapMarkerListOut } from "@/lib/types";
+import type { ApartmentComplex, ListingMapMarker, ZipteriorMapMarkerListOut } from "@/lib/types";
 
 type MapMode = "listings" | "interior";
 
@@ -29,6 +29,11 @@ function ServiceMapView() {
   const [markerCount, setMarkerCount] = useState(0);
   const [unavailable, setUnavailable] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
+
+  const [query, setQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<ApartmentComplex[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showResults, setShowResults] = useState(false);
 
   useEffect(() => {
     if (!KAKAO_APP_KEY) {
@@ -150,9 +155,72 @@ function ServiceMapView() {
     };
   }, [isMapReady, mode, loadListingMarkers, loadInteriorMarkers]);
 
+  useEffect(() => {
+    const keyword = query.trim();
+    if (keyword.length < 2) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+    setIsSearching(true);
+    const timer = setTimeout(() => {
+      apiFetch<ApartmentComplex[]>(`/apartments/complexes?keyword=${encodeURIComponent(keyword)}`)
+        .then((items) => setSearchResults(items))
+        .catch(() => setSearchResults([]))
+        .finally(() => setIsSearching(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const handleSelectComplex = useCallback((complex: ApartmentComplex) => {
+    const kakao = window.kakao;
+    const map = mapRef.current;
+    if (!kakao || !map || complex.latitude == null || complex.longitude == null) return;
+    map.setLevel(4);
+    map.setCenter(new kakao.maps.LatLng(complex.latitude, complex.longitude));
+    setQuery(complex.name);
+    setShowResults(false);
+  }, []);
+
   return (
     <div className="relative h-[calc(100vh-4rem)] w-full">
       <div ref={mapContainerRef} className="h-full w-full bg-soft" />
+
+      <div className="absolute left-4 top-4 z-10 w-72 max-w-[calc(100%-2rem)]">
+        <input
+          type="text"
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setShowResults(true);
+          }}
+          onFocus={() => setShowResults(true)}
+          onBlur={() => setTimeout(() => setShowResults(false), 150)}
+          placeholder="단지명, 지역으로 검색"
+          className="w-full rounded-full border border-line bg-white px-4 py-2.5 text-sm shadow-md outline-none focus:border-brand-red"
+        />
+        {showResults && query.trim().length >= 2 && (
+          <div className="absolute left-0 right-0 top-full mt-2 max-h-80 overflow-y-auto rounded-xl border border-line bg-white shadow-lg">
+            {isSearching ? (
+              <p className="px-4 py-3 text-sm text-muted">검색 중...</p>
+            ) : searchResults.length === 0 ? (
+              <p className="px-4 py-3 text-sm text-muted">검색 결과가 없어요</p>
+            ) : (
+              searchResults.map((complex) => (
+                <button
+                  key={complex.id}
+                  type="button"
+                  onClick={() => handleSelectComplex(complex)}
+                  className="block w-full border-b border-line px-4 py-2.5 text-left last:border-b-0 hover:bg-soft"
+                >
+                  <div className="text-sm font-semibold text-ink">{complex.name}</div>
+                  <div className="text-xs text-muted">{complex.road_address}</div>
+                </button>
+              ))
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="absolute right-4 top-4 z-10 flex flex-col items-end gap-2">
         <div className="flex overflow-hidden rounded-full border border-line bg-white shadow-md">

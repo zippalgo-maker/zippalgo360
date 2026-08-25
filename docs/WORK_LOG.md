@@ -426,3 +426,36 @@ sudo systemctl restart zippalgo360-web
   처리를 구현하고, 위에서 생성한 `SSO_SHARED_SECRET`을 집테리어 `.env`에
   넣어야 로그인 통합이 실제로 동작함. 그 전까지 `/jipterior`는 지금처럼
   정상 작동하되(폴백), 로그인은 여전히 집테리어 자체 로그인으로 이루어짐.
+
+---
+
+## 2026-08-25 — 집팔고 지도 검색창 추가 (매물 마커/결제열람은 이미 구현되어 있었음)
+
+### 시작 전
+- 사용자 요청: "집팔고 개발해보자 — 집테리어 지도(통합검색 포함) 가져다
+  쓸 수 있어? 매물을 마커로 표시하고 부동산 로그인 후 결제해서 매물정보
+  확인하는 시스템."
+- 확인 결과 대부분 **이미 구현되어 있었음**(다른 세션이 이전에 작업):
+  - `/map` 페이지에 "매물보기"(`GET /listings/map/markers`)/"인테리어보기"
+    토글 이미 존재.
+  - 부동산 업체 로그인 → `GET /listings/browse/active`(`require_company_type
+    ("real_estate")`) → `POST /payments/...`로 결제 → 결제 전엔 동/호수
+    마스킹, 결제 후(`payments_repository.get_purchase` 확인)에만 노출 —
+    `apps/api/app/modules/listings/service.py`의 `_can_view_unmasked`에
+    정확히 구현되어 있음(실제 PG 연동 전이라 지금은 모의결제).
+  - 단지 검색 API(`GET /apartments/complexes?keyword=`)도 이미 존재.
+- **없던 것**: `/map` 페이지에 단지명으로 검색해서 지도를 이동시키는
+  검색창(집테리어의 "통합검색"에 해당하는 UX)이 없었음 — 이번에 이것만 추가.
+
+### 진행 중
+- **[완료]** `apps/web/src/app/map/page.tsx`에 검색창 추가(좌상단, 기존
+  매물보기/인테리어보기 토글은 우상단 그대로 유지). 입력 300ms 디바운스 후
+  `GET /apartments/complexes?keyword=`로 검색, 드롭다운에 단지명/도로명주소
+  표시, 클릭 시 카카오맵 `setCenter`/`setLevel(4)`로 해당 단지 위치로 이동.
+  지도 이동은 기존 `idle` 이벤트 리스너가 그대로 받아서 매물/인테리어
+  마커도 자동으로 새로고침됨(추가 코드 불필요).
+- 로컬 `npm run build` 성공, `/map` 라우트 정상 생성 확인.
+
+### 완료 후
+(진행 중 — 서버 배포는 사용자 요청 시 진행. 배포되면 브라우저에서 검색 동작
+실제 확인 필요.)
