@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useState } from "react";
 import { SERVICES } from "@/lib/services";
+import { useAuth } from "@/lib/auth-context";
 
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { user, logout, isLoading } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 border-b border-line bg-background/90 backdrop-blur">
@@ -27,18 +29,38 @@ export default function Header() {
         </nav>
 
         <div className="hidden items-center gap-3 md:flex">
-          <Link
-            href="/login"
-            className="text-sm font-medium text-ink/80 transition hover:text-brand-green"
-          >
-            로그인
-          </Link>
-          <Link
-            href="/register"
-            className="rounded-full bg-brand-green px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-green-2"
-          >
-            회원가입
-          </Link>
+          {isLoading ? null : user ? (
+            <>
+              <Link
+                href="/mypage"
+                className="text-sm font-medium text-ink/80 transition hover:text-brand-green"
+              >
+                {user.name}님
+              </Link>
+              <button
+                type="button"
+                onClick={logout}
+                className="rounded-full border border-line px-4 py-2 text-sm font-semibold text-ink transition hover:border-brand-green hover:text-brand-green"
+              >
+                로그아웃
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="text-sm font-medium text-ink/80 transition hover:text-brand-green"
+              >
+                로그인
+              </Link>
+              <Link
+                href="/register"
+                className="rounded-full bg-brand-green px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-green-2"
+              >
+                회원가입
+              </Link>
+            </>
+          )}
         </div>
 
         <button
@@ -71,18 +93,44 @@ export default function Header() {
               </li>
             ))}
             <li className="flex gap-3 pt-2">
-              <Link
-                href="/login"
-                className="flex-1 rounded-full border border-line py-2 text-center text-sm font-medium"
-              >
-                로그인
-              </Link>
-              <Link
-                href="/register"
-                className="flex-1 rounded-full bg-brand-green py-2 text-center text-sm font-semibold text-white"
-              >
-                회원가입
-              </Link>
+              {user ? (
+                <>
+                  <Link
+                    href="/mypage"
+                    className="flex-1 rounded-full border border-line py-2 text-center text-sm font-medium"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    {user.name}님
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      logout();
+                      setMenuOpen(false);
+                    }}
+                    className="flex-1 rounded-full bg-brand-green py-2 text-center text-sm font-semibold text-white"
+                  >
+                    로그아웃
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/login"
+                    className="flex-1 rounded-full border border-line py-2 text-center text-sm font-medium"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    로그인
+                  </Link>
+                  <Link
+                    href="/register"
+                    className="flex-1 rounded-full bg-brand-green py-2 text-center text-sm font-semibold text-white"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    회원가입
+                  </Link>
+                </>
+              )}
             </li>
           </ul>
         </nav>
