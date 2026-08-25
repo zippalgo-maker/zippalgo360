@@ -97,6 +97,20 @@ export interface ListingSummary {
   is_unlocked: boolean;
 }
 
+export interface ListingMapMarker {
+  id: number;
+  complex_id: number;
+  apartment_type_id: number;
+  complex_name: string;
+  latitude: number;
+  longitude: number;
+  sido: string;
+  sigungu: string | null;
+  asking_price: number;
+  view_price: number;
+  status: ListingStatus;
+}
+
 export interface ListingPurchase {
   id: number;
   listing_id: number;
@@ -197,6 +211,22 @@ export interface ZipteriorPortfolioCard {
 
 export interface ZipteriorPortfolioListOut {
   items: ZipteriorPortfolioCard[];
+  total: number;
+  available: boolean;
+}
+
+export interface ZipteriorMapMarker {
+  id: number;
+  name: string;
+  latitude: number;
+  longitude: number;
+  sido: string | null;
+  sigungu: string | null;
+  portfolio_count: number;
+}
+
+export interface ZipteriorMapMarkerListOut {
+  items: ZipteriorMapMarker[];
   total: number;
   available: boolean;
 }

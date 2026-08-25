@@ -51,3 +51,17 @@ class ListingSummary(BaseModel):
     status: ListingStatus
     created_at: datetime
     is_unlocked: bool = False
+
+
+class ListingMapMarker(BaseModel):
+    id: int
+    complex_id: int
+    apartment_type_id: int
+    complex_name: str
+    latitude: float
+    longitude: float
+    sido: str
+    sigungu: str | None
+    asking_price: int
+    view_price: int
+    status: ListingStatus

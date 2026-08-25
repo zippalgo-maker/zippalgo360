@@ -41,7 +41,7 @@ export const SERVICES: ServiceInfo[] = [
     description:
       "인테리어 업체가 시공한 포트폴리오를 확인하고, 내 집과 같은 단지·같은 평형이 인테리어된 사례를 보고 마음에 들면 견적문의를 보내 상담받을 수 있습니다.",
     status: "live",
-    href: "https://zipterior.kr",
+    href: "/map?mode=interior",
     icon: "/icons/zipterior.png",
     ctaLabel: "시공사례 찾기",
   },

@@ -22,6 +22,13 @@ export default function JipalgoPage() {
             구조입니다.
           </p>
 
+          <Link
+            href="/map?mode=listings"
+            className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-brand-red hover:underline"
+          >
+            지도에서 매물 보기 →
+          </Link>
+
           {!isLoading && (
             <div className={`${cardClass} mt-8 max-w-md`}>
               {!user && (

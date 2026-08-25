@@ -3,7 +3,7 @@ from sqlalchemy import Connection
 
 from app.modules.companies import repository as companies_repository
 from app.modules.listings import repository
-from app.modules.listings.schemas import ListingCreate, ListingOut, ListingSummary
+from app.modules.listings.schemas import ListingCreate, ListingMapMarker, ListingOut, ListingSummary
 from app.modules.payments import repository as payments_repository
 
 
@@ -59,6 +59,13 @@ def list_public_listings(
     """비로그인 방문자도 볼 수 있는 매물 목록(마스킹). 지도/공개 브라우징용."""
     listings = repository.list_active_listings(conn, complex_id=complex_id, apartment_type_id=apartment_type_id)
     return [ListingSummary(**listing, is_unlocked=False) for listing in listings]
+
+
+def list_map_markers(
+    conn: Connection, *, north: float | None, south: float | None, east: float | None, west: float | None, limit: int
+) -> list[ListingMapMarker]:
+    markers = repository.list_map_markers(conn, north=north, south=south, east=east, west=west, limit=limit)
+    return [ListingMapMarker(**marker) for marker in markers]
 
 
 def cancel_listing(conn: Connection, seller_id: int, listing_id: int) -> ListingOut:

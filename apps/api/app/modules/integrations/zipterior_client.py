@@ -3,6 +3,8 @@ import httpx
 from app.config import get_settings
 from app.modules.integrations.schemas import (
     ZipteriorCompanySummary,
+    ZipteriorMapMarker,
+    ZipteriorMapMarkerListOut,
     ZipteriorPortfolioCard,
     ZipteriorPortfolioListOut,
 )
@@ -85,3 +87,59 @@ def get_portfolios_for_complex_type(
         return ZipteriorPortfolioListOut(items=[], total=0, available=False)
 
     return ZipteriorPortfolioListOut(items=items, total=data.get("total", len(items)), available=True)
+
+
+def get_interior_map_markers(
+    *,
+    north: float | None = None,
+    south: float | None = None,
+    east: float | None = None,
+    west: float | None = None,
+    sido: str | None = None,
+    sigungu: str | None = None,
+    limit: int = 1000,
+) -> ZipteriorMapMarkerListOut:
+    """시공사례(포트폴리오)가 있는 단지의 지도 마커 목록.
+
+    집테리어의 공개 지도 API(marker_type=complex, has_portfolio=true)를 그대로
+    프록시한다. 실패 시(네트워크 장애, 배포 중단 등) available=False로 빈 목록을
+    돌려주어 집팔고360 지도 화면이 깨지지 않도록 한다.
+    """
+    params: dict = {"marker_type": "complex", "has_portfolio": "true", "limit": limit}
+    if north is not None:
+        params["north"] = north
+    if south is not None:
+        params["south"] = south
+    if east is not None:
+        params["east"] = east
+    if west is not None:
+        params["west"] = west
+    if sido:
+        params["sido"] = sido
+    if sigungu:
+        params["sigungu"] = sigungu
+
+    try:
+        response = httpx.get(
+            f"{settings.zipterior_api_base_url}/api/v1/public/map/markers",
+            params=params,
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        data = response.json()
+        items = [
+            ZipteriorMapMarker(
+                id=item["id"],
+                name=item["name"],
+                latitude=float(item["latitude"]),
+                longitude=float(item["longitude"]),
+                sido=item.get("sido"),
+                sigungu=item.get("sigungu"),
+                portfolio_count=item.get("portfolio_count", 0),
+            )
+            for item in data["items"]
+        ]
+    except (httpx.HTTPError, ValueError, KeyError, TypeError):
+        return ZipteriorMapMarkerListOut(items=[], total=0, available=False)
+
+    return ZipteriorMapMarkerListOut(items=items, total=data.get("total", len(items)), available=True)

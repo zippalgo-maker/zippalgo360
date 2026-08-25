@@ -4,7 +4,7 @@ from sqlalchemy import Connection
 from app.database import get_db
 from app.deps import get_optional_current_user, require_company_type, require_role
 from app.modules.listings import service
-from app.modules.listings.schemas import ListingCreate, ListingOut, ListingSummary
+from app.modules.listings.schemas import ListingCreate, ListingMapMarker, ListingOut, ListingSummary
 from app.modules.payments.repository import get_unlocked_listing_ids
 
 router = APIRouter(prefix="/listings", tags=["listings"])
@@ -34,6 +34,18 @@ def list_public_listings(
     conn: Connection = Depends(get_db),
 ) -> list[ListingSummary]:
     return service.list_public_listings(conn, complex_id=complex_id, apartment_type_id=apartment_type_id)
+
+
+@router.get("/map/markers", response_model=list[ListingMapMarker])
+def list_map_markers(
+    north: float | None = None,
+    south: float | None = None,
+    east: float | None = None,
+    west: float | None = None,
+    limit: int = 1000,
+    conn: Connection = Depends(get_db),
+) -> list[ListingMapMarker]:
+    return service.list_map_markers(conn, north=north, south=south, east=east, west=west, limit=min(limit, 3000))
 
 
 @router.get("/{listing_id}", response_model=ListingOut)

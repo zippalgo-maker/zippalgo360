@@ -85,6 +85,42 @@ def list_active_listings(conn: Connection, *, complex_id: int | None, apartment_
     return [dict(r) for r in rows]
 
 
+def list_map_markers(
+    conn: Connection,
+    *,
+    north: float | None,
+    south: float | None,
+    east: float | None,
+    west: float | None,
+    limit: int,
+) -> list[dict]:
+    query = """
+        SELECT l.id, l.complex_id, l.apartment_type_id, l.asking_price, l.view_price, l.status,
+               c.name AS complex_name, c.latitude, c.longitude, c.sido, c.sigungu
+        FROM listings l
+        JOIN apartment_complexes c ON c.id = l.complex_id
+        WHERE l.status = 'active' AND c.latitude IS NOT NULL AND c.longitude IS NOT NULL
+    """
+    params: dict = {}
+    if north is not None:
+        query += " AND c.latitude <= :north"
+        params["north"] = north
+    if south is not None:
+        query += " AND c.latitude >= :south"
+        params["south"] = south
+    if east is not None:
+        query += " AND c.longitude <= :east"
+        params["east"] = east
+    if west is not None:
+        query += " AND c.longitude >= :west"
+        params["west"] = west
+    query += " ORDER BY l.created_at DESC LIMIT :limit"
+    params["limit"] = limit
+
+    rows = conn.execute(text(query), params).mappings().all()
+    return [dict(r) for r in rows]
+
+
 def update_status(conn: Connection, listing_id: int, status_value: str) -> None:
     conn.execute(
         text("UPDATE listings SET status = :status, updated_at = now() WHERE id = :id"),

@@ -32,3 +32,20 @@ class ZipteriorPortfolioListOut(BaseModel):
     total: int
     available: bool
     """집테리어 API에 접속할 수 없을 때 False. 이 경우 items는 빈 배열."""
+
+
+class ZipteriorMapMarker(BaseModel):
+    id: int
+    name: str
+    latitude: float
+    longitude: float
+    sido: str | None
+    sigungu: str | None
+    portfolio_count: int
+
+
+class ZipteriorMapMarkerListOut(BaseModel):
+    items: list[ZipteriorMapMarker]
+    total: int
+    available: bool
+    """집테리어 API에 접속할 수 없을 때 False. 이 경우 items는 빈 배열."""
