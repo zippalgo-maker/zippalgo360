@@ -215,11 +215,13 @@ sudo systemctl restart zippalgo360-web
   쿠키 문제(로그인 세션 유지 실패 가능성)를 구조적으로 피할 수 있음.
 
 ### 완료 후
+- **[완료] 서버 재배포** — `git pull` → `npm run build` →
+  `systemctl restart zippalgo360-web` 사용자가 실행, 성공 확인.
+  `https://zippalgo360.com/jipterior` → 200, 응답 HTML에
+  `src="https://interior.zippalgo360.com"` 정상 반영 확인 (curl).
 - 로그인이 iframe 안에서 실제로 유지되는지는 여전히 **브라우저 실접속 확인
   필요** — same-site로 바뀌어서 문제가 줄었을 가능성이 높지만, 완전히
-  검증된 건 아님. 문제가 남아있다면 다음 후보는 `zipterior-api`의 세션
-  쿠키에 `Domain=.zippalgo360.com`을 명시하는 것(단, 이건 zipterior.kr
-  자체 접속 시의 쿠키 동작에도 영향을 주므로 데스크탑 세션과 조율 필요).
-- 서버 재배포(`git pull` → `npm run build` →
-  `systemctl restart zippalgo360-web`)는 이 커밋 푸시 후 사용자에게 요청함,
-  결과 확인 대기 중.
+  검증된 건 아님(curl로는 쿠키/로그인 동작까지 확인 불가). 문제가 남아있다면
+  다음 후보는 `zipterior-api`의 세션 쿠키에 `Domain=.zippalgo360.com`을
+  명시하는 것(단, 이건 zipterior.kr 자체 접속 시의 쿠키 동작에도 영향을
+  주므로 데스크탑 세션과 조율 필요).
