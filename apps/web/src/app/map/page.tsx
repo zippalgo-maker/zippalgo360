@@ -44,13 +44,33 @@ interface LayerDef {
 }
 
 const LAYER_DEFS: LayerDef[] = [
-  { key: "listings", label: "매물(집팔고)", available: true },
-  { key: "interiorPortfolio", label: "인테리어 시공사례(집테리어)", available: true },
+  { key: "listings", label: "매물", available: true },
+  { key: "interiorPortfolio", label: "인테리어 시공사례", available: true },
   { key: "company_real_estate", label: "부동산 업체", available: true },
   { key: "company_interior", label: "인테리어 업체", available: true },
   { key: "company_mover", label: "이사업체", available: false },
   { key: "company_cleaner", label: "청소업체", available: false },
 ];
+
+// 레이어 패널 카드를 "집팔고/집테리어/생활서비스" 세 묶음으로 나눠 보여주기
+// 위한 그룹핑(상호배타 규칙의 LAYER_GROUP_ZIPPALGO/ZIPTERIOR와는 별개로,
+// 순수하게 UI 표시용).
+const LAYER_PANEL_GROUPS: { label: string; keys: LayerKey[] }[] = [
+  { label: "집팔고", keys: ["listings", "company_real_estate"] },
+  { label: "집테리어", keys: ["interiorPortfolio", "company_interior"] },
+  { label: "생활서비스", keys: ["company_mover", "company_cleaner"] },
+];
+
+// 레이어 토글 옆 색점 — 실제 지도 위 마커 색과 맞춘다(매물=빨강 핀,
+// 시공사례=zpi-count-marker 배경색, 나머지는 COMPANY_LAYER_COLOR 그대로).
+const LAYER_DOT_COLOR: Record<LayerKey, string> = {
+  listings: "#bb1730",
+  interiorPortfolio: "#21463b",
+  company_real_estate: "#427cff",
+  company_interior: "#21463b",
+  company_mover: "#c98a2e",
+  company_cleaner: "#2f9e6f",
+};
 
 // 집팔고360 자체 companies 테이블에서 바로 조회하는 레이어만 여기 둔다.
 // company_interior는 집테리어 프록시(loadInteriorCompanyMarkers)로 별도 처리.
@@ -962,45 +982,89 @@ function ServiceMapView() {
           </button>
         </div>
 
-        <div className="w-56 rounded-xl border border-line bg-white/95 p-3 shadow-md">
-          <p className="mb-2 text-xs font-semibold text-muted">지도에 표시할 레이어</p>
-          <ul className="flex flex-col gap-1.5">
-            {LAYER_DEFS.map((layer) => (
-              <li key={layer.key} className="flex items-center justify-between gap-2 text-sm">
-                <label
-                  className={`flex flex-1 items-center gap-2 ${
-                    layer.available ? "cursor-pointer text-ink" : "cursor-not-allowed text-muted"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={activeLayers.has(layer.key)}
-                    disabled={!layer.available}
-                    onChange={() => toggleLayer(layer.key, layer.available)}
-                  />
-                  {layer.label}
-                </label>
-                {!layer.available ? (
-                  <span className="text-xs text-muted">준비중</span>
-                ) : activeLayers.has(layer.key) ? (
-                  <span className="text-xs text-muted">
-                    {unavailableLayers.has(layer.key)
-                      ? "불러올 수 없음"
-                      : (layerCounts[layer.key] ?? 0).toLocaleString()}
-                  </span>
-                ) : null}
-              </li>
+        <div className="w-64 overflow-hidden rounded-2xl border border-line bg-white/95 shadow-lg backdrop-blur">
+          <div className="flex items-center gap-2 border-b border-line px-4 py-3">
+            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-brand-green/10 text-brand-green">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 22 8.5 12 15 2 8.5 12 2" />
+                <polyline points="2 15.5 12 22 22 15.5" />
+                <polyline points="2 12 12 18.5 22 12" />
+              </svg>
+            </span>
+            <p className="text-sm font-bold text-ink">지도 레이어</p>
+          </div>
+
+          <div className="flex flex-col divide-y divide-line">
+            {LAYER_PANEL_GROUPS.map((group) => (
+              <div key={group.label} className="px-4 py-3">
+                <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted">{group.label}</p>
+                <div className="flex flex-col gap-0.5">
+                  {group.keys.map((key) => {
+                    const layer = LAYER_DEFS.find((item) => item.key === key)!;
+                    const active = activeLayers.has(key);
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        disabled={!layer.available}
+                        aria-pressed={active}
+                        onClick={() => toggleLayer(key, layer.available)}
+                        className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left transition ${
+                          layer.available ? "hover:bg-soft" : "cursor-not-allowed opacity-45"
+                        } ${active ? "bg-soft" : ""}`}
+                      >
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span
+                            className="h-2.5 w-2.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: LAYER_DOT_COLOR[key] }}
+                          />
+                          <span className="truncate text-sm font-medium text-ink">{layer.label}</span>
+                        </span>
+                        <span className="flex shrink-0 items-center gap-2">
+                          {!layer.available ? (
+                            <span className="rounded-full bg-soft px-1.5 py-0.5 text-[10px] font-semibold text-muted">
+                              준비중
+                            </span>
+                          ) : active ? (
+                            <span className="text-[11px] font-medium text-muted">
+                              {unavailableLayers.has(key) ? "불러올 수 없음" : (layerCounts[key] ?? 0).toLocaleString()}
+                            </span>
+                          ) : null}
+                          <span
+                            className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
+                              active ? "bg-brand-green" : "bg-line"
+                            }`}
+                          >
+                            <span
+                              className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                                active ? "translate-x-4" : "translate-x-0.5"
+                              }`}
+                            />
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             ))}
-          </ul>
-          {activeLayers.has("interiorPortfolio") && (
-            <p className="mt-2 border-t border-line pt-2 text-[11px] leading-relaxed text-brand-green">
-              초록색 마커는 실제 단지별 시공사례 수 입니다.
-            </p>
-          )}
-          {activeLayers.has("listings") && (
-            <p className="mt-2 border-t border-line pt-2 text-[11px] leading-relaxed text-brand-red">
-              붉은색 마커는 단지별 매물 수 입니다.
-            </p>
+          </div>
+
+          {(activeLayers.has("interiorPortfolio") || activeLayers.has("listings")) && (
+            <div className="flex flex-col gap-1.5 border-t border-line bg-soft/60 px-4 py-3">
+              {activeLayers.has("interiorPortfolio") && (
+                <p className="flex items-center gap-1.5 text-[11px] leading-relaxed text-brand-green">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-green" />
+                  초록색 마커는 실제 단지별 시공사례 수 입니다.
+                </p>
+              )}
+              {activeLayers.has("listings") && (
+                <p className="flex items-center gap-1.5 text-[11px] leading-relaxed text-brand-red">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-red" />
+                  붉은색 마커는 단지별 매물 수 입니다.
+                </p>
+              )}
+            </div>
           )}
         </div>
 
