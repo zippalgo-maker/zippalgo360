@@ -161,6 +161,16 @@ export const CATEGORY_LIST: LifestyleCategoryMeta[] = [
 
 export const HOME_STYLES = ["모던", "미니멀", "내추럴", "북유럽풍", "클래식", "기타"];
 
+/** 카테고리별 포인트 컬러 — 집팔고360 CI(레드/그린/블루) 범위 안에서만 순환시킨다. */
+export const CATEGORY_ACCENT: Record<ServiceCategory, string> = {
+  moving: "#427cff",
+  move_out_cleaning: "#2f5c4e",
+  living_cleaning: "#447466",
+  appliance: "#bb1730",
+  furniture: "#951125",
+  subscription: "#21463b",
+};
+
 export function getCategoryMeta(value: ServiceCategory): LifestyleCategoryMeta {
   const found = CATEGORY_LIST.find((c) => c.value === value);
   if (!found) throw new Error(`Unknown category: ${value}`);

@@ -156,3 +156,14 @@ export function getMockCompaniesByCategory(category: ServiceCategory | null): Mo
   if (!category) return MOCK_COMPANIES;
   return MOCK_COMPANIES.filter((c) => c.category === category);
 }
+
+export function searchMockCompanies(companies: MockCompany[], query: string): MockCompany[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return companies;
+  return companies.filter(
+    (c) =>
+      c.name.toLowerCase().includes(q) ||
+      c.tagline.toLowerCase().includes(q) ||
+      c.highlightTags.some((tag) => tag.toLowerCase().includes(q))
+  );
+}

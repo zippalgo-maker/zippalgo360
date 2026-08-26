@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { CATEGORY_LIST, type ServiceCategory } from "@/lib/lifestyle-data";
-import { getMockCompaniesByCategory } from "@/lib/mock-companies";
+import { getMockCompaniesByCategory, searchMockCompanies } from "@/lib/mock-companies";
 import ProCard from "@/components/lifestyle/ProCard";
 
 function isValidCategory(value: string | null): value is ServiceCategory {
@@ -14,11 +14,13 @@ function isValidCategory(value: string | null): value is ServiceCategory {
 function CompanyBrowse() {
   const searchParams = useSearchParams();
   const initial = searchParams.get("category");
+  const initialQuery = searchParams.get("q") ?? "";
   const [category, setCategory] = useState<ServiceCategory | "all">(
     isValidCategory(initial) ? initial : "all"
   );
 
-  const companies = getMockCompaniesByCategory(category === "all" ? null : category);
+  const byCategory = getMockCompaniesByCategory(category === "all" ? null : category);
+  const companies = searchMockCompanies(byCategory, initialQuery);
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-12 sm:py-16">
@@ -30,6 +32,12 @@ function CompanyBrowse() {
         업체 소개, 후기, 응답률을 비교해보고 원하는 업체에 바로 견적을 요청할 수 있어요. 물론
         어떤 업체가 좋을지 모르겠다면 카테고리만 골라 전체 업체에게 견적을 받을 수도 있어요.
       </p>
+      {initialQuery && (
+        <p className="mt-3 text-sm text-ink/70">
+          <span className="font-semibold text-brand-red">&ldquo;{initialQuery}&rdquo;</span> 검색 결과{" "}
+          {companies.length}건
+        </p>
+      )}
 
       <div className="mt-6 flex flex-wrap gap-2">
         <button
@@ -63,10 +71,13 @@ function CompanyBrowse() {
         </div>
       ) : (
         <div className="mt-8 rounded-2xl border border-dashed border-line bg-soft p-10 text-center">
-          <p className="font-semibold text-ink">아직 준비 중인 카테고리예요</p>
+          <p className="font-semibold text-ink">
+            {initialQuery ? "검색 결과가 없어요" : "아직 준비 중인 카테고리예요"}
+          </p>
           <p className="mt-1 text-sm text-muted">
-            대신 이 카테고리로 바로 견적을 요청해보시면 제휴 업체가 순차적으로 입점하는 대로
-            안내드릴게요.
+            {initialQuery
+              ? "다른 키워드로 검색하거나, 카테고리를 선택해서 전체 업체에게 견적을 받아보세요."
+              : "대신 이 카테고리로 바로 견적을 요청해보시면 제휴 업체가 순차적으로 입점하는 대로 안내드릴게요."}
           </p>
           {category !== "all" && (
             <Link
