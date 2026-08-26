@@ -93,7 +93,7 @@ function PartnerDashboard() {
       </div>
 
       <div className="mt-6 flex flex-wrap gap-3">
-        <Link href="/jipsago/assignments" className={`${primaryButtonClass} w-auto px-6`}>
+        <Link href="/zipsago/assignments" className={`${primaryButtonClass} w-auto px-6`}>
           배정된 구매의뢰 보기
         </Link>
         <Link href="/zippalgo/browse" className={`${secondaryButtonClass} w-auto px-6`}>

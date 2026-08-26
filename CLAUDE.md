@@ -26,12 +26,18 @@ truth)다.
 
 ## 네이밍 규칙
 
-- "집팔고"(매물 등록/더블베네핏 서브서비스)의 영문 표현은 **`zippalgo`**다.
-  `jipalgo`처럼 한글 발음을 그대로 로마자화한 표기를 쓰지 않는다(2026-08-26,
-  `apps/web/src/app/jipalgo` → `apps/web/src/app/zippalgo`로 라우트/slug/링크
-  전체를 이 규칙에 맞춰 수정함). 다른 서브서비스(집사고=jipsago, 집테리어=
-  zipterior/jipterior, 집이사=jipisa, 집청소=jipcheongso)는 기존 표기 유지 —
-  이 규칙은 "집팔고" 한정.
+- "집"으로 시작하는 모든 서브서비스의 영문 표현은 **`jip`이 아니라 `zip`으로
+  로마자화**한다: 집팔고=**zippalgo**, 집사고=**zipsago**, 집테리어=**zipterior**,
+  집이사=**zipisa**, 집청소=**zipcheongso**. 한글 발음을 그대로 로마자화한
+  `jip*` 표기는 쓰지 않는다(2026-08-26, `apps/web/src/app/{jipalgo,jipsago,
+  jipterior,jipisa,jipcheongso}` → `apps/web/src/app/{zippalgo,zipsago,
+  zipterior,zipisa,zipcheongso}`로 라우트 폴더/slug/링크/컴포넌트명 전체를
+  이 규칙에 맞춰 일괄 수정함).
+- 서버에 이미 존재하는 별도 인프라(집테리어의 `/srv/zipterior`,
+  `zipterior_app`/`zipterior_db`, `zipterior-api.service`,
+  `zipterior.zippalgo360.com` 등)는 이 저장소가 관리하는 프론트엔드 라우트와
+  무관한, 이미 `zip` 표기를 쓰던 별도 코드베이스/서버라 이번 규칙과 항상
+  일치한다 — 그대로 유지, 변경 대상 아님.
 
 ## 아키텍처 원칙
 

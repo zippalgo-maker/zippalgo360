@@ -11,7 +11,7 @@ const STEPS = [
   { n: "4", title: "매칭 & 상담", desc: "수락한 중개사와 연결되어 상담과 매물 추천을 받습니다." },
 ];
 
-export default function JipsagoPage() {
+export default function ZipsagoPage() {
   const { user, isLoading } = useAuth();
 
   return (
@@ -46,10 +46,10 @@ export default function JipsagoPage() {
                 <>
                   <p className="text-sm font-semibold text-ink">원하는 조건을 의뢰해보세요</p>
                   <div className="mt-4 flex gap-2">
-                    <Link href="/jipsago/new" className={primaryButtonClass}>
+                    <Link href="/zipsago/new" className={primaryButtonClass}>
                       구매의뢰 등록하기
                     </Link>
-                    <Link href="/jipsago/mine" className={secondaryButtonClass}>
+                    <Link href="/zipsago/mine" className={secondaryButtonClass}>
                       내 구매의뢰 보기
                     </Link>
                   </div>
@@ -59,7 +59,7 @@ export default function JipsagoPage() {
                 <>
                   <p className="text-sm font-semibold text-ink">배정된 의뢰를 확인해보세요</p>
                   <div className="mt-4 flex gap-2">
-                    <Link href="/jipsago/assignments" className={primaryButtonClass}>
+                    <Link href="/zipsago/assignments" className={primaryButtonClass}>
                       배정된 의뢰 보기
                     </Link>
                     <Link href="/onboarding/company" className={secondaryButtonClass}>

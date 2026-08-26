@@ -1,6 +1,6 @@
 import ComingSoonService from "@/components/lifestyle/ComingSoonService";
 
-export default function JipcheongsoPage() {
+export default function ZipcheongsoPage() {
   return (
     <ComingSoonService
       serviceType="cleaning"

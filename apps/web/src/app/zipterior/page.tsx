@@ -10,7 +10,7 @@ import { useAuth } from "@/lib/auth-context";
 // 직접 넣을 때 발생하는 제3자 쿠키 문제(로그인 세션 유지 실패)를 피할 수 있다.
 const ZIPTERIOR_URL = "https://zipterior.zippalgo360.com";
 
-export default function JipteriorEmbedPage() {
+export default function ZipteriorEmbedPage() {
   const { token, isLoading } = useAuth();
   const [iframeSrc, setIframeSrc] = useState(ZIPTERIOR_URL);
 

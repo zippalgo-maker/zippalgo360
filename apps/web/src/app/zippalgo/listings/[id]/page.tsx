@@ -142,7 +142,7 @@ export default function PublicListingDetailPage() {
         <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-ink/80">{listing.description}</p>
 
         {user?.role !== "company" && (
-          <Link href={`/jipsago/new?${buyRequestParams.toString()}`} className={`${primaryButtonClass} mt-6`}>
+          <Link href={`/zipsago/new?${buyRequestParams.toString()}`} className={`${primaryButtonClass} mt-6`}>
             이 집 사러가기
           </Link>
         )}

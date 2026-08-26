@@ -1081,7 +1081,53 @@ sudo systemctl restart zippalgo360-web
   유지.
 
 ### 완료 후
-- 로컬 빌드/타입체크만 확인됨 — 서버 배포는 아직 안 함(이 저장소는
-  git 기반 배포이므로, 다음 배포 시 `/jipalgo`로 들어오는 기존 링크/북마크가
-  있다면 깨질 수 있음. 필요하면 nginx 레벨에서 `/jipalgo` → `/zippalgo`
-  301 리다이렉트 추가를 고려할 것 — 이번 작업 범위 밖으로 남겨둠).
+- **[완료] 서버 배포**: `/srv/zippalgo360`에서 `git pull` →
+  `apps/web`에서 `npm run build` → `sudo systemctl restart
+  zippalgo360-web`. 빌드 성공, 라우트 목록에 `/zippalgo` 계열 정상 출력.
+  배포 후 확인: `https://zippalgo360.com/jipalgo` → `404`(정상, 옛 라우트
+  제거됨), `https://zippalgo360.com/zippalgo` → `200`(정상). 사용자가
+  실제 메뉴 클릭으로도 재확인 예정.
+- 사용자가 "집" 로마자화를 zip으로 통일하는 규칙을 재확인 후 "다
+  바꿔야지 바꿀때"로 나머지 4개 라우트도 전부 바꾸라고 지시함.
+
+---
+
+## 2026-08-26 — 나머지 서브서비스 라우트도 `jip*` → `zip*` 전면 통일
+
+### 시작 전
+- 사용자 지시: `zippalgo`만 바꾸지 말고 `jipsago`, `jipterior`, `jipisa`,
+  `jipcheongso`도 전부 같은 규칙(zip으로 로마자화)으로 통일.
+
+### 진행 중
+- **[완료]** `git mv`로 라우트 폴더 4개 이동: `jipsago`→`zipsago`,
+  `jipterior`→`zipterior`, `jipisa`→`zipisa`, `jipcheongso`→`zipcheongso`.
+- **[완료]** anchor 기반 Python 치환으로 관련 파일 전부 수정:
+  `lib/services.ts`(slug/href 8곳), `app/partners/page.tsx`,
+  `app/mypage/page.tsx`, `app/zippalgo/listings/[id]/page.tsx`,
+  `app/zipsago/{page,new,mine}/page.tsx`(내부 상호 링크 포함),
+  컴포넌트 함수명(`JipsagoPage`→`ZipsagoPage`, `JipisaPage`→`ZipisaPage`,
+  `JipcheongsoPage`→`ZipcheongsoPage`, `JipteriorEmbedPage`→
+  `ZipteriorEmbedPage`).
+- **[완료]** 저장소 전체에서 `jipalgo|jipsago|jipterior|jipisa|jipcheongso`
+  검색 → `docs/WORK_LOG.md`, `CLAUDE.md`(과거 기록/네이밍 규칙 설명문)
+  외에는 0건 확인.
+- 주의: `zipterior` 라우트(`app/zipterior/page.tsx`, 옛 `jipterior`)는
+  이 세션에서 구현한 SSO iframe 임베드 페이지 그 자체 — 경로만 바뀌었고
+  로직은 그대로임(SSO 코드 발급 → iframe src에 `?sso=` 붙이는 로직은
+  이 문서 위쪽 SSO 섹션 참고). 서버(`/srv/zipterior`)에 떠 있는 **외부**
+  집테리어 백엔드/도메인(`zipterior.zippalgo360.com` 등)은 이 저장소가
+  관리하는 게 아니라 별도 코드베이스라 이번 변경과 무관 — 애초에 이미
+  `zip` 표기를 쓰고 있어서 그대로 규칙과 일치함.
+- **[완료]** `CLAUDE.md` 네이밍 규칙 섹션을 "집팔고만 zippalgo"에서
+  "집으로 시작하는 모든 서브서비스는 zip으로 로마자화"로 갱신.
+- **[완료]** `.next` 캐시 삭제 후 `next build` 재실행 — 컴파일/타입체크
+  통과, 라우트 목록에 `/zippalgo`, `/zipsago`, `/zipterior`, `/zipisa`,
+  `/zipcheongso` 및 하위 라우트 전부 정상 생성 확인.
+
+### 완료 후
+- 로컬 빌드만 확인됨, 서버 배포는 다음 단계로 대기 — 배포 시 이전
+  `/zippalgo` 단독 배포 때와 동일하게 `git pull` → `apps/web`에서
+  `npm run build` → `sudo systemctl restart zippalgo360-web` 순서로
+  진행하면 됨. 배포 후 `/jipsago`, `/jipterior`, `/jipisa`, `/jipcheongso`는
+  전부 404로, `/zipsago`, `/zipterior`, `/zipisa`, `/zipcheongso`는
+  200으로 나오는지 확인 필요.

@@ -76,7 +76,7 @@ export default function MyPurchaseRequestsPage() {
     <div className="mx-auto max-w-2xl px-5 py-16">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-ink">내 구매의뢰</h1>
-        <Link href="/jipsago/new" className="text-sm font-semibold text-brand-red">
+        <Link href="/zipsago/new" className="text-sm font-semibold text-brand-red">
           + 구매의뢰 등록
         </Link>
       </div>

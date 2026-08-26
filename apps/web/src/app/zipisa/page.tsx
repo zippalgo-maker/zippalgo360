@@ -1,6 +1,6 @@
 import ComingSoonService from "@/components/lifestyle/ComingSoonService";
 
-export default function JipisaPage() {
+export default function ZipisaPage() {
   return (
     <ComingSoonService
       serviceType="moving"

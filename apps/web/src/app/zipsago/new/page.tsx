@@ -56,7 +56,7 @@ function NewPurchaseRequestForm() {
           contact_method: contactMethod,
         },
       });
-      router.push(`/jipsago/mine?highlight=${request.id}`);
+      router.push(`/zipsago/mine?highlight=${request.id}`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "구매의뢰 등록에 실패했습니다.");
     } finally {
