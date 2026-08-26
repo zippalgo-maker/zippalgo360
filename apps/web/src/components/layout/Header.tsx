@@ -24,14 +24,14 @@ export default function Header() {
             <Link
               key={service.slug}
               href={service.href}
-              className="flex flex-col items-center text-sm font-medium text-ink/80 transition hover:text-brand-red"
+              className="relative text-sm font-medium text-ink/80 transition hover:text-brand-red"
             >
-              {service.name}
               {service.navSubtitle && (
-                <span className="mt-0.5 whitespace-nowrap text-[9px] font-normal leading-none text-ink/45">
+                <span className="absolute -top-3 left-1/2 w-max -translate-x-1/2 whitespace-nowrap text-[9px] font-semibold leading-none text-brand-red/80">
                   {service.navSubtitle}
                 </span>
               )}
+              {service.name}
             </Link>
           ))}
         </nav>
@@ -110,7 +110,7 @@ export default function Header() {
                 >
                   {service.name}
                   {service.navSubtitle && (
-                    <span className="ml-2 text-xs font-normal text-ink/45">{service.navSubtitle}</span>
+                    <span className="ml-2 text-xs font-semibold text-brand-red/80">{service.navSubtitle}</span>
                   )}
                 </Link>
               </li>
