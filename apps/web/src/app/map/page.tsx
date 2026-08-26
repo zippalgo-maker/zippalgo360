@@ -1,13 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { useAuth } from "@/lib/auth-context";
 import { loadKakaoMaps } from "@/lib/kakao-maps";
 import { buildCountMarkerHtml, buildFanMarkerHtml, type AreaUnit } from "@/lib/interior-marker";
-import { SERVICES } from "@/lib/services";
 import InteriorComplexPanel from "@/components/map/InteriorComplexPanel";
 import InteriorPortfolioPanel from "@/components/map/InteriorPortfolioPanel";
 import type {
@@ -209,12 +206,14 @@ function ServiceMapView() {
   const [isLocating, setIsLocating] = useState(false);
   const [layerPanelOpen, setLayerPanelOpen] = useState(false);
 
-  // 채팅/햄버거 버튼 — 집테리어 지도 화면과 같은 자리(우상단)에 우선
-  // 구조/위치만 그대로 이식한다("일단 그대로 가져와"). 채팅은 아직 우리
-  // 플랫폼에 채팅 기능 자체가 없어 안내 토스트만 띄우고, 햄버거는 우리
-  // 사이트의 실제 상단 내비게이션(Header.tsx와 동일한 목록)을 펼친다.
-  const { user, logout } = useAuth();
-  const [menuOpen, setMenuOpen] = useState(false);
+  // 채팅 버튼 — 우측 지도 컨트롤 스택에 함께 둔다(햄버거는 이미 상단
+  // 헤더(Header.tsx)에 같은 메뉴가 있어 지도 위에 따로 두지 않기로
+  // 함). 채팅 자체는 아직 플랫폼에 없어 패널은 빈 상태만 보여주지만,
+  // 클릭하면 실제로 패널이 열리고 닫혀야 하므로 toast 안내로 때우지
+  // 않는다. unreadChatCount는 채팅 기능이 생기면 실제 안읽은 채팅방
+  // 수로 채워질 자리 — 지금은 0으로 고정, 0이면 배지 자체를 숨긴다.
+  const [chatOpen, setChatOpen] = useState(false);
+  const [unreadChatCount] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
@@ -821,6 +820,15 @@ function ServiceMapView() {
 
   const isLoading = loadingLayers.size > 0;
 
+  // 우측 지도 컨트롤 스택 공통 버튼 스타일 — 기본은 흰색, 눌러서 켜진/
+  // 전환된 상태는 집테리어 마커와 같은 계열의 파스텔 그린으로 강조한다.
+  const controlButtonClass = (active: boolean) =>
+    `flex h-11 w-11 items-center justify-center rounded-xl border shadow-md backdrop-blur transition ${
+      active
+        ? "border-brand-green/40 bg-brand-green/15 text-brand-green"
+        : "border-line bg-white/95 text-ink/80 hover:bg-soft"
+    }`;
+
   return (
     <div className="relative h-[calc(100vh-4rem)] w-full">
       <div ref={mapContainerRef} className="h-full w-full bg-soft" />
@@ -879,83 +887,41 @@ function ServiceMapView() {
         </div>
       </div>
 
-      {/* 채팅·햄버거 버튼 — 집테리어 지도 화면과 같은 우상단 자리. */}
-      <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setToast("채팅 기능은 준비 중입니다.")}
-          aria-label="채팅 열기"
-          className="flex h-11 w-11 items-center justify-center rounded-xl border border-line bg-white/95 text-brand-green shadow-md backdrop-blur transition hover:bg-soft"
-        >
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <path d="M4 4.75h16v11.5H9l-5 3.5v-15Z" />
-          </svg>
-        </button>
+      {/* 지도 보기 컨트롤 — 우측 세로 스택. 햄버거 메뉴는 상단 헤더
+          (Header.tsx)에 이미 같은 메뉴가 있어 지도 위에 따로 두지 않고,
+          채팅은 이 스택 맨 위로 옮겨왔다(집테리어처럼 검색창 옆 별도
+          자리 대신, 다른 지도 컨트롤들과 함께 묶어 UX상 더 자연스러운
+          위치). 그 아래로 사용 빈도가 높은 조작(확대·축소, 현재위치)을
+          두고, 화면 표시 설정(일반·위성 전환, 평·㎡ 전환)을 그 아래에
+          배치. 모든 버튼은 기본 흰색 → 켜지거나 전환되면 집테리어 마커와
+          같은 계열의 파스텔 그린(controlButtonClass)으로 통일. */}
+      <div className="absolute right-4 top-4 z-20 flex flex-col items-end gap-2">
         <div className="relative">
           <button
             type="button"
-            onClick={() => setMenuOpen((open) => !open)}
-            aria-label="전체 메뉴"
-            aria-expanded={menuOpen}
-            className="flex h-11 w-11 items-center justify-center rounded-xl border border-line bg-white/95 text-lg text-ink shadow-md backdrop-blur transition hover:bg-soft"
+            onClick={() => setChatOpen((open) => !open)}
+            aria-label="채팅 열기"
+            aria-expanded={chatOpen}
+            className={`relative ${controlButtonClass(chatOpen)}`}
           >
-            ☰
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path d="M4 4.75h16v11.5H9l-5 3.5v-15Z" />
+            </svg>
+            {unreadChatCount > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-red px-1 text-[9px] font-bold text-white">
+                {unreadChatCount}
+              </span>
+            )}
           </button>
-          {menuOpen && (
-            <div className="absolute right-0 top-12 w-52 overflow-hidden rounded-xl border border-line bg-white shadow-lg">
-              <Link href="/map" onClick={() => setMenuOpen(false)} className="block px-4 py-2.5 text-sm font-medium text-ink hover:bg-soft">
-                지도
-              </Link>
-              {SERVICES.map((service) => (
-                <Link
-                  key={service.slug}
-                  href={service.href}
-                  onClick={() => setMenuOpen(false)}
-                  className="block px-4 py-2.5 text-sm font-medium text-ink hover:bg-soft"
-                >
-                  {service.name}
-                </Link>
-              ))}
-              <Link href="/partners" onClick={() => setMenuOpen(false)} className="block px-4 py-2.5 text-sm font-semibold text-ink hover:bg-soft">
-                파트너 센터
-              </Link>
-              <div className="border-t border-line">
-                {user ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      logout();
-                      setMenuOpen(false);
-                    }}
-                    className="block w-full px-4 py-2.5 text-left text-sm font-medium text-brand-red hover:bg-soft"
-                  >
-                    로그아웃
-                  </button>
-                ) : (
-                  <Link href="/login" onClick={() => setMenuOpen(false)} className="block px-4 py-2.5 text-sm font-medium text-ink hover:bg-soft">
-                    로그인
-                  </Link>
-                )}
-              </div>
-            </div>
-          )}
         </div>
-      </div>
 
-      {/* 지도 보기 컨트롤 — 우측 세로 스택. 사용 빈도가 높은 조작(확대·
-          축소, 현재위치)을 위쪽에, 화면 표시 설정(일반·위성 전환, 평·㎡
-          전환)을 아래쪽에 묶어 UX상 자연스러운 순서로 배치했다. 일반·위성/
-          평·㎡ 둘 다 "누르면 현재 상태가 반대로 바뀌는" 단일 토글 버튼 —
-          두 옵션을 나란히 보여주는 방식보다 다른 정사각 버튼(줌/현재위치)
-          과 크기·스타일이 통일돼 훨씬 정돈돼 보인다. */}
-      <div className="absolute right-4 top-20 z-10 flex flex-col items-end gap-2">
         <div className="flex flex-col items-end gap-2">
-          <div className="flex w-[42px] flex-col overflow-hidden rounded-xl border border-line bg-white/95 shadow-md backdrop-blur">
-            <button type="button" onClick={() => handleZoom("in")} aria-label="지도 확대" className="h-[42px] text-xl font-bold text-ink/80 hover:bg-soft">
+          <div className="flex w-11 flex-col overflow-hidden rounded-xl border border-line bg-white/95 shadow-md backdrop-blur">
+            <button type="button" onClick={() => handleZoom("in")} aria-label="지도 확대" className="h-11 text-xl font-bold text-ink/80 hover:bg-soft">
               +
             </button>
             <div className="border-t border-line" />
-            <button type="button" onClick={() => handleZoom("out")} aria-label="지도 축소" className="h-[42px] text-xl font-bold text-ink/80 hover:bg-soft">
+            <button type="button" onClick={() => handleZoom("out")} aria-label="지도 축소" className="h-11 text-xl font-bold text-ink/80 hover:bg-soft">
               −
             </button>
           </div>
@@ -963,9 +929,7 @@ function ServiceMapView() {
             type="button"
             onClick={handleLocate}
             aria-label="현재 위치로 이동"
-            className={`flex h-[42px] w-[42px] items-center justify-center rounded-xl border border-line bg-white/95 shadow-md backdrop-blur ${
-              isLocating ? "text-brand-green" : "text-ink/80"
-            } hover:bg-soft`}
+            className={controlButtonClass(isLocating)}
           >
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="7" />
@@ -976,7 +940,7 @@ function ServiceMapView() {
             type="button"
             onClick={() => handleMapType(mapType === "normal" ? "satellite" : "normal")}
             aria-label={`지도 유형을 ${mapType === "normal" ? "위성" : "일반"} 화면으로 전환`}
-            className="flex h-[42px] w-[42px] items-center justify-center rounded-xl border border-line bg-white/95 text-[11px] font-bold text-ink/80 shadow-md backdrop-blur hover:bg-soft"
+            className={`${controlButtonClass(mapType === "satellite")} text-[11px] font-bold`}
           >
             {mapType === "normal" ? "일반" : "위성"}
           </button>
@@ -984,7 +948,7 @@ function ServiceMapView() {
             type="button"
             onClick={() => setAreaUnit((unit) => (unit === "m2" ? "pyeong" : "m2"))}
             aria-label={`면적 단위를 ${areaUnit === "m2" ? "평" : "㎡"}로 전환`}
-            className="flex h-[42px] w-[42px] items-center justify-center rounded-xl border border-line bg-white/95 text-[11px] font-bold text-ink/80 shadow-md backdrop-blur hover:bg-soft"
+            className={`${controlButtonClass(areaUnit === "pyeong")} text-[11px] font-bold`}
           >
             {areaUnit === "m2" ? "㎡" : "평"}
           </button>
@@ -996,9 +960,7 @@ function ServiceMapView() {
             onClick={() => setLayerPanelOpen((open) => !open)}
             aria-label="지도 레이어 선택"
             aria-expanded={layerPanelOpen}
-            className={`relative flex h-11 w-11 items-center justify-center rounded-xl border border-line bg-white/95 shadow-md backdrop-blur transition hover:bg-soft ${
-              layerPanelOpen ? "border-brand-green text-brand-green" : "text-ink/80"
-            }`}
+            className={`relative ${controlButtonClass(layerPanelOpen)}`}
           >
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polygon points="12 2 22 8.5 12 15 2 8.5 12 2" />
@@ -1125,6 +1087,31 @@ function ServiceMapView() {
           onClose={() => setSelectedPortfolio(null)}
           areaUnit={areaUnit}
         />
+      )}
+
+      {chatOpen && (
+        <div className="absolute right-0 top-0 z-30 flex h-full w-full max-w-sm flex-col overflow-hidden border-l border-line bg-white shadow-2xl">
+          <div className="flex items-center justify-between border-b border-line px-5 py-4">
+            <p className="text-sm font-bold text-ink">채팅</p>
+            <button
+              type="button"
+              onClick={() => setChatOpen(false)}
+              aria-label="채팅 닫기"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-lg text-muted transition hover:bg-soft hover:text-ink"
+            >
+              ×
+            </button>
+          </div>
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-green/10 text-brand-green">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M4 4.75h16v11.5H9l-5 3.5v-15Z" />
+              </svg>
+            </span>
+            <p className="text-sm font-semibold text-ink">아직 채팅 내역이 없어요</p>
+            <p className="text-xs text-muted">매물·업체 상세에서 문의를 시작하면 여기에 표시됩니다.</p>
+          </div>
+        </div>
       )}
 
       {toast && (
