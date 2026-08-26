@@ -2026,3 +2026,31 @@ sudo systemctl restart zippalgo360-web
      안 될 수 있음. 필요시 이전 세션과 같은 방식(SSH로 사용자가
      anchor 기반 패치 스크립트 실행)으로 `/m` 쪽 파일에도 동일 패치를
      추가해야 함.
+
+### 배포 및 후속 확인 (같은 세션, 사용자 SSH 릴레이)
+- 사용자가 서버에서 `git checkout claude/zippalgo360-interior-service-tz2qfv`
+  → `git pull` → `npm run build` → `sudo systemctl restart
+  zippalgo360-web` 실행, 배포 완료.
+- **[완료] 검증 1**: `curl -I https://zipterior.zippalgo360.com/m` → `200
+  OK`, `curl -s .../m | head`로 확인한 HTML이 스크린샷(집팔고360
+  플랫폼바+서비스아이콘 5개+지도/견적요청/포트폴리오/MY집테리어 탭)과
+  일치 — 도메인 자체는 정상 서빙 확인.
+- **[확인됨] 문제 2 실제로 존재**: `curl -s .../m | grep -i
+  "zpEmbed\|nativeMap\|sso"` 결과, `zpEmbed`/`sso` 문자열이 전혀 없음
+  (매치된 건 `m.html`이 자기 내부 지도 패널용으로 쓰는
+  `index.html?nativeMap=1` iframe 참조뿐, 우리 임베드 감지와 무관).
+  즉 로고/플랫폼바 숨김도, SSO 자동 로그인도 지금 `/m`에서는 전혀
+  동작 안 함.
+- **[완료] 파일 위치 확인**: `ls -la /var/www/zipterior/`로 확인—
+  `/m`이 실제로 서빙하는 파일은 `index.html`과 별개인
+  **`/var/www/zipterior/m.html`**(정적 파일, 26272 bytes로
+  `curl`의 `Content-Length`와 일치). `index.html`에 있던 zpEmbed
+  감지 스크립트·style.css의 `zp-zippalgo-embedded` 규칙·SSO exchange
+  스크립트는 전부 `index.html` 전용으로 들어가 있어서 `m.html`에는
+  하나도 안 들어있던 것 — 다음 단계로 `m.html`에도 동일한 패치를
+  넣어야 함(진행 중, 다음 항목 참고).
+- 참고로 `/var/www/zipterior/`에는 파일 수정마다 `.bak_YYYYMMDD_HHMMSS_설명`
+  백업이 계속 쌓이는 자체 관례가 있음(예:
+  `index.html.bak_20260826_094446_before_sso_frontend`가 SSO 패치
+  직전 백업으로 추정) — 우리가 `m.html`을 패치할 때도 이 관례를
+  따라 패치 전 백업을 먼저 뜨는 게 안전.
