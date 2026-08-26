@@ -732,10 +732,21 @@ function ServiceMapView() {
   // 집테리어 js/app.js: #locateControl 클릭 시 navigator.geolocation으로
   // 현재 위치를 받아 map.flyTo(..., 16)으로 이동 — 카카오 지도는 flyTo가
   // 없어 setLevel+setCenter로 동일한 효과를 낸다.
+  // 기존 코드는 실패 시(권한 거부/타임아웃 등) 조용히 로딩 상태만 풀고
+  // 아무 피드백도 없어서 "버튼이 안 먹는다"는 문의로 이어졌다 — 실패
+  // 원인별로 토스트를 띄우도록 수정. 또한 enableHighAccuracy:true는
+  // GPS가 없는 데스크톱 브라우저에서 위치 확인이 오래 걸리거나
+  // 타임아웃으로 실패하는 경우가 있어(집테리어는 주로 모바일에서
+  // 쓰여 이 문제가 덜 드러났을 뿐) false로 낮춰 Wi-Fi/IP 기반의 더 빠른
+  // 위치 확인을 우선한다.
   const handleLocate = useCallback(() => {
     const kakao = window.kakao;
     const map = mapRef.current;
-    if (!kakao || !map || !navigator.geolocation) return;
+    if (!kakao || !map) return;
+    if (!navigator.geolocation) {
+      setToast("이 브라우저는 위치 확인을 지원하지 않습니다.");
+      return;
+    }
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -743,8 +754,18 @@ function ServiceMapView() {
         map.setCenter(new kakao.maps.LatLng(position.coords.latitude, position.coords.longitude));
         setIsLocating(false);
       },
-      () => setIsLocating(false),
-      { enableHighAccuracy: true, timeout: 8000 }
+      (error) => {
+        setIsLocating(false);
+        console.error("[map] 현재 위치 확인 실패", error);
+        if (error.code === error.PERMISSION_DENIED) {
+          setToast("위치 접근이 차단되어 있습니다. 브라우저 주소창 옆 위치 권한을 허용해 주세요.");
+        } else if (error.code === error.TIMEOUT) {
+          setToast("위치 확인이 시간 초과됐습니다. 다시 시도해 주세요.");
+        } else {
+          setToast("현재 위치를 가져오지 못했습니다.");
+        }
+      },
+      { enableHighAccuracy: false, timeout: 8000 }
     );
   }, []);
 
