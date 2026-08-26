@@ -2171,3 +2171,33 @@ sudo systemctl restart zippalgo360-web
   로 실서비스에 `background:#fff` 정상 반영 확인.
 - **미검증(실사용 확인 필요)**: 위성 지도 위에서 실제로 버튼이 잘
   보이는지.
+
+### 후속: 선택(active) 상태도 여전히 반투명이라 안 보임 → 흰 배경 고정 + 빨간 글자
+- 사용자 재확인: 안 보이던 건 기본 상태가 아니라 **클릭해서 선택된
+  (active) 상태** — `rgba(33,70,59,.15)`(반투명 파스텔 그린)도 위성
+  지도 위에서 마찬가지로 묻힘. 사용자 지시: 선택 상태도 배경은 그냥
+  흰색으로 두고, 글자색만 빨간색으로 바꾸자.
+- **[완료] 집테리어 서버**: `css/style.css`의 `.locate-control.active`,
+  `.map-type-control/.area-unit-control button.active`,
+  `.zipterior-zoom-control button:hover/:active` 전부 배경을
+  `rgba(33,70,59,.15)` → `#fff`(고정 불투명), 글자·테두리 색을
+  `#21463b`(그린) → `#bb1730`(브랜드 레드)로 변경. `index.html`
+  캐시버스터 `v=2.5.83-opaque-controls` → `v=2.5.84-active-red-text`.
+  사용자가 SSH로 패치 스크립트 실행(중간에 제가 이 세션 로컬
+  샌드박스에서 실수로 먼저 실행해봐서 "No such file" 에러가 났었음 —
+  서버 명령은 반드시 사용자 SSH 세션에서 실행해야 함, 실수 인지 후
+  올바른 블록을 다시 전달함).
+- **[완료] 우리 저장소**: 사용자가 "PC버전도 같이 바꿔야지"라고
+  지적 — 저희 자체 `apps/web/src/app/map/page.tsx`의
+  `controlButtonClass`도 선택 상태에 동일한 반투명 파스텔 그린
+  (`bg-brand-green/15`)을 쓰고 있어 같은 문제가 잠재해있었음(아직
+  실사용 리포트는 없었지만 동일 원인이라 선제 수정). 기본/선택 상태
+  모두 배경을 불투명 흰색(`bg-white`)으로 고정하고, 선택 상태는
+  테두리·글자색만 `border-brand-red text-brand-red`로 변경.
+  `backdrop-blur`는 완전 불투명 배경에서 의미가 없어져 같이 제거.
+- **[완료] 검증**: 집테리어 쪽은 `curl`로 실서비스 CSS에
+  `color:#bb1730` 반영 확인. 우리 쪽은 로컬 `next build` 클린,
+  git 커밋 완료(아직 서버 미배포 — 다음 배포 시 `git pull` →
+  `npm run build` → `systemctl restart zippalgo360-web` 필요).
+- **미검증(실사용 확인 필요)**: 양쪽 다 브라우저로 위성 지도 위에서
+  선택된 버튼(흰 배경 + 빨간 글자)이 잘 보이는지.
