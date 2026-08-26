@@ -1984,3 +1984,45 @@ sudo systemctl restart zippalgo360-web
   `map` 객체 없으면 조기 return) 시각적으로 검증 못 함, 상태값 자체는
   area unit과 동일한 패턴이라 실배포 환경(카카오맵 정상 로드)에서는
   문제없이 동작할 것으로 판단.
+
+---
+
+## 2026-08-26 — `/zipterior` 임베드, 모바일 기기는 집테리어 모바일 버전(`/m`)으로 접속
+
+### 시작 전
+- 사용자: "zipterior.kr/m으로 접속하면 집테리어 모바일 버전으로 접속하게
+  되는데 zippalgo360.com/zipterior 로 모바일 기기로 접속하면 모바일
+  버전으로 접속하도록 수정하자 — 집팔고360에 집테리어 다 넣으면
+  zipterior.kr은 없어질 예정이라서."
+- 현재 `apps/web/src/app/zipterior/page.tsx`는 기기 구분 없이 항상
+  `https://zipterior.zippalgo360.com/?zpEmbed=1`(데스크톱 버전) 하나만
+  iframe에 넣고 있음 — 모바일 기기로 접속해도 데스크톱 버전이 그대로
+  뜸.
+- **이 세션은 `zipterior.kr`/`zipterior.zippalgo360.com`에 아웃바운드
+  네트워크 접근이 막혀있어(egress 프록시가 차단, 이전 세션들과 동일한
+  제약) `/m` 경로의 실제 HTML 구조를 직접 확인할 수 없었음** — 트레일링
+  슬래시 유무, `zpEmbed=1`/`sso=` 쿼리스트링이 데스크톱과 동일하게
+  동작하는지, 무엇보다 로고 숨김(`zp-zippalgo-embedded` 클래스, 이전
+  세션에서 `index.html`/`style.css`에 서버 사이드로 패치함)과 SSO
+  자동 로그인 스크립트(역시 `index.html`에 패치됨)가 `/m`이 서빙하는
+  파일에도 적용되어 있는지는 코드만으로는 판단 불가. 사용자 확인 필요.
+
+### 진행 중
+- **[완료]** `apps/web/src/app/zipterior/page.tsx` — `navigator.userAgent`로
+  모바일 기기(Android/iPhone/iPad/iPod/Mobi)를 감지해 iframe src의
+  경로를 `/`(데스크톱) 대신 `/m`(모바일)으로 바꾸도록 수정.
+  `zpEmbed=1`/`sso=` 쿼리스트링 부착 로직은 기존과 동일하게 유지,
+  경로만 갈아끼움 (`buildEmbedUrl(isMobile, ssoCode?)` 헬퍼로 정리).
+- **[완료] 검증**: `next build` 클린, `npx eslint` 새 오류 없음.
+- **미검증(반드시 실사용 확인 필요)**:
+  1. `https://zipterior.zippalgo360.com/m`이 `zipterior.kr/m`과 동일한
+     서버/파일을 서빙하는지 (도메인만 다르므로 서빙 자체는 될 것으로
+     예상하나 직접 curl/브라우저 확인 못함).
+  2. `/m`이 서빙하는 파일이 `index.html`과 별개 파일(예: `m.html` 또는
+     별도 디렉토리)이라면, 앞서 `index.html`에어 넣었던 로고 숨김
+     (`zpEmbed=1` → `zp-zippalgo-embedded` 클래스)과 SSO 자동 로그인
+     삽입 스크립트가 그 파일에는 없을 가능성이 큼 — 있다면 모바일
+     iframe에서 집테리어 로고가 다시 보이거나 SSO 자동 로그인이
+     안 될 수 있음. 필요시 이전 세션과 같은 방식(SSH로 사용자가
+     anchor 기반 패치 스크립트 실행)으로 `/m` 쪽 파일에도 동일 패치를
+     추가해야 함.
