@@ -204,7 +204,7 @@ function ServiceMapView() {
 
   // 집테리어 지도 컨트롤(줌/일반·위성/평·㎡/현재위치) 이식용 상태 — 전부
   // 집테리어 js/app.js의 동일 기능을 카카오맵 SDK 호출로 그대로 옮긴 것.
-  const [areaUnit, setAreaUnit] = useState<AreaUnit>("pyeong");
+  const [areaUnit, setAreaUnit] = useState<AreaUnit>("m2");
   const [mapType, setMapType] = useState<"normal" | "satellite">("normal");
   const [isLocating, setIsLocating] = useState(false);
   const [layerPanelOpen, setLayerPanelOpen] = useState(false);
@@ -921,44 +921,14 @@ function ServiceMapView() {
         </div>
       </div>
 
-      {/* 지도 보기 컨트롤(일반/위성, 평/㎡, 확대·축소, 현재위치) — 집테리어
-          지도 화면과 같은 우측 세로 스택. */}
+      {/* 지도 보기 컨트롤 — 우측 세로 스택. 사용 빈도가 높은 조작(확대·
+          축소, 현재위치)을 위쪽에, 화면 표시 설정(일반·위성 전환, 평·㎡
+          전환)을 아래쪽에 묶어 UX상 자연스러운 순서로 배치했다. 일반·위성/
+          평·㎡ 둘 다 "누르면 현재 상태가 반대로 바뀌는" 단일 토글 버튼 —
+          두 옵션을 나란히 보여주는 방식보다 다른 정사각 버튼(줌/현재위치)
+          과 크기·스타일이 통일돼 훨씬 정돈돼 보인다. */}
       <div className="absolute right-4 top-20 z-10 flex flex-col items-end gap-2">
         <div className="flex flex-col items-end gap-2">
-          <div className="flex h-9 items-center gap-0.5 rounded-xl border border-line bg-white/95 px-1.5 shadow-md backdrop-blur">
-            <button
-              type="button"
-              onClick={() => handleMapType("normal")}
-              className={`rounded-lg px-2 py-1 text-[11px] font-bold ${mapType === "normal" ? "bg-brand-green/50 text-white" : "text-ink/60"}`}
-            >
-              일반
-            </button>
-            <span className="text-line">|</span>
-            <button
-              type="button"
-              onClick={() => handleMapType("satellite")}
-              className={`rounded-lg px-2 py-1 text-[11px] font-bold ${mapType === "satellite" ? "bg-brand-green/50 text-white" : "text-ink/60"}`}
-            >
-              위성
-            </button>
-          </div>
-          <div className="flex h-9 items-center gap-0.5 rounded-xl border border-line bg-white/95 px-1.5 shadow-md backdrop-blur">
-            <button
-              type="button"
-              onClick={() => setAreaUnit("pyeong")}
-              className={`rounded-lg px-2 py-1 text-[11px] font-bold ${areaUnit === "pyeong" ? "bg-brand-green/50 text-white" : "text-ink/60"}`}
-            >
-              평
-            </button>
-            <span className="text-line">|</span>
-            <button
-              type="button"
-              onClick={() => setAreaUnit("m2")}
-              className={`rounded-lg px-2 py-1 text-[11px] font-bold ${areaUnit === "m2" ? "bg-brand-green/50 text-white" : "text-ink/60"}`}
-            >
-              ㎡
-            </button>
-          </div>
           <div className="flex w-[42px] flex-col overflow-hidden rounded-xl border border-line bg-white/95 shadow-md backdrop-blur">
             <button type="button" onClick={() => handleZoom("in")} aria-label="지도 확대" className="h-[42px] text-xl font-bold text-ink/80 hover:bg-soft">
               +
@@ -980,6 +950,22 @@ function ServiceMapView() {
               <circle cx="12" cy="12" r="7" />
               <circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none" />
             </svg>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleMapType(mapType === "normal" ? "satellite" : "normal")}
+            aria-label={`지도 유형을 ${mapType === "normal" ? "위성" : "일반"} 화면으로 전환`}
+            className="flex h-[42px] w-[42px] items-center justify-center rounded-xl border border-line bg-white/95 text-[11px] font-bold text-ink/80 shadow-md backdrop-blur hover:bg-soft"
+          >
+            {mapType === "normal" ? "일반" : "위성"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setAreaUnit((unit) => (unit === "m2" ? "pyeong" : "m2"))}
+            aria-label={`면적 단위를 ${areaUnit === "m2" ? "평" : "㎡"}로 전환`}
+            className="flex h-[42px] w-[42px] items-center justify-center rounded-xl border border-line bg-white/95 text-[11px] font-bold text-ink/80 shadow-md backdrop-blur hover:bg-soft"
+          >
+            {areaUnit === "m2" ? "㎡" : "평"}
           </button>
         </div>
 
