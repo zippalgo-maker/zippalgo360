@@ -76,7 +76,22 @@ const MARKER_FETCH_LIMIT = 5000;
 const ZIPTERIOR_SOURCE_LIMIT = 5000;
 
 const KAKAO_APP_KEY = process.env.NEXT_PUBLIC_KAKAO_MAP_JS_KEY ?? "";
-const SEOUL_CENTER = { lat: 37.5665, lng: 126.978 };
+// 집테리어 자체 지도(js/app.js)의 시작 위치/축척과 동일하게 맞춘다
+// (성수JC 부근, 카카오 레벨 7 = 집테리어의 leaflet 스타일 줌 11).
+const MAP_START_CENTER = { lat: 37.5445, lng: 127.0559 };
+const MAP_START_LEVEL = 7;
+
+// 집테리어의 /api/v1/public/map/viewport(PublicMapService.cluster_cell_degrees,
+// app/modules/public_map/service.py)는 카카오 레벨이 아니라 "숫자가 클수록
+// 더 확대된" leaflet 스타일 줌을 기대한다(zoom<=7→0.5도 격자, zoom>15→
+// 클러스터링 해제) — 집테리어 프론트(js/map-provider.js fromKakaoLevel)도
+// 클라이언트 클러스터링에 같은 변환을 쓴다. 카카오 레벨을 그대로 넘기면
+// (레벨이 작을수록 확대) 방향이 반대라, 축소된 화면일수록 서버가 오히려
+// "많이 확대된 것"으로 착각해 격자를 필요 이상으로 좁게/넓게 잡아
+// 마커가 서로 겹치는 문제가 있었다(2026-08-26 사용자 스크린샷으로 확인).
+function toZipteriorZoom(kakaoLevel: number): number {
+  return Math.min(18, Math.max(4, 18 - kakaoLevel));
+}
 
 function ServiceMapView() {
   const searchParams = useSearchParams();
@@ -141,8 +156,8 @@ function ServiceMapView() {
         if (cancelled || !mapContainerRef.current) return;
         const kakao = window.kakao;
         const map = new kakao.maps.Map(mapContainerRef.current, {
-          center: new kakao.maps.LatLng(SEOUL_CENTER.lat, SEOUL_CENTER.lng),
-          level: 8,
+          center: new kakao.maps.LatLng(MAP_START_CENTER.lat, MAP_START_CENTER.lng),
+          level: MAP_START_LEVEL,
         });
         mapRef.current = map;
         infoWindowRef.current = new kakao.maps.InfoWindow({ removable: true });
@@ -398,7 +413,7 @@ function ServiceMapView() {
     const sw = bounds.getSouthWest();
     const ne = bounds.getNorthEast();
     const data = await apiFetch<ZipteriorViewportOut>(
-      `/integrations/zipterior/viewport?marker_type=complex&has_portfolio=true&zoom=${map.getLevel()}&north=${ne.getLat()}&south=${sw.getLat()}&east=${ne.getLng()}&west=${sw.getLng()}&source_limit=${ZIPTERIOR_SOURCE_LIMIT}`
+      `/integrations/zipterior/viewport?marker_type=complex&has_portfolio=true&zoom=${toZipteriorZoom(map.getLevel())}&north=${ne.getLat()}&south=${sw.getLat()}&east=${ne.getLng()}&west=${sw.getLng()}&source_limit=${ZIPTERIOR_SOURCE_LIMIT}`
     );
     if (!activeLayersRef.current.has("interiorPortfolio")) return;
     clearLayerMarkers("interiorPortfolio");
@@ -420,7 +435,7 @@ function ServiceMapView() {
     const sw = bounds.getSouthWest();
     const ne = bounds.getNorthEast();
     const data = await apiFetch<ZipteriorViewportOut>(
-      `/integrations/zipterior/viewport?marker_type=company&zoom=${map.getLevel()}&north=${ne.getLat()}&south=${sw.getLat()}&east=${ne.getLng()}&west=${sw.getLng()}&source_limit=${ZIPTERIOR_SOURCE_LIMIT}`
+      `/integrations/zipterior/viewport?marker_type=company&zoom=${toZipteriorZoom(map.getLevel())}&north=${ne.getLat()}&south=${sw.getLat()}&east=${ne.getLng()}&west=${sw.getLng()}&source_limit=${ZIPTERIOR_SOURCE_LIMIT}`
     );
     if (!activeLayersRef.current.has("company_interior")) return;
     clearLayerMarkers("company_interior");

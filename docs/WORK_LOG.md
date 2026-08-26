@@ -1438,3 +1438,60 @@ sudo systemctl restart zippalgo360-web
   **map "인테리어 시공사례" 레이어 구현 작업 완료** — 남은 건 사용자가
   브라우저로 직접 마커 클릭 → 부챗살 → 단지정보 → 포트폴리오 상세까지
   실제 화면에서 확인하는 것.
+
+---
+
+## 2026-08-26 — 인테리어 마커 겹침 버그: zoom 단위 불일치 수정 + 시작 위치 정렬
+
+### 시작 전
+- 사용자가 실제 화면 스크린샷 첨부 — 지도가 한반도 전체가 보일 정도로
+  축소된 상태로 시작하고, 클러스터 마커들이 서로 크게 겹쳐 보임.
+  "지도 시작축적, 축척별 마커 갯수 합쳐지고 표현되는 기준을 집테리어
+  지도와 동일하게 적용" 요청.
+
+### 진행 중 — 근본 원인 확인 (SSH로 zipterior 서버 소스 재확인)
+- `/api/v1/public/map/viewport`를 실제로 구동하는
+  `app/modules/public_map/service.py`의
+  `PublicMapService.cluster_cell_degrees(zoom)`를 읽어 정확한 격자
+  크기 규칙을 확인:
+  ```
+  zoom<=7  -> 0.500도(가장 넓음)
+  zoom<=9  -> 0.200도
+  zoom<=11 -> 0.080도
+  zoom<=13 -> 0.030도
+  zoom<=15 -> 0.012도
+  zoom>15  -> None(클러스터링 해제, 개별 마커)
+  ```
+  이 규칙은 **"숫자가 클수록 더 확대된" leaflet 스타일 줌**을 전제로
+  함(집테리어 자체 지도의 `js/map-provider.js`
+  `fromKakaoLevel=level=>clamp(18-level,4,18)`와 동일한 방향) —
+  카카오 레벨은 반대로 **숫자가 작을수록 확대**되는 체계.
+- **[원인 확정]** 우리 `map/page.tsx`는 `zoom=${map.getLevel()}`로
+  카카오 레벨을 변환 없이 그대로 서버에 넘기고 있었음. 그래서 지도를
+  축소할수록(카카오 레벨 숫자가 커질수록) 서버는 오히려 "더 확대된
+  화면"으로 착각해 격자를 필요 이상으로 좁게 잡거나, 반대로 확대된
+  화면에서 격자를 너무 넓게 잡는 등 방향이 완전히 뒤집혀 있었음 —
+  이게 스크린샷의 거대한 겹친 클러스터의 진짜 원인.
+- 시작 위치/축척도 확인: 집테리어 자체 지도(`js/app.js`)는
+  `map.setView([37.5445,127.0559], 11)`(leaflet 스타일 줌 11 =
+  카카오 레벨 `18-11=7`, 성수JC 부근)로 시작하는데, 우리는
+  `SEOUL_CENTER(37.5665,126.978)` + 레벨 8로 시작해서 더 넓은 범위가
+  한번에 보이고 있었음.
+
+### 진행 중 — 수정
+- **[완료]** `apps/web/src/app/map/page.tsx`:
+  - `toZipteriorZoom(kakaoLevel)` 함수 추가 — `18 - kakaoLevel`(4~18로
+    clamp)로 변환해 집테리어 서버가 기대하는 방향과 맞춤.
+    `loadInteriorMarkers`/`loadInteriorCompanyMarkers` 둘 다
+    `zoom=${map.getLevel()}` → `zoom=${toZipteriorZoom(map.getLevel())}`
+    로 수정.
+  - `SEOUL_CENTER`(37.5665,126.978)+레벨 8 → `MAP_START_CENTER`
+    (37.5445,127.0559, 성수JC)+`MAP_START_LEVEL`(7)로 변경해 집테리어
+    시작 화면과 동일하게 맞춤(지도 전체의 기본 시작 위치라 다른
+    레이어에도 공통 적용됨).
+- **[완료]** 로컬 `next build` 성공(타입체크 통과).
+
+### 완료 후
+- 로컬 빌드만 확인됨 — 서버 배포(`npm run build` + `zippalgo360-web`
+  재시작, API는 안 건드렸으니 재시작 불필요) 및 실브라우저로 마커
+  겹침이 실제로 해소됐는지 확인은 다음 단계.
