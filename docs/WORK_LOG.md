@@ -1616,3 +1616,25 @@ sudo systemctl restart zippalgo360-web
 - 로컬 검증 완료, push 완료(`3730e59`). **서버 재배포 필요**: `git pull`
   → `npm run build` → `zippalgo360-web` 재시작(백엔드 변경 없음, API
   재시작 불필요).
+
+---
+
+## 2026-08-26 — 집서비스 화면 구성은 다른 세션으로 인계
+
+### 완료 후
+- 사용자 지시: "집서비스 화면 구성은 다른 세션에서 진행할게" — 이 세션은
+  `/zipservice`의 **화면 디자인/구성을 더 이상 건드리지 않음**.
+- 현재까지 이 세션이 만든 것(다른 세션이 이어받을 기준점):
+  - 백엔드: `lifestyle_interest_registrations`에 6개 카테고리(moving,
+    move_out_cleaning, living_cleaning, appliance, furniture,
+    subscription) + `pyeong`/`home_style` 컬럼(마이그레이션 0004).
+    `POST /lifestyle/interest`가 이 필드들을 받음.
+  - 프론트: `/zipservice` 페이지 + `ZipServiceForm`(카테고리 6개 카드 +
+    조건부 평형/스타일 입력 + 이름/연락처/지역/일정/메모 폼) — 최소
+    기능만 있는 상태, 화면 구성/디자인은 미완성으로 남겨둠.
+  - 상단 nav "집서비스" 라벨 + 부제목("이사·청소·가전·가구") 정렬·색상
+    수정 완료, 서버 배포 완료.
+- 다른 세션이 `/zipservice` 화면을 다시 만들 때 참고할 것: 백엔드
+  스키마(카테고리 값 6종, `pyeong`/`home_style`)는 이미 나가 있으니 굳이
+  다시 바꿀 필요 없으면 그대로 재사용 가능. 바꾸게 되면 이 문서에 기록
+  남겨줄 것(다른 세션이 만든 걸 이 세션이 임의로 되돌리지 않도록).
