@@ -820,13 +820,15 @@ function ServiceMapView() {
 
   const isLoading = loadingLayers.size > 0;
 
-  // 우측 지도 컨트롤 스택 공통 버튼 스타일 — 기본은 흰색, 눌러서 켜진/
-  // 전환된 상태는 집테리어 마커와 같은 계열의 파스텔 그린으로 강조한다.
+  // 우측 지도 컨트롤 스택 공통 버튼 스타일 — 배경은 항상 불투명 흰색으로
+  // 고정(반투명이면 위성지도 위에서 버튼 자체가 묻혀 안 보이는 문제가
+  // 있었음), 눌러서 켜진/전환된 상태는 배경 대신 글자·테두리 색만
+  // 빨간색으로 강조한다.
   const controlButtonClass = (active: boolean) =>
-    `flex h-11 w-11 items-center justify-center rounded-xl border shadow-md backdrop-blur transition ${
+    `flex h-11 w-11 items-center justify-center rounded-xl border bg-white shadow-md transition ${
       active
-        ? "border-brand-green/40 bg-brand-green/15 text-brand-green"
-        : "border-line bg-white/95 text-ink/80 hover:bg-soft"
+        ? "border-brand-red text-brand-red"
+        : "border-line text-ink/80 hover:bg-soft"
     }`;
 
   return (
