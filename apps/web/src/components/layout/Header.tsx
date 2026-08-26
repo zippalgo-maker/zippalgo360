@@ -17,6 +17,9 @@ export default function Header() {
         </Link>
 
         <nav className="hidden items-center gap-7 md:flex">
+          <Link href="/map" className="text-sm font-medium text-ink/80 transition hover:text-brand-red">
+            지도
+          </Link>
           {SERVICES.map((service) => (
             <Link
               key={service.slug}
@@ -84,6 +87,15 @@ export default function Header() {
       {menuOpen && (
         <nav className="border-t border-line bg-background px-5 py-4 md:hidden">
           <ul className="flex flex-col gap-3">
+            <li>
+              <Link
+                href="/map"
+                className="block py-1 text-sm font-medium text-ink/80"
+                onClick={() => setMenuOpen(false)}
+              >
+                지도
+              </Link>
+            </li>
             {SERVICES.map((service) => (
               <li key={service.slug}>
                 <Link
