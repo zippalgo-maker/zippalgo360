@@ -1333,5 +1333,7 @@ sudo systemctl restart zippalgo360-web
   확인.
 
 ### 완료 후
-- 로컬 빌드만 확인됨 — 커밋·푸시 후 서버 배포(`git pull` → `npm run
-  build` → `systemctl restart zippalgo360-web`) 필요.
+- **[완료] 서버 배포**: `git pull` → `npm run build` → `systemctl
+  restart zippalgo360-web` 사용자가 실행, 빌드 성공. 배포 후 확인:
+  `https://zippalgo360.com/map` → `200`, 메인 페이지 HTML에 "지도"
+  텍스트 포함 확인 — 정상 반영됨.
