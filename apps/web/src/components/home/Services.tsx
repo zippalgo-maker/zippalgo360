@@ -12,7 +12,7 @@ export default function Services() {
         집팔고360으로 무엇을 도와드릴까요?
       </h2>
 
-      <div className="mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-[1.3fr_1.3fr_1.3fr_0.85fr_0.85fr]">
+      <div className="mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-[1.3fr_1.3fr_1.3fr_0.85fr]">
         {featured.map((service, i) => (
           <article
             key={service.slug}

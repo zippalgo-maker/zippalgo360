@@ -24,9 +24,14 @@ export default function Header() {
             <Link
               key={service.slug}
               href={service.href}
-              className="text-sm font-medium text-ink/80 transition hover:text-brand-red"
+              className="flex flex-col items-center text-sm font-medium text-ink/80 transition hover:text-brand-red"
             >
               {service.name}
+              {service.navSubtitle && (
+                <span className="mt-0.5 whitespace-nowrap text-[9px] font-normal leading-none text-ink/45">
+                  {service.navSubtitle}
+                </span>
+              )}
             </Link>
           ))}
         </nav>
@@ -104,6 +109,9 @@ export default function Header() {
                   onClick={() => setMenuOpen(false)}
                 >
                   {service.name}
+                  {service.navSubtitle && (
+                    <span className="ml-2 text-xs font-normal text-ink/45">{service.navSubtitle}</span>
+                  )}
                 </Link>
               </li>
             ))}
