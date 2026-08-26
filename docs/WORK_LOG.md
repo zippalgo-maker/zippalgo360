@@ -1047,8 +1047,64 @@ sudo systemctl restart zippalgo360-web
   `zippalgo360.com` 로그인 후 `/zipterior`(옛 `/jipterior`, 라우트명은
   이후 별도 세션에서 zip으로 통일됨) 메뉴 진입 → "로그인 잘 되네"로
   확인. **SSO 통합(사용자 지시 "1번") 전체 완료.**
-- 다음: 사용자 지시대로 "2번"(인테리어 업체 마커 데이터 검증, 뷰포트
-  엔드포인트 전환 이후 재확인 안 됨) → 마지막으로 백업/이중화 순.
+- 다음: 사용자 지시대로 "2번"(인테리어 업체 마커 데이터 검증) 착수 →
+  아래 섹션 참고. 그 다음은 마지막으로 백업/이중화.
+
+---
+
+## 2026-08-26 — "2번" 인테리어 업체(company_interior) 마커 검증: 근본 원인 확인, 조치는 보류
+
+### 시작 전
+- 사용자 지시 "2번": 지도의 `company_interior`("인테리어 업체") 레이어가
+  실제로 정확한 데이터를 보여주는지 검증. 뷰포트 엔드포인트
+  (`/integrations/zipterior/viewport?marker_type=company`) 전환 이후
+  재확인이 안 된 상태였음.
+
+### 진행 중 — 원인 진단 (SSH로 zipterior 서버 직접 확인)
+- zipterior의 `/api/v1/public/map/viewport?marker_type=company`를
+  서울 전역 bbox로 직접 호출 → `{"items":[],"source_marker_count":0}`
+  (같은 조건 `marker_type=complex`는 정상적으로 데이터 나옴 — 즉
+  company 분기만 문제).
+- `app/modules/public_map/repository.py`의 `list_markers()` company
+  분기 소스를 직접 읽어 원인 특정. **우리 프록시 코드/쿼리 문제가
+  아니라 zipterior DB의 데이터 상태 문제**:
+  - `companies` 테이블: 활성(status='active', deleted_at IS NULL)
+    1,693건 중 **위도/경도가 채워진 행 0건** (주소 텍스트(`address`)는
+    912건에 있음에도 지오코딩이 안 되어 있음).
+  - `is_visible_on_map` 컬럼: DB 기본값은 `TRUE`인데, 활성 업체
+    1,693건 중 **`TRUE`인 행 0건**. 이 컬럼은 쿼리에서 회사 마커를
+    내려줄 때 하드 조건(`WHERE ... c.is_visible_on_map=TRUE ...`)이라
+    위경도가 있어도 이 값이 false면 어차피 안 나옴.
+  - 이 컬럼은 zipterior 코드 전반(관리자 개요, bulk_import,
+    포트폴리오 좋아요/즐겨찾기/댓글/신고 리포지토리)에서 두루 게이트로
+    쓰이는 진짜 살아있는 컬럼 — 죽은 코드 아님.
+  - **zipterior 자체 프론트(`js/app.js:961`)도
+    `fetchMarkers('company', true)`를 호출** — 즉 업체 마커는
+    zipterior 자기 지도에서도 켜져 있어야 하는 라이브 기능. 지금 상태면
+    zipterior 자체 지도에서도 업체 마커가 하나도 안 뜨고 있을 가능성이
+    높음(집팔고360만의 문제가 아닐 수 있음 — zipterior 쪽 확인 필요).
+- `company_memberships` 테이블도 0건이라 `map_priority`/프리미엄 로직도
+  전부 기본값(0)으로만 동작 중.
+
+### 판단 — 이번 세션에서 직접 고치지 않음
+- `is_visible_on_map`이 전부 false인 게 **의도된 정책**(예: 업체
+  사무실 위치를 지도에 개별 노출하지 않기로 한 비즈니스 결정,
+  마이그레이션 중 임시 상태 등)인지 **실수/버그**인지 이 세션에서는
+  판단할 근거가 없음. zipterior 프로덕션 DB에 `UPDATE
+  companies SET is_visible_on_map=true ...`나 대량 지오코딩 스크립트를
+  임의로 돌리는 건 리스크가 크고 이 저장소(집팔고360) 범위를 벗어남 —
+  실행하지 않음.
+- 사용자에게 3가지 선택지(① zipterior 쪽에 먼저 의도적인지 확인 후
+  보류 ② 데이터 정리될 때까지 지도에서 `company_interior` 레이어를
+  임시로 숨김 ③ 바로 SQL로 일괄 true 변경)를 물었으나 **"대기, 다음
+  지시 기다려라"로 응답** — 착수 보류, 다음 세션은 이 판단을 다시
+  묻지 않고 여기서부터 이어가면 됨.
+
+### 완료 후
+- 코드 변경 없음(진단만 수행). `interiorPortfolio`(집테리어 시공사례,
+  `marker_type=complex&has_portfolio=true`)는 이번 조사와 무관하게
+  이전과 동일하게 정상 동작 중 — 문제는 `company_interior`(업체 마커)
+  레이어 한정.
 
 ---
 
