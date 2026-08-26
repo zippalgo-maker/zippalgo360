@@ -1749,3 +1749,12 @@ sudo systemctl restart zippalgo360-web
   이식)도 마찬가지로 집테리어 `index.html`/`js/app.js`/`css/style.css`
   원본 마크업 확인이 먼저 필요 — 조회 스크립트에 한 번에 포함해서
   요청할 예정.
+- **[완료] 커밋/푸시**: 세부 작업 1/3/4를 `3369da2`로 커밋, 원격이
+  뒤에 더 앞서있지 않음을 fetch로 확인 후 push 완료(브랜치
+  `claude/jippalgo360-platform-6bvrfh`). **서버 재배포 아직 안 함**
+  (프론트만 변경, 다음 배포 시 `npm run build` + `zippalgo360-web`
+  재시작 필요, 백엔드 변경 없음).
+- 세부 작업 2/5/6/7을 위해 집테리어 `index.html` 전체 + `js/app.js`/
+  `css/style.css`의 검색·컨트롤·채팅·햄버거·brand-box 관련 부분을
+  읽기 전용으로 덤프하는 조회 스크립트(`inspect-zipterior-ui.sh`)를
+  준비해 사용자에게 전달, 결과 대기 중.
