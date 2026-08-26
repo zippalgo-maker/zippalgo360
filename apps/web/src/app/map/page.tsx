@@ -246,7 +246,12 @@ function ServiceMapView() {
         <a href="https://zipterior.zippalgo360.com/?complex_id=${item.id}" target="_blank" rel="noreferrer" style="color:#bb1730;font-weight:600;">집테리어에서 보기 →</a>
       </div>`
     );
-    setLayerCounts((prev) => ({ ...prev, interiorPortfolio: data.source_marker_count }));
+    // "인테리어 시공사례" 배지는 단지(마커) 개수가 아니라 실제 시공사례
+    // (포트폴리오) 합계를 보여줘야 이름과 맞는다 — 한 단지에 여러 업체가
+    // 각각 시공사례를 등록할 수 있어서 항상 단지 수보다 많다.
+    // source_marker_count(단지 수)를 쓰면 라벨과 안 맞는 숫자가 뜬다.
+    const totalPortfolios = data.items.reduce((sum, item) => sum + item.portfolio_count, 0);
+    setLayerCounts((prev) => ({ ...prev, interiorPortfolio: totalPortfolios }));
   }, [clearLayerMarkers, setLayerUnavailable, renderViewportItems]);
 
   const loadInteriorCompanyMarkers = useCallback(async () => {
