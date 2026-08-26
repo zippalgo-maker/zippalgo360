@@ -27,7 +27,7 @@ export default function Header() {
               className="relative text-sm font-medium text-ink/80 transition hover:text-brand-red"
             >
               {service.navSubtitle && (
-                <span className="absolute -top-3 left-1/2 w-max -translate-x-1/2 whitespace-nowrap text-[9px] font-normal leading-none text-ink/45">
+                <span className="absolute -top-3 left-1/2 w-max -translate-x-1/2 whitespace-nowrap text-[9px] font-semibold leading-none text-brand-red/80">
                   {service.navSubtitle}
                 </span>
               )}
@@ -110,7 +110,7 @@ export default function Header() {
                 >
                   {service.name}
                   {service.navSubtitle && (
-                    <span className="ml-2 text-xs font-normal text-ink/45">{service.navSubtitle}</span>
+                    <span className="ml-2 text-xs font-semibold text-brand-red/80">{service.navSubtitle}</span>
                   )}
                 </Link>
               </li>
