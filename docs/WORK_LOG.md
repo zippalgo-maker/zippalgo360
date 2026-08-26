@@ -2054,3 +2054,43 @@ sudo systemctl restart zippalgo360-web
   `index.html.bak_20260826_094446_before_sso_frontend`가 SSO 패치
   직전 백업으로 추정) — 우리가 `m.html`을 패치할 때도 이 관례를
   따라 패치 전 백업을 먼저 뜨는 게 안전.
+
+### `m.html`에 zpEmbed 감지 + SSO 스크립트 패치 (같은 세션, SSH 릴레이)
+- `index.html`은 `nativeMap=1`(m.html이 자기 자신을 내부 지도/상세/채팅
+  패널용 iframe으로 재사용할 때 쓰는, 우리 용도와 무관한 기존
+  파라미터)→`zt-embedded` 클래스 패턴이 있고 SSO exchange 스크립트도
+  있지만(로고 숨김용 `zp-zippalgo-embedded`는 확인 결과 유실됨, 이번
+  범위 밖으로 보류), `m.html`은 우리 용도의 `zpEmbed`/`sso` 처리가
+  전혀 없었음. `m.html`의 중복 UI는 `.m-platbar`(집팔고360 로고+검색+
+  메뉴+알림벨)와 `.m-service-nav`(집팔고/집사고/집테리어/집이사/
+  집청소 5개 아이콘, 집테리어만 활성 나머지 "예정") — 둘 다 우리
+  Next.js 쪽 전역 `Header.tsx`(모든 라우트 최상단에 항상 렌더링,
+  `apps/web/src/app/layout.tsx`)가 이미 제공하는 진짜 헤더/내비게이션과
+  내용이 겹침(m.html 쪽은 실제 링크가 아니라 전부 "예정" 표시라 더
+  혼란스러움).
+- **[완료]** 사용자가 SSH로 python3 heredoc 앵커 패치 실행(패치 전
+  `m.html`/`css/mobile.css` 백업 먼저 뜸):
+  - `m.html` `<head>`에 `zpEmbed=1` 쿼리스트링 감지 스크립트 추가
+    (`nativeMap`→`zt-embedded`와 동일 패턴, 클래스명은
+    `zp-zippalgo-embedded`로 index.html 쪽과 통일) — `css/mobile.css`
+    링크 태그 캐시버스터도 `v=1.11.5-panel-expand` →
+    `v=1.12.0-zp-embed`로 올림.
+  - `m.html`에 SSO exchange 스크립트 추가(`index.html`의 기존 스크립트와
+    동일 로직 — `?sso=코드`를 `/auth/sso/exchange`로 교환 후
+    `ZipteriorAPI.save`+`location.reload()`) — `js/api-client.js` 로드
+    직후, `js/customer-data.js` 직전에 삽입.
+  - `css/mobile.css`의 기존 `.app-shell.map-panel-open .m-platbar,
+    .m-service-nav, .m-subnav{display:none}` 규칙 바로 뒤에
+    `html.zp-zippalgo-embedded .m-platbar, .m-service-nav{display:none
+    !important}` 추가(`.m-subnav`는 그대로 유지 — 지도/견적요청/
+    포트폴리오/MY집테리어 탭은 실제 기능이라 안 건드림).
+- **[완료] 검증**: `grep`으로 `m.html`에 두 스크립트, `mobile.css`에
+  새 규칙 모두 정상 삽입 확인. **미검증(실사용 확인 필요)**: 브라우저
+  로 `zippalgo360.com/zipterior` 모바일 접속 시 실제로 중복 헤더가
+  사라지고 로그인 상태가 이어지는지 — curl로는 JS 실행이 안 돼 클래스
+  부착 자체는 확인 불가.
+- **보류(다음 항목)**: `index.html`의 로고(`.brand-box`) 숨김용
+  `zp-zippalgo-embedded` 패치가 유실된 상태라, 데스크톱 임베드
+  (`zippalgo360.com/zipterior`를 PC로 접속)에서도 지금은 집테리어
+  로고가 다시 노출될 가능성 있음 — 이번 세션 범위 밖이라 손대지
+  않았고, 사용자에게 별도 확인 요청 필요.
