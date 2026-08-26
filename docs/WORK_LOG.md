@@ -2125,3 +2125,35 @@ sudo systemctl restart zippalgo360-web
   로컬 grep으로 확인.
 - **미검증(실사용 확인 필요)**: 브라우저로 PC 로고 안 보이는지,
   모바일 검색창 눌렀을 때 더 이상 확대 안 되는지.
+
+### 후속: 지도 우측 컨트롤 버튼을 /map 페이지와 같은 색상으로 통일
+- 사용자 요청: "현재 map 오른쪽 버튼스타일로 집테리어 접속시 지도화면의
+  오른쪽 버튼에도 적용" — `zippalgo360.com/map`에서 이미 통일해둔
+  흰 배경/파스텔 그린 활성 상태 버튼 스타일을 집테리어 지도 화면
+  (줌/현재위치/지도유형/평·㎡/레이어)에도 적용해달라는 요청.
+- **판단**: 지도유형(일반|위성)·평/㎡ 버튼은 지금 2버튼 pill 구조
+  (`.map-type-control`/`.area-unit-control`, 각 버튼 30×28px, 선택
+  시 진초록 단색 채움)라 `/map`처럼 "단일 토글 버튼"으로 완전히
+  바꾸려면 자바스크립트까지 손대야 해서 실서비스 지도가 깨질 위험이
+  있음 — **구조/동작(pill, JS)은 그대로 두고 색상·테두리·그림자만**
+  `/map`과 통일하는 것으로 범위를 정함(사용자에게 이 판단을 설명하고
+  바로 진행, 별도 승인 대기 없이 실행). 또한 `zipterior.kr` 직접
+  방문자 화면에는 전혀 영향 없도록 `html.zp-zippalgo-embedded` 스코프
+  안에서만 적용(`zpEmbed=1`일 때만).
+- **[완료]** `css/style.css` 파일 끝에 스코프 규칙 추가 —
+  `.zipterior-zoom-control`/`.locate-control`/`.map-type-control`/
+  `.area-unit-control`/`.marker-style-control` 컨테이너를 흰 배경
+  카드(`rgba(255,255,255,.95)`, 테두리 `#e6e9e7`, `border-radius:12px`,
+  옅은 그림자)로, 각 버튼 기본 텍스트는 `rgba(32,36,33,.7~.8)`
+  (`--color-ink`), 활성/hover 상태는 파스텔 그린
+  `rgba(33,70,59,.15)` 배경 + `#21463b`(`--color-brand-green`) 글자로
+  통일(`apps/web/src/app/globals.css`의 실제 브랜드 색상 값을 그대로
+  가져다 씀). pill 구분선(`<span>|</span>`)은 옅은 회색으로 톤다운만.
+- **[완료]** `index.html`의 `css/style.css` 링크 캐시버스터
+  `v=2.5.81-zp-embed` → `v=2.5.82-zp-controls`로 재차 갱신.
+- **[완료] 검증**: `curl -s https://zipterior.zippalgo360.com/?zpEmbed=1`
+  로 링크 버전 갱신 확인, `curl -s
+  https://zipterior.zippalgo360.com/css/style.css?v=2.5.82-zp-controls`
+  로 새 규칙 4줄 모두 정상 서빙 확인(원격 실서비스 기준).
+- **미검증(실사용 확인 필요)**: 브라우저로 실제 버튼 색상이 의도한
+  대로 바뀌었는지, pill 레이아웃이 안 깨졌는지(글꼴/줄바꿈 등).
