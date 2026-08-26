@@ -46,14 +46,6 @@ export default function ZipteriorEmbedPage() {
         className="h-full w-full border-0"
         allow="geolocation"
       />
-      <a
-        href={ZIPTERIOR_URL}
-        target="_blank"
-        rel="noreferrer"
-        className="absolute right-4 top-4 z-10 rounded-full border border-line bg-white/95 px-3 py-1.5 text-xs font-semibold text-ink/70 shadow-md transition hover:text-brand-red"
-      >
-        새 탭에서 열기 ↗
-      </a>
     </div>
   );
 }

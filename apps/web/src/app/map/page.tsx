@@ -56,6 +56,13 @@ const COMPANY_LAYER_TYPE: Partial<Record<LayerKey, string>> = {
   company_cleaner: "cleaner",
 };
 
+// 집팔고(매물+부동산업체) ↔ 집테리어(시공사례+인테리어업체)는 지도 위
+// 초록/빨강 마커가 뒤섞여 보이면 어느 쪽 숫자인지 헷갈리기 때문에, 둘 중
+// 한 그룹을 켜면 반대 그룹은 자동으로 꺼지도록 상호배타 처리한다(이사/
+// 청소업체는 어느 그룹에도 속하지 않아 자유롭게 중복 선택 가능).
+const LAYER_GROUP_ZIPPALGO: ReadonlySet<LayerKey> = new Set(["listings", "company_real_estate"]);
+const LAYER_GROUP_ZIPTERIOR: ReadonlySet<LayerKey> = new Set(["interiorPortfolio", "company_interior"]);
+
 const COMPANY_LAYER_COLOR: Partial<Record<LayerKey, string>> = {
   company_real_estate: "#427cff",
   company_interior: "#21463b",
@@ -623,23 +630,41 @@ function ServiceMapView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMapReady, activeLayers]);
 
-  const toggleLayer = useCallback((layer: LayerKey, available: boolean) => {
-    if (!available) return;
-    setActiveLayers((prev) => {
-      const next = new Set(prev);
-      if (next.has(layer)) {
-        next.delete(layer);
-        clearLayerMarkers(layer);
-        if (layer === "interiorPortfolio") {
-          interiorMarkerElementsRef.current.clear();
-          closeInteriorPanels();
-        }
-      } else {
-        next.add(layer);
+  const deactivateLayer = useCallback(
+    (next: Set<LayerKey>, layer: LayerKey) => {
+      next.delete(layer);
+      clearLayerMarkers(layer);
+      if (layer === "interiorPortfolio") {
+        interiorMarkerElementsRef.current.clear();
+        closeInteriorPanels();
       }
-      return next;
-    });
-  }, [clearLayerMarkers, closeInteriorPanels]);
+    },
+    [clearLayerMarkers, closeInteriorPanels]
+  );
+
+  const toggleLayer = useCallback(
+    (layer: LayerKey, available: boolean) => {
+      if (!available) return;
+      setActiveLayers((prev) => {
+        const next = new Set(prev);
+        if (next.has(layer)) {
+          deactivateLayer(next, layer);
+        } else {
+          const opposingGroup = LAYER_GROUP_ZIPPALGO.has(layer)
+            ? LAYER_GROUP_ZIPTERIOR
+            : LAYER_GROUP_ZIPTERIOR.has(layer)
+              ? LAYER_GROUP_ZIPPALGO
+              : null;
+          opposingGroup?.forEach((opposingLayer) => {
+            if (next.has(opposingLayer)) deactivateLayer(next, opposingLayer);
+          });
+          next.add(layer);
+        }
+        return next;
+      });
+    },
+    [deactivateLayer]
+  );
 
   useEffect(() => {
     const keyword = query.trim();
@@ -741,6 +766,16 @@ function ServiceMapView() {
               </li>
             ))}
           </ul>
+          {activeLayers.has("interiorPortfolio") && (
+            <p className="mt-2 border-t border-line pt-2 text-[11px] leading-relaxed text-brand-green">
+              초록색 마커는 실제 단지별 시공사례 수 입니다.
+            </p>
+          )}
+          {activeLayers.has("listings") && (
+            <p className="mt-2 border-t border-line pt-2 text-[11px] leading-relaxed text-brand-red">
+              붉은색 마커는 단지별 매물 수 입니다.
+            </p>
+          )}
         </div>
 
         {isLoading && (
