@@ -2157,3 +2157,17 @@ sudo systemctl restart zippalgo360-web
   로 새 규칙 4줄 모두 정상 서빙 확인(원격 실서비스 기준).
 - **미검증(실사용 확인 필요)**: 브라우저로 실제 버튼 색상이 의도한
   대로 바뀌었는지, pill 레이아웃이 안 깨졌는지(글꼴/줄바꿈 등).
+
+### 후속: 위성지도에서 컨트롤 버튼이 안 보이는 문제 (반투명 → 불투명)
+- 사용자 실사용 확인: 위성 지도 위에서는 배경(rgba(255,255,255,.95)
+  반투명 흰색 + blur)이 위성 이미지에 묻혀 버튼이 잘 안 보임.
+- **[완료]** `css/style.css`의 방금 추가한 컨트롤 카드 배경을
+  `rgba(255,255,255,.95)` → `#fff`(완전 불투명)로, 의미 없어진
+  `backdrop-filter:blur(8px)`도 `none`으로 변경(반투명이 아니라 블러
+  효과 자체가 안 보임). `index.html`의 `style.css` 캐시버스터
+  `v=2.5.82-zp-controls` → `v=2.5.83-opaque-controls`.
+- **[완료] 검증**: `curl -s
+  https://zipterior.zippalgo360.com/css/style.css?v=2.5.83-opaque-controls`
+  로 실서비스에 `background:#fff` 정상 반영 확인.
+- **미검증(실사용 확인 필요)**: 위성 지도 위에서 실제로 버튼이 잘
+  보이는지.
