@@ -1337,3 +1337,84 @@ sudo systemctl restart zippalgo360-web
   restart zippalgo360-web` 사용자가 실행, 빌드 성공. 배포 후 확인:
   `https://zippalgo360.com/map` → `200`, 메인 페이지 HTML에 "지도"
   텍스트 포함 확인 — 정상 반영됨.
+
+---
+
+## 2026-08-26 — map "인테리어 시공사례" 레이어를 집테리어 지도와 동일하게 구현
+
+### 시작 전
+- 사용자 지시: map에서 "인테리어 시공사례" 선택 시 마커 디자인, 마커
+  클릭 시 뜨는 부챗살 마커, 마커 클릭 시 단지 기본정보+포트폴리오
+  상세정보 노출까지 집테리어 자체 지도화면과 "100% 동일하게" 구현.
+- 조사 결과 이 기능이 방별 사진 갤러리, 라이트박스, 즉석 채팅상담,
+  즐겨찾기, 분석 트래킹까지 엮인 큰 시스템임을 확인 → 사용자에게 범위
+  확인 후 **핵심만(마커+부챗살+단지정보+포트폴리오 상세)** 구현하기로
+  확정, 라이트박스/채팅/즐겨찾기/분석 트래킹은 제외.
+
+### 진행 중 — 집테리어 소스 조사 (SSH로 읽기 전용, 코드는 안 건드림)
+- `/var/www/zipterior/js/map-provider.js`(카카오맵 래퍼), `js/app.js`
+  (마커/부채꼴/패널 로직 실제 구현, ~1300줄 중 핵심 구간 발췌),
+  `css/style.css`(마커/부채꼴 색상·치수)를 읽어 정확한 구현 방식 파악:
+  - 마커: `.count-marker`(반투명 초록 원, "시공 N", 44×44,
+    `rgba(33,70,59,.62)` 배경 + `rgba(23,59,49,.96)` 1px 테두리) —
+    클러스터/개별 마커 둘 다 같은 스타일.
+  - 부챗살(fan) 마커: `point()`/`arcPath()` 알고리즘으로 평형 타입별
+    SVG 쐐기(wedge)를 그림(색상 배열 10개 하드코딩), 중앙에 "시공 N건"
+    원형 사인, 상단에 단지명 말풍선 + 닫기(×) 버튼.
+  - `mapApiComplex`/`mapApiType`/`mapApiPortfolio`(js/app.js 44~53행):
+    집테리어 `/api/v1/public/complexes/{id}`, `/api/v1/portfolios?
+    complex_id=`, `/api/v1/portfolios/{id}` 응답을 화면에 쓰는 형태로
+    변환하는 로직 — 이걸 그대로 Python으로 옮겨서 우리 백엔드와
+    집테리어 프론트가 같은 필드를 같은 방식으로 해석하게 맞춤.
+  - 다행히 `apps/web/src/app/globals.css`의 브랜드 색상(`--color-
+    brand-green:#21463b`, `--color-brand-red:#bb1730`)이 집테리어의
+    `--green`/`--red`와 이미 완전히 동일 — 디자인 통일이 수월했음.
+
+### 진행 중 — 구현
+- **[완료] 백엔드**(`apps/api/app/modules/integrations/`): 기존
+  zipterior 프록시(schemas.py/zipterior_client.py/router.py)에 3개
+  엔드포인트 추가:
+  - `GET /integrations/zipterior/complexes/{complex_id}` — 단지
+    기본정보(주소/입주시기/세대수/동수/주차대수/난방/시공사/평형
+    타입별 목록/이미지).
+  - `GET /integrations/zipterior/complex-portfolios?complex_id=` —
+    단지의 시공사례 카드 목록(최대 100건, offset 지원).
+  - `GET /integrations/zipterior/portfolios/{portfolio_id}` —
+    포트폴리오 상세(히어로 이미지, 사진 목록, 업체정보, 예산/기간
+    등). `ast.parse`로 문법 확인.
+- **[완료] 프론트엔드**(`apps/web`):
+  - `src/lib/interior-marker.ts`(신규) — `buildCountMarkerHtml`,
+    `buildFanMarkerHtml`(집테리어 point/arcPath/selectedIcon을 TS로
+    그대로 이식).
+  - `src/app/globals.css` — `.zpi-*` 접두사로 마커/부챗살 CSS 추가
+    (집테리어 값 그대로, 전역 클래스 충돌 방지).
+  - `src/components/map/InteriorComplexPanel.tsx`(신규) — 단지 상세
+    슬라이드 패널(히어로 이미지, 기본정보 그리드, 평형 타입 탭,
+    필터된 포트폴리오 카드 그리드, 최신순 정렬).
+  - `src/components/map/InteriorPortfolioPanel.tsx`(신규) — 포트폴리오
+    상세 패널(히어로+사진 그리드+업체정보+연락처).
+  - `src/app/map/page.tsx` — `interiorPortfolio` 레이어 전용 렌더러
+    (`renderInteriorComplexMarkers`) 추가: 개별 마커 클릭 시 다른
+    레이어처럼 인포윈도우 대신, 그 마커 자체가 부챗살로 바뀌고
+    (`openInteriorComplex`) 옆에 단지 패널이 열림 — 집테리어의
+    `selectComplex` 흐름과 동일. 부챗살 조각 클릭(`bindFanInteractions`)
+    → 평형 필터, 닫기 버튼 → 원래 배지로 복원(`collapseInteriorMarker`/
+    `closeInteriorPanels`). 클러스터 마커는 성능 요구사항(이 문서 앞부분
+    "속도 저하 없어야 한다" 원칙)에 따라 기존처럼 확대 방식 유지(집테리어
+    는 클러스터 클릭 시 목록 표시 — 우리는 서버 사전 클러스터링 구조라
+    클릭 시점엔 개별 단지 데이터가 없어서 확대가 더 적합한 절충안으로
+    판단, 마커 디자인 자체는 동일하게 맞춤).
+  - `src/lib/types.ts` — 새 백엔드 스키마에 대응하는 TS 타입 추가.
+- **[완료] 검증**: `next build` 성공(타입체크 통과), `npx eslint`로
+  새로 작성한 코드가 기존 코드베이스 관례(예: `activeLayersRef` 패턴,
+  effect 안 setState 패턴)에서 벗어난 새로운 린트 오류를 만들지 않는지
+  확인(React Compiler 계열 린트 규칙이 이 저장소에 이미 광범위하게
+  깔려 있었지만 빌드를 막지는 않는 경고 수준이라는 것도 함께 확인함).
+
+### 완료 후
+- 로컬 빌드/린트만 확인됨 — 서버 배포(API는 `zippalgo360-api` 재시작
+  필요 없음, 새 엔드포인트만 추가한 것이라 무중단 반영 안 됨 — **주의:
+  `apps/api`는 실제로는 재시작해야 새 라우터가 반영됨**, `apps/web`은
+  `npm run build` 후 `zippalgo360-web` 재시작 필요) 및 실브라우저
+  end-to-end 테스트(부챗살 클릭, 단지정보, 포트폴리오 상세까지)는
+  다음 단계로 남김.

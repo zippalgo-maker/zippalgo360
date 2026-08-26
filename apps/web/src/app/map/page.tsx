@@ -4,10 +4,15 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { loadKakaoMaps } from "@/lib/kakao-maps";
+import { buildCountMarkerHtml, buildFanMarkerHtml } from "@/lib/interior-marker";
+import InteriorComplexPanel from "@/components/map/InteriorComplexPanel";
+import InteriorPortfolioPanel from "@/components/map/InteriorPortfolioPanel";
 import type {
   ApartmentComplex,
   CompanyMapMarker,
   ListingMapMarker,
+  ZipteriorComplexDetailOut,
+  ZipteriorPortfolioSummary,
   ZipteriorViewportItem,
   ZipteriorViewportOut,
 } from "@/lib/types";
@@ -87,6 +92,28 @@ function ServiceMapView() {
   const clusterersByLayerRef = useRef<Partial<Record<LayerKey, any>>>({});
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const infoWindowRef = useRef<any>(null);
+
+  // "인테리어 시공사례" 레이어의 개별(비클러스터) 마커 — 집테리어 지도와
+  // 동일하게, 클릭하면 이 마커 자체가 부챗살(fan) 모양으로 바뀐다. 그러려면
+  // 마커별 DOM 엘리먼트와 원본 데이터를 계속 들고 있어야 해서 별도 ref로
+  // 관리한다(다른 레이어처럼 클릭 즉시 인포윈도우만 띄우고 끝나지 않음).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const interiorMarkerElementsRef = useRef<Map<number, { el: HTMLDivElement; overlay: any; item: ZipteriorViewportItem }>>(
+    new Map()
+  );
+  const interiorComplexCacheRef = useRef<Map<number, ZipteriorComplexDetailOut>>(new Map());
+  const [selectedComplexId, setSelectedComplexId] = useState<number | null>(null);
+  const [selectedArea, setSelectedArea] = useState<string | null>(null);
+  const [selectedPortfolio, setSelectedPortfolio] = useState<ZipteriorPortfolioSummary | null>(null);
+  // idle 이벤트로 뷰포트가 다시 로드될 때 쓰는 렌더 함수는 지도가 처음
+  // 준비되거나 activeLayers가 바뀔 때만 새로 붙기 때문에(아래 useEffect의
+  // 의존성 배열 참고), 그 클로저 안에서 selectedComplexId/selectedArea를
+  // 직접 읽으면 오래된 값이 남는다 — activeLayersRef와 같은 이유로 ref에
+  // 최신 값을 담아 항상 최신값을 읽게 한다.
+  const selectedComplexIdRef = useRef<number | null>(null);
+  selectedComplexIdRef.current = selectedComplexId;
+  const selectedAreaRef = useRef<string | null>(null);
+  selectedAreaRef.current = selectedArea;
 
   const [activeLayers, setActiveLayers] = useState<Set<LayerKey>>(initialLayers);
   const activeLayersRef = useRef(activeLayers);
@@ -191,6 +218,143 @@ function ServiceMapView() {
     []
   );
 
+  // 부챗살 마커를 원래의 "시공 N" 원형 배지로 되돌린다(단지 선택 해제 시).
+  const collapseInteriorMarker = useCallback((complexId: number) => {
+    const entry = interiorMarkerElementsRef.current.get(complexId);
+    if (!entry) return;
+    entry.el.innerHTML = buildCountMarkerHtml(entry.item.portfolio_count, entry.item.name ?? undefined);
+    entry.overlay.setZIndex?.(0);
+  }, []);
+
+  const closeInteriorPanels = useCallback(() => {
+    setSelectedComplexId((current) => {
+      if (current != null) collapseInteriorMarker(current);
+      return null;
+    });
+    setSelectedArea(null);
+    setSelectedPortfolio(null);
+  }, [collapseInteriorMarker]);
+
+  // 부챗살 마커 안의 조각(평형 타입) 클릭, 닫기 버튼, 단지명/시공건수
+  // 클릭에 이벤트를 건다 — 집테리어 지도(js/app.js bindFanInteractions)와
+  // 동일한 3가지 상호작용. closeInteriorPanels는 collapseInteriorMarker에만
+  // 의존하는 안정적인(stable) 콜백이라 ref로 감쌀 필요 없이 그대로 캡처한다.
+  const bindFanInteractions = useCallback(
+    (el: HTMLDivElement, complex: ZipteriorComplexDetailOut) => {
+      el.querySelectorAll<HTMLElement>(".zpi-fan-sector").forEach((sector) => {
+        sector.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const area = sector.dataset.area;
+          const type = sector.dataset.type;
+          if (area == null || type == null) return;
+          setSelectedArea(`${area}|${type}`);
+        });
+      });
+      el.querySelector<HTMLElement>("[data-fan-close]")?.addEventListener("click", (event) => {
+        event.stopPropagation();
+        closeInteriorPanels();
+      });
+      el.querySelectorAll<HTMLElement>("[data-fan-open-basic]").forEach((node) => {
+        node.addEventListener("click", (event) => {
+          event.stopPropagation();
+          setSelectedComplexId(complex.id);
+        });
+      });
+    },
+    [closeInteriorPanels]
+  );
+
+  // 단지 마커를 클릭했을 때: 단지 상세를 받아와 그 마커를 부챗살로
+  // 바꾸고 패널을 연다(집테리어의 selectComplex와 동일한 흐름).
+  const openInteriorComplex = useCallback(
+    async (complexId: number) => {
+      setSelectedComplexId((current) => {
+        if (current != null && current !== complexId) collapseInteriorMarker(current);
+        return complexId;
+      });
+      setSelectedArea(null);
+      setSelectedPortfolio(null);
+
+      let complex = interiorComplexCacheRef.current.get(complexId);
+      if (!complex) {
+        try {
+          complex = await apiFetch<ZipteriorComplexDetailOut>(`/integrations/zipterior/complexes/${complexId}`);
+          interiorComplexCacheRef.current.set(complexId, complex);
+        } catch {
+          return;
+        }
+      }
+      if (!complex.available) return;
+      const entry = interiorMarkerElementsRef.current.get(complexId);
+      if (!entry) return;
+      entry.el.innerHTML = buildFanMarkerHtml(complex, null);
+      entry.overlay.setZIndex?.(10000);
+      bindFanInteractions(entry.el, complex);
+    },
+    [collapseInteriorMarker, bindFanInteractions]
+  );
+
+  // interiorPortfolio 레이어 전용 렌더러 — 다른 레이어(renderViewportItems)와
+  // 달리 개별 마커를 클릭하면 인포윈도우 대신 그 마커 자체가 부챗살로
+  // 바뀌고 옆에 단지 정보 패널이 열린다(집테리어 자체 지도와 동일한 UX).
+  const renderInteriorComplexMarkers = useCallback(
+    (items: ZipteriorViewportItem[]) => {
+      const kakao = window.kakao;
+      const map = mapRef.current;
+      interiorMarkerElementsRef.current.clear();
+      items.forEach((item) => {
+        const position = new kakao.maps.LatLng(item.latitude, item.longitude);
+        const isCluster = item.item_type === "cluster";
+        const el = document.createElement("div");
+        el.innerHTML = buildCountMarkerHtml(item.portfolio_count, isCluster ? undefined : item.name ?? undefined);
+        const overlay = new kakao.maps.CustomOverlay({
+          position,
+          content: el,
+          map,
+          yAnchor: 0.5,
+          xAnchor: 0.5,
+          zIndex: 0,
+        });
+        if (isCluster) {
+          el.addEventListener("click", () => {
+            map.setLevel(Math.max(1, map.getLevel() - 2));
+            map.setCenter(position);
+          });
+        } else if (item.id != null) {
+          const complexId = item.id;
+          interiorMarkerElementsRef.current.set(complexId, { el, overlay, item });
+          el.addEventListener("click", () => openInteriorComplex(complexId));
+        }
+        markersByLayerRef.current.interiorPortfolio.push(overlay);
+      });
+      // 지도를 살짝 움직여서 이 레이어가 다시 로드돼도(idle 재조회), 이미
+      // 펼쳐 놓았던 단지가 여전히 화면 안에 있으면 부챗살 상태를 그대로
+      // 복원한다 — 새로 만든 마커는 기본적으로 표준 배지 상태이기 때문.
+      const currentComplexId = selectedComplexIdRef.current;
+      if (currentComplexId != null) {
+        const cached = interiorComplexCacheRef.current.get(currentComplexId);
+        const entry = interiorMarkerElementsRef.current.get(currentComplexId);
+        if (cached?.available && entry) {
+          entry.el.innerHTML = buildFanMarkerHtml(cached, selectedAreaRef.current);
+          entry.overlay.setZIndex?.(10000);
+          bindFanInteractions(entry.el, cached);
+        }
+      }
+    },
+    [openInteriorComplex, bindFanInteractions]
+  );
+
+  // 단지 정보 패널에서 평형 타입 탭을 눌러 selectedArea가 바뀌면, 지도
+  // 위 부챗살 마커의 활성 조각(active 표시)도 같이 갱신한다.
+  useEffect(() => {
+    if (selectedComplexId == null) return;
+    const complex = interiorComplexCacheRef.current.get(selectedComplexId);
+    const entry = interiorMarkerElementsRef.current.get(selectedComplexId);
+    if (!complex?.available || !entry) return;
+    entry.el.innerHTML = buildFanMarkerHtml(complex, selectedArea);
+    bindFanInteractions(entry.el, complex);
+  }, [selectedArea, selectedComplexId, bindFanInteractions]);
+
   const loadListingMarkers = useCallback(async () => {
     const kakao = window.kakao;
     const map = mapRef.current;
@@ -239,20 +403,14 @@ function ServiceMapView() {
     if (!activeLayersRef.current.has("interiorPortfolio")) return;
     clearLayerMarkers("interiorPortfolio");
     setLayerUnavailable("interiorPortfolio", !data.available);
-    renderViewportItems("interiorPortfolio", data.items, "#bb1730", (item) =>
-      `<div style="padding:10px 12px;min-width:180px;font-size:13px;line-height:1.6;">
-        <strong>${item.name}</strong><br/>
-        시공사례 ${item.portfolio_count}건<br/>
-        <a href="https://zipterior.zippalgo360.com/?complex_id=${item.id}" target="_blank" rel="noreferrer" style="color:#bb1730;font-weight:600;">집테리어에서 보기 →</a>
-      </div>`
-    );
+    renderInteriorComplexMarkers(data.items);
     // "인테리어 시공사례" 배지는 단지(마커) 개수가 아니라 실제 시공사례
     // (포트폴리오) 합계를 보여줘야 이름과 맞는다 — 한 단지에 여러 업체가
     // 각각 시공사례를 등록할 수 있어서 항상 단지 수보다 많다.
     // source_marker_count(단지 수)를 쓰면 라벨과 안 맞는 숫자가 뜬다.
     const totalPortfolios = data.items.reduce((sum, item) => sum + item.portfolio_count, 0);
     setLayerCounts((prev) => ({ ...prev, interiorPortfolio: totalPortfolios }));
-  }, [clearLayerMarkers, setLayerUnavailable, renderViewportItems]);
+  }, [clearLayerMarkers, setLayerUnavailable, renderInteriorComplexMarkers]);
 
   const loadInteriorCompanyMarkers = useCallback(async () => {
     const kakao = window.kakao;
@@ -384,12 +542,16 @@ function ServiceMapView() {
       if (next.has(layer)) {
         next.delete(layer);
         clearLayerMarkers(layer);
+        if (layer === "interiorPortfolio") {
+          interiorMarkerElementsRef.current.clear();
+          closeInteriorPanels();
+        }
       } else {
         next.add(layer);
       }
       return next;
     });
-  }, [clearLayerMarkers]);
+  }, [clearLayerMarkers, closeInteriorPanels]);
 
   useEffect(() => {
     const keyword = query.trim();
@@ -499,6 +661,19 @@ function ServiceMapView() {
           </div>
         )}
       </div>
+
+      {activeLayers.has("interiorPortfolio") && selectedComplexId != null && (
+        <InteriorComplexPanel
+          complexId={selectedComplexId}
+          selectedArea={selectedArea}
+          onSelectArea={setSelectedArea}
+          onClose={closeInteriorPanels}
+          onOpenPortfolio={setSelectedPortfolio}
+        />
+      )}
+      {selectedPortfolio && (
+        <InteriorPortfolioPanel portfolioId={selectedPortfolio.id} onClose={() => setSelectedPortfolio(null)} />
+      )}
 
       {mapError && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/95">

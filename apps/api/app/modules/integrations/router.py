@@ -3,7 +3,10 @@ from fastapi import APIRouter, Query
 from app.modules.integrations import zipterior_client
 from app.modules.integrations.schemas import (
     ZipteriorCompanyMapMarkerListOut,
+    ZipteriorComplexDetailOut,
+    ZipteriorComplexPortfolioListOut,
     ZipteriorMapMarkerListOut,
+    ZipteriorPortfolioDetailOut,
     ZipteriorPortfolioListOut,
     ZipteriorViewportOut,
 )
@@ -69,3 +72,22 @@ def get_interior_viewport(
         has_portfolio=has_portfolio,
         source_limit=source_limit,
     )
+
+
+@router.get("/complexes/{complex_id}", response_model=ZipteriorComplexDetailOut)
+def get_complex_detail(complex_id: int) -> ZipteriorComplexDetailOut:
+    return zipterior_client.get_complex_detail(complex_id)
+
+
+@router.get("/complex-portfolios", response_model=ZipteriorComplexPortfolioListOut)
+def get_complex_portfolios(
+    complex_id: int = Query(..., ge=1),
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+) -> ZipteriorComplexPortfolioListOut:
+    return zipterior_client.get_complex_portfolios(complex_id=complex_id, limit=limit, offset=offset)
+
+
+@router.get("/portfolios/{portfolio_id}", response_model=ZipteriorPortfolioDetailOut)
+def get_portfolio_detail(portfolio_id: int) -> ZipteriorPortfolioDetailOut:
+    return zipterior_client.get_portfolio_detail(portfolio_id)

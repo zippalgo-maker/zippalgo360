@@ -276,3 +276,81 @@ export interface ZipteriorViewportOut {
   source_marker_count: number;
   available: boolean;
 }
+
+export interface ZipteriorApartmentType {
+  id: number;
+  area: string;
+  type: string;
+  count: number;
+  supply_area_m2: number | null;
+  exclusive_area_m2: number | null;
+  room_count: number | null;
+  bathroom_count: number | null;
+  rate: string | null;
+  floor_plan_path: string | null;
+}
+
+export interface ZipteriorComplexDetailOut {
+  id: number;
+  name: string;
+  latitude: number;
+  longitude: number;
+  address: string;
+  year: string;
+  households: string;
+  buildings: string;
+  parking: string;
+  heating: string;
+  builder: string;
+  portfolio_count: number;
+  apartment_types: ZipteriorApartmentType[];
+  images: string[];
+  available: boolean;
+}
+
+export interface ZipteriorPortfolioSummary {
+  id: number;
+  company_id: number | null;
+  company_name: string;
+  complex_name: string;
+  title: string;
+  scope: string;
+  budget: string;
+  duration: string;
+  date: string;
+  area: string;
+  type: string;
+  image: string | null;
+}
+
+export interface ZipteriorComplexPortfolioListOut {
+  items: ZipteriorPortfolioSummary[];
+  total: number;
+  available: boolean;
+}
+
+export interface ZipteriorPortfolioImage {
+  src: string;
+  caption: string | null;
+}
+
+export interface ZipteriorPortfolioDetailOut {
+  id: number;
+  company_id: number | null;
+  company_name: string;
+  company_logo: string | null;
+  company_phone: string | null;
+  complex_id: number | null;
+  complex_name: string;
+  title: string;
+  scope: string;
+  budget: string;
+  duration: string;
+  date: string;
+  area: string;
+  type: string;
+  intro: string;
+  hero_image: string | null;
+  images: ZipteriorPortfolioImage[];
+  available: boolean;
+}

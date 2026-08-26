@@ -35,3 +35,205 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
 }
+
+/* 인테리어 시공사례 지도 마커 — 집테리어 자체 지도와 동일한 디자인으로
+   맞춘 것(색상/치수는 집테리어 js/app.js의 portfolioMarkerHtml·
+   selectedIcon, css/style.css의 .count-marker·.fan-*를 그대로 옮김).
+   전역 클래스 충돌을 피하려고 zpi- 접두사를 붙였다. */
+.zpi-count-marker {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: rgba(33, 70, 59, 0.62);
+  color: #fff;
+  line-height: 1;
+  border: 1px solid rgba(23, 59, 49, 0.96);
+  box-shadow: 0 8px 17px rgba(24, 67, 54, 0.28);
+  transition: transform 0.16s ease, background 0.16s ease;
+  cursor: pointer;
+}
+.zpi-count-marker:hover {
+  transform: scale(1.08);
+  background: #c94d5b;
+  border-color: #b84250;
+}
+.zpi-marker-copy {
+  font-size: 9px;
+  font-weight: 700;
+  opacity: 0.9;
+}
+.zpi-marker-number {
+  display: block;
+  font-size: 13px;
+  font-weight: 950;
+  line-height: 1;
+  margin-top: 1px;
+}
+
+.zpi-selected-wrap {
+  position: relative;
+  width: 220px;
+  height: 210px;
+  animation: zpi-pop 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes zpi-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.66);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.zpi-fan-svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 220px;
+  height: 164px;
+  overflow: visible;
+  filter: drop-shadow(0 6px 10px rgba(22, 55, 45, 0.2));
+  pointer-events: none;
+}
+.zpi-fan-sector {
+  cursor: pointer;
+  pointer-events: visiblePainted;
+  outline: none;
+  transform-origin: 110px 70px;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+.zpi-fan-sector:hover {
+  filter: brightness(1.14);
+  transform: scale(1.025);
+}
+.zpi-fan-sector path {
+  transition: fill 0.16s ease, stroke-width 0.16s ease;
+}
+.zpi-fan-sector.active path {
+  fill: #c94d5b !important;
+  stroke: #fff;
+  stroke-width: 2;
+}
+.zpi-fan-sector text {
+  pointer-events: none;
+}
+.zpi-fan-label {
+  font-family: Pretendard, "Noto Sans KR", sans-serif;
+  fill: #fff;
+  text-anchor: middle;
+  font-size: 8.5px;
+  font-weight: 900;
+}
+.zpi-fan-count {
+  fill: #edf7f3;
+  font-size: 7px;
+  font-weight: 700;
+}
+
+.zpi-selected-name {
+  position: absolute;
+  z-index: 12;
+  left: 50%;
+  bottom: calc(100% - 2px);
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 210px;
+  padding: 7px 29px;
+  border: 1px solid #d8d8d8;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--color-brand-green);
+  box-shadow: 0 6px 16px rgba(18, 45, 37, 0.18);
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.3;
+  letter-spacing: -0.35px;
+  text-align: center;
+  white-space: normal;
+  word-break: keep-all;
+}
+.zpi-selected-name span {
+  cursor: pointer;
+}
+.zpi-selected-name:after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: #fff;
+}
+.zpi-fan-close {
+  position: absolute;
+  z-index: 3;
+  top: -9px;
+  right: -9px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid #d8d8d8;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--color-brand-green);
+  font-size: 17px;
+  line-height: 1;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+}
+.zpi-selected-sign {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  top: 82px;
+  transform: translate(-50%, -50%);
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  background: #fff;
+  border: 3px solid var(--color-brand-green);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+  padding: 8px;
+}
+.zpi-selected-sign small {
+  display: block;
+  margin-bottom: 1px;
+  color: var(--color-brand-green);
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+}
+.zpi-selected-sign span {
+  display: block;
+  color: #c93048;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+.zpi-fan-more {
+  position: absolute;
+  z-index: 8;
+  left: 50%;
+  top: 163px;
+  transform: translateX(-50%);
+  border: 1px solid #d8e1dc;
+  border-radius: 999px;
+  background: #fff;
+  padding: 6px 11px;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--color-brand-green);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.13);
+  cursor: pointer;
+}
