@@ -6,6 +6,7 @@ import { primaryButtonClass, secondaryButtonClass } from "@/lib/ui";
 import { PROCESS_STEPS } from "@/lib/lifestyle-data";
 import MemberBenefitSection from "@/components/lifestyle/MemberBenefitSection";
 import CategoryGrid from "@/components/lifestyle/CategoryGrid";
+import FeaturedCompanies from "@/components/lifestyle/FeaturedCompanies";
 import ZipServiceFaq from "@/components/lifestyle/ZipServiceFaq";
 import MobileStickyCta from "@/components/lifestyle/MobileStickyCta";
 
@@ -54,16 +55,19 @@ export default function ZipServicePage() {
               <Link href="/zipservice/new" className={`${primaryButtonClass} w-fit px-8`}>
                 무료 견적 받기
               </Link>
-              {!isLoading && !user && (
-                <Link href="/register" className={`${secondaryButtonClass} w-fit px-8`}>
-                  회원가 확인하려면 가입하기
-                </Link>
-              )}
+              <Link href="/zipservice/companies" className={`${secondaryButtonClass} w-fit px-8`}>
+                업체 둘러보고 선택하기
+              </Link>
             </div>
+            {!isLoading && !user && (
+              <Link href="/register" className="mt-3 inline-block text-sm font-medium text-brand-red underline underline-offset-2">
+                회원가 확인하려면 가입하기
+              </Link>
+            )}
 
-            <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muted">
+            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muted">
               <span>✓ 신청·상담 무료</span>
-              <span>✓ 카테고리 6종 통합 신청</span>
+              <span>✓ 업체 프로필 비교 후 선택 가능</span>
               <span>✓ 회원가 자동 적용</span>
             </div>
           </div>
@@ -114,6 +118,7 @@ export default function ZipServicePage() {
 
       <MemberBenefitSection />
       <CategoryGrid />
+      <FeaturedCompanies />
 
       <section className="bg-soft">
         <div className="mx-auto max-w-6xl px-5 py-16 sm:py-20">

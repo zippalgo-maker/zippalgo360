@@ -13,9 +13,8 @@ export default function CategoryGrid() {
 
       <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {CATEGORY_LIST.map((c) => (
-          <Link
+          <div
             key={c.value}
-            href={`/zipservice/new?category=${c.value}`}
             className="group flex flex-col rounded-2xl border border-line bg-white p-6 transition hover:-translate-y-1 hover:border-brand-red hover:shadow-brand"
           >
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-red-soft text-brand-red transition group-hover:bg-brand-red group-hover:text-white">
@@ -31,17 +30,23 @@ export default function CategoryGrid() {
                 평균 <span className="font-semibold text-ink/80">{formatPriceRange(c.priceRange)}</span>
               </p>
             )}
-            <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-brand-red">
-              무료 견적 받기
-              <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 transition group-hover:translate-x-0.5">
-                <path
-                  fillRule="evenodd"
-                  d="M7.3 4.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4-1.4L11.6 10 7.3 5.7a1 1 0 0 1 0-1.4z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </span>
-          </Link>
+
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <Link href={`/zipservice/new?category=${c.value}`} className="inline-flex items-center gap-1 text-sm font-semibold text-brand-red">
+                무료 견적 받기
+                <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 transition group-hover:translate-x-0.5">
+                  <path
+                    fillRule="evenodd"
+                    d="M7.3 4.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4-1.4L11.6 10 7.3 5.7a1 1 0 0 1 0-1.4z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </Link>
+              <Link href={`/zipservice/companies?category=${c.value}`} className="text-xs font-medium text-muted underline underline-offset-2 hover:text-brand-red">
+                업체 둘러보기
+              </Link>
+            </div>
+          </div>
         ))}
       </div>
     </section>

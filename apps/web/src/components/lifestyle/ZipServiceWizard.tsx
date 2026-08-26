@@ -7,6 +7,8 @@ import { apiFetch, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { cardClass, errorTextClass, inputClass, labelClass, primaryButtonClass, secondaryButtonClass } from "@/lib/ui";
 import CategoryIcon from "@/components/lifestyle/CategoryIcon";
+import CompanyLogo from "@/components/lifestyle/CompanyLogo";
+import { getMockCompany } from "@/lib/mock-companies";
 import {
   CATEGORY_LIST,
   HOME_STYLES,
@@ -27,11 +29,15 @@ export default function ZipServiceWizard() {
   const { user } = useAuth();
   const isMember = !!user;
 
-  const initialCategory = searchParams.get("category");
+  const initialCompany = searchParams.get("company");
+  const preselectedCompany = initialCompany ? getMockCompany(initialCompany) ?? null : null;
+  const initialCategory = preselectedCompany ? preselectedCompany.category : searchParams.get("category");
+
   const [step, setStep] = useState(isValidCategory(initialCategory) ? 1 : 0);
   const [category, setCategory] = useState<ServiceCategory | null>(
     isValidCategory(initialCategory) ? initialCategory : null
   );
+  const [targetCompanyId, setTargetCompanyId] = useState<string | null>(preselectedCompany?.id ?? null);
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
   const [pyeong, setPyeong] = useState("");
   const [homeStyle, setHomeStyle] = useState("");
@@ -46,6 +52,7 @@ export default function ZipServiceWizard() {
 
   const meta = category ? getCategoryMeta(category) : null;
   const needsHomeContext = category === "appliance" || category === "furniture";
+  const targetCompany = targetCompanyId ? getMockCompany(targetCompanyId) ?? null : null;
 
   function toggleOption(questionId: string, option: string, multi?: boolean) {
     setAnswers((prev) => {
@@ -64,15 +71,17 @@ export default function ZipServiceWizard() {
   const canProceedStep2 = region.trim().length > 0;
 
   function buildMemo(): string | undefined {
-    if (!meta) return memo.trim() || undefined;
-    const lines = meta.quickQuestions
-      .map((q) => {
-        const selected = answers[q.id];
-        return selected && selected.length > 0 ? `${q.shortLabel}: ${selected.join(", ")}` : null;
-      })
-      .filter((line): line is string => line !== null);
     const parts = [];
-    if (lines.length) parts.push(lines.join("\n"));
+    if (targetCompany) parts.push(`요청 업체: ${targetCompany.name}`);
+    if (meta) {
+      const lines = meta.quickQuestions
+        .map((q) => {
+          const selected = answers[q.id];
+          return selected && selected.length > 0 ? `${q.shortLabel}: ${selected.join(", ")}` : null;
+        })
+        .filter((line): line is string => line !== null);
+      if (lines.length) parts.push(lines.join("\n"));
+    }
     if (memo.trim()) parts.push(memo.trim());
     return parts.length ? parts.join("\n\n") : undefined;
   }
@@ -107,6 +116,7 @@ export default function ZipServiceWizard() {
     setDone(false);
     setStep(0);
     setCategory(null);
+    setTargetCompanyId(null);
     setAnswers({});
     setPyeong("");
     setHomeStyle("");
@@ -132,7 +142,9 @@ export default function ZipServiceWizard() {
         </span>
         <h1 className="mt-5 text-2xl font-bold text-ink">신청이 완료됐어요!</h1>
         <p className="mt-2 text-sm leading-relaxed text-muted">
-          남겨주신 연락처로 제휴 업체가 곧 연락드릴 예정이에요.
+          {targetCompany
+            ? `${targetCompany.name}에서 남겨주신 연락처로 곧 연락드릴 예정이에요.`
+            : "남겨주신 연락처로 제휴 업체가 곧 연락드릴 예정이에요."}
         </p>
 
         {isMember ? (
@@ -163,6 +175,23 @@ export default function ZipServiceWizard() {
       <h1 className="mt-2 text-2xl font-bold text-ink sm:text-3xl">
         {meta ? meta.label : "어떤 서비스가 필요하세요?"}
       </h1>
+
+      {targetCompany && (
+        <div className="mt-4 flex items-center gap-3 rounded-2xl border border-brand-red bg-brand-red-soft px-4 py-3">
+          <CompanyLogo name={targetCompany.name} gradient={targetCompany.gradient} className="h-10 w-10 rounded-xl text-sm" />
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold text-brand-red">이 업체에 견적요청</p>
+            <p className="truncate text-sm font-bold text-ink">{targetCompany.name}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setTargetCompanyId(null)}
+            className="shrink-0 text-xs font-semibold text-brand-red underline underline-offset-2"
+          >
+            전체 업체에게 받기
+          </button>
+        </div>
+      )}
 
       <div className="mt-6 flex items-center gap-2">
         {STEP_LABELS.map((label, i) => (
@@ -331,6 +360,10 @@ export default function ZipServiceWizard() {
                 <div className="flex justify-between gap-3">
                   <dt>카테고리</dt>
                   <dd className="text-ink/80">{meta.label}</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt>요청 대상</dt>
+                  <dd className="text-ink/80">{targetCompany ? targetCompany.name : "전체 제휴 업체"}</dd>
                 </div>
                 <div className="flex justify-between gap-3">
                   <dt>{meta.regionLabel}</dt>
