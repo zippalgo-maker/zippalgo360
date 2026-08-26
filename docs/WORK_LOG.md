@@ -1418,3 +1418,15 @@ sudo systemctl restart zippalgo360-web
   `npm run build` 후 `zippalgo360-web` 재시작 필요) 및 실브라우저
   end-to-end 테스트(부챗살 클릭, 단지정보, 포트폴리오 상세까지)는
   다음 단계로 남김.
+- **[완료] 배포 및 스모크 테스트**: 사용자가 `git pull` → 백엔드
+  `ast.parse` + `zippalgo360-api` 재시작 → 프론트 `npm run build` +
+  `zippalgo360-web` 재시작까지 실행, 전부 성공. 실제 단지 id(4716,
+  한화갤러리아포레)로 새 엔드포인트 2개를 스모크 테스트 — 둘 다
+  `HTTP 200`, 데이터 정상 반환 확인.
+- **[버그 발견 및 수정]** 스모크 테스트 응답에서 평형 타입의 `area`
+  필드가 `"70A"`처럼 문자가 섞여 나오는 버그 발견 — 원인은
+  `_pyeong_label()`이 집테리어 원본 JS(`pyeongLabelFromType()`)와
+  달리 `pyeong_label` 문자열에서 **숫자만 정규식으로 추출하는 과정을
+  빠뜨리고** 통째로 썼기 때문. `re.search(r"\d+(?:\.\d+)?", ...)`로
+  숫자만 뽑도록 수정(`zipterior_client.py`). `ast.parse` 통과 확인,
+  커밋·푸시 완료 — **다음 배포 시 이 수정본으로 백엔드 재시작 필요**.

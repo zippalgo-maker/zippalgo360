@@ -1,3 +1,5 @@
+import re
+
 import httpx
 
 from app.config import get_settings
@@ -283,7 +285,14 @@ def get_interior_viewport(
 # 맞추기 위함.
 
 
-def _pyeong_label(supply_area_m2: float | None, exclusive_area_m2: float | None) -> str:
+def _pyeong_label(pyeong_label: str | None, supply_area_m2: float | None, exclusive_area_m2: float | None) -> str:
+    # 집테리어 js/app.js의 pyeongLabelFromType()과 동일: pyeong_label이
+    # 있으면 그 안의 숫자 부분만 뽑아 쓴다("70A" -> "70") — 문자가 섞여
+    # 있어도(공급면적 기준 타입 코드 등) 평형 숫자만 남긴다.
+    if pyeong_label:
+        match = re.search(r"\d+(?:\.\d+)?", str(pyeong_label))
+        if match:
+            return match.group(0)
     m2 = supply_area_m2 or exclusive_area_m2 or 0
     return str(max(1, int(m2 / 3.305785))) if m2 else "평형"
 
@@ -291,8 +300,7 @@ def _pyeong_label(supply_area_m2: float | None, exclusive_area_m2: float | None)
 def _to_apartment_type(item: dict) -> ZipteriorApartmentType:
     supply = float(item.get("supply_area_m2") or 0) or None
     exclusive = float(item.get("exclusive_area_m2") or 0) or None
-    pyeong = item.get("pyeong_label")
-    area = str(pyeong) if pyeong else _pyeong_label(supply, exclusive)
+    area = _pyeong_label(item.get("pyeong_label"), supply, exclusive)
     type_name = str(item.get("type_name") or "A")
     type_code = type_name[len(area):].strip() if type_name.startswith(area) else type_name
     return ZipteriorApartmentType(
