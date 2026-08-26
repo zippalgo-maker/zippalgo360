@@ -1125,9 +1125,11 @@ sudo systemctl restart zippalgo360-web
   `/zipcheongso` 및 하위 라우트 전부 정상 생성 확인.
 
 ### 완료 후
-- 로컬 빌드만 확인됨, 서버 배포는 다음 단계로 대기 — 배포 시 이전
-  `/zippalgo` 단독 배포 때와 동일하게 `git pull` → `apps/web`에서
-  `npm run build` → `sudo systemctl restart zippalgo360-web` 순서로
-  진행하면 됨. 배포 후 `/jipsago`, `/jipterior`, `/jipisa`, `/jipcheongso`는
-  전부 404로, `/zipsago`, `/zipterior`, `/zipisa`, `/zipcheongso`는
-  200으로 나오는지 확인 필요.
+- **[완료] 서버 배포**: `git pull` → `npm run build` → `systemctl
+  restart zippalgo360-web` 사용자가 실행, 빌드 성공(라우트 목록에
+  `/zipsago`, `/zipterior`, `/zipisa`, `/zipcheongso` 전부 출력).
+  배포 후 확인: 옛 라우트(`/jipsago`, `/jipterior`, `/jipisa`,
+  `/jipcheongso`) 전부 `404`, 새 라우트(`/zipsago`, `/zipterior`,
+  `/zipisa`, `/zipcheongso`) 전부 `200` — 정상. 이걸로 "집" 계열
+  서브서비스 5개(zippalgo, zipsago, zipterior, zipisa, zipcheongso)
+  전부 `zip` 로마자화 규칙으로 라이브까지 통일 완료.
