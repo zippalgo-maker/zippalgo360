@@ -954,3 +954,78 @@ sudo systemctl restart zippalgo360-web
 ### 완료 후
 - **[완료]** 서버 배포 및 사용자 확인 — "8124개 이제 맞게 나오네". 집테리어
   자체 지도의 8000+와 일치하는 수준으로 정상화됨.
+
+---
+
+## 2026-08-26 — 로그인 통합(SSO) 1단계: 집테리어 측 `/sso/exchange` 엔드포인트 구현
+
+### 시작 전
+- 사용자 지시: 백업은 제일 마지막, 1) 집테리어 쪽 SSO exchange 엔드포인트,
+  2) 인테리어 업체 마커 데이터 검증 순으로 진행. 1번은 "지금 이 세션에서
+  SSH로 직접 구현"으로 진행하기로 결정(데스크탑 세션에 넘기지 않음).
+- 설계는 이미 이 문서 앞부분 "로그인 통합 설계 제안" 섹션에 기록되어
+  있음 — 1회용 opaque 코드를 iframe URL 쿼리로 넘기고, 서버 간
+  `SSO_SHARED_SECRET`(양쪽 `.env`에 동일 값, `openssl rand -hex 32`로
+  생성, 값 자체는 이 로그에도 절대 기록 안 함)으로 서버 대 서버 검증하는
+  방식.
+- 집팔고360 쪽(이 저장소)은 이미 구현되어 있었음: `POST
+  /auth/sso/issue-code`(로그인 사용자용, 1회용 코드 발급), `POST
+  /auth/sso/verify`(서버 간, `Authorization: Bearer <SSO_SHARED_SECRET>`).
+  이번 작업은 집테리어(`/srv/zipterior/backend`, 이 세션이 git으로
+  추적하지 않는 별도 코드베이스) 쪽에서 그 코드를 받아 실제 로그인
+  세션(access/refresh token)으로 교환해주는 `/sso/exchange`를 만드는
+  것.
+
+### 진행 중
+- 집테리어 auth 모듈(`router.py`/`service.py`/`repository.py`/
+  `schemas.py`) 및 `core/config.py`/`core/security.py`를 SSH로 읽어
+  기존 로그인 플로우(토큰 발급 방식, DB 세션 처리, 비밀번호 해시 등)를
+  먼저 파악. httpx/requests가 설치되어 있지 않아(기존 `naver_complex_client.py`
+  등도 stdlib `urllib`만 사용) 같은 관례를 따르기로 함.
+- **[완료]** 아래 5개 파일을 `.bak_<timestamp>` 백업 후 anchor 기반
+  Python 문자열 치환(`content.replace(old, new, 1)` + `assert count==1`)
+  방식으로 패치/생성. 전부 `py_compile` 통과 확인:
+  - `app/core/config.py` — `sso_shared_secret: str | None = None`,
+    `zippalgo360_api_base_url: str = "https://zippalgo360.com"` 필드 추가.
+  - `app/modules/auth/sso_bridge.py` (신규) — `verify_code_with_zippalgo360(code)`,
+    stdlib `urllib.request`로 집팔고360의 `/api/auth/sso/verify`를
+    5초 타임아웃으로 호출, 실패 시 예외 없이 `None` 반환(fail-soft).
+  - `app/modules/auth/schemas.py` — `SsoExchangeRequest(code: str)` 추가.
+  - `app/modules/auth/service.py` — `sso_exchange(session, code, ip_address,
+    user_agent)` 추가. v1 범위: 집팔고360 **customer 역할만** 자동 연동
+    (company 계정은 사업자등록번호 등 온보딩 정책이 따로 필요해 범위
+    밖 — 그냥 폴백). 이메일 기준으로 기존 계정 조회, 없으면 랜덤 비밀번호로
+    신규 생성 후 기존 로그인과 동일하게 access/refresh 토큰 발급,
+    `record_login_attempt`에 `metadata={"source":"zippalgo360_sso"}`로
+    출처 기록. `AuthService.sso_exchange = staticmethod(sso_exchange)`로
+    등록.
+  - `app/modules/auth/router.py` — `POST /sso/exchange`(전체 경로
+    `/api/v1/auth/sso/exchange`) 추가, 실패 시 `400 {"detail":"SSO
+    로그인을 처리할 수 없습니다."}`, 성공 시 기존 로그인과 동일한
+    `TokenResponse` 반환.
+- **[완료]** `.env`에 `SSO_SHARED_SECRET`(집팔고360 쪽과 동일 값 복사)과
+  `ZIPPALGO360_API_BASE_URL=https://zippalgo360.com` 추가.
+- **[완료]** `zipterior-api` systemd 재시작 → `active`, 헬스체크
+  200. 잘못된 코드로 `/sso/exchange` 호출 시 `400`(예상대로), 기존
+  `/auth/login`은 잘못된 자격증명에 그대로 `401`(기존 로그인 영향
+  없음 확인).
+- **[완료] 시크릿 일치 검증**: 첫 복사 스크립트 출력이 꼬여서 나와
+  실제로 복사됐는지 불확실했음 → 값 자체는 출력하지 않고 양쪽 `.env`의
+  `SSO_SHARED_SECRET` 값을 각각 `sha256sum`, 길이(64자)로 비교하는
+  스크립트를 별도로 실행 — **해시/길이 완전 일치 확인**(`307ed1c91ac1...`,
+  64자). 두 서버가 같은 비밀키를 쓰고 있음이 확정됨.
+
+### 남은 작업 (다음 세션 이어서 진행)
+- **[미완료]** 집테리어 **프론트엔드**는 아직 전혀 손대지 않음 — 현재
+  클라이언트 쪽 어디에도 `?sso=` 쿼리 파라미터를 읽어서
+  `/api/v1/auth/sso/exchange`를 호출하는 코드가 없음. 백엔드만 준비된
+  상태이고, 실제로 iframe 진입 시 자동 로그인되는 기능은 아직 동작하지
+  않음. 다음 단계: 집테리어 부트스트랩 JS(로그인 성공 시 토큰을
+  localStorage에 저장하는 기존 코드)를 찾아서, 페이지 로드 시 `?sso=`
+  파라미터가 있으면 exchange 호출 → 같은 localStorage 키로 토큰 저장 →
+  `history.replaceState`로 URL에서 파라미터 제거, 순서로 연동.
+- **[미완료]** 실제 로그인된 집팔고360 사용자로 전체 흐름(발급 →
+  iframe 진입 → 교환 → 자동 로그인) end-to-end 테스트는 아직 안 함
+  (지금까지는 잘못된 코드로 400만 확인한 상태).
+- 이후 사용자 지시대로 "2번"(인테리어 업체 마커 데이터 검증, 뷰포트
+  엔드포인트 전환 이후 재확인 안 됨) → 마지막으로 백업/이중화 순.
