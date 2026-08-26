@@ -1141,12 +1141,9 @@ sudo systemctl restart zippalgo360-web
   — 지오코딩은 노출과 무관한 "준비 작업"으로 의도한 대로 안전하게 끝남.
 
 ### 남은 작업
-- **[다음 단계]** `is_visible_on_map`을 언제/어떻게 켤지는 아직 미정 —
-  전부 한 번에 켤지, 일부만 켤지, 집테리어 관리자 화면에서 업체별로
-  검토 후 켤지 등은 사용자와 다시 상의 필요. 이것만 정리되면(그리고
-  실제로 노출 스위치가 켜지면) 집팔고360 지도의 `company_interior`
-  레이어는 코드 수정 없이 자동으로 실제 데이터를 보여줄 것으로 예상
-  (프록시 구조상 zipterior의 실시간 상태를 그대로 반영하기 때문).
+- **[완료 — 아래 "2번" 마무리 섹션에서 처리]** `is_visible_on_map`을
+  언제/어떻게 켤지는 사용자가 "일괄로 켜줘"로 확정 → 911건 일괄 노출
+  완료. 자세한 내용은 이 문서의 "2번" 마무리 섹션 참고.
 
 ---
 
@@ -1229,3 +1226,90 @@ sudo systemctl restart zippalgo360-web
   `/zipisa`, `/zipcheongso`) 전부 `200` — 정상. 이걸로 "집" 계열
   서브서비스 5개(zippalgo, zipsago, zipterior, zipisa, zipcheongso)
   전부 `zip` 로마자화 규칙으로 라이브까지 통일 완료.
+
+---
+
+## 2026-08-26 — "2번" 마무리: 매칭 실패 원인 확인, 관리자 "좌표없음" 배지 추가, 업체 지도 노출 일괄 켜기 + zippalgo360-api 다운타임 발견/복구
+
+### 시작 전
+- 사용자 확인: `is_visible_on_map` 전부 false인 게 zipterior의 의도된
+  정책(현재 업체 미노출)이었고, "집테리어 쪽에서 노출시키면 집팔고360
+  지도에도 자연스럽게 뜨도록 해야 한다"는 요구사항 재확인. 지오코딩은
+  이미 완료된 상태(911/912건 성공).
+- 사용자 지시 2가지: (1) 매칭 실패 1건이 무엇인지 찾고, 관리자 화면에
+  "지도 미노출" 표시가 있는지 확인 후 없으면 추가할 것 (2) 지오코딩된
+  업체 노출을 **일괄로** 켤 것.
+
+### 진행 중
+- **[완료] 매칭 실패 원인 확인**: 실패 업체는 id=1450 "선퍼니처(부평점)",
+  주소 "인천광역시 부평구 산청로25번길 4 (산곡동)". 이 주소를 카카오
+  주소검색/키워드검색 API에 원문·괄호제거 등 여러 형태로 재호출해봐도
+  전부 0건 — 카카오 자체 DB에 이 도로명이 없는 것으로 보임(주소 오기재
+  가능성). 코드/로직 문제 아님, 개별 주소 데이터 이슈로 확인.
+- **[완료] 관리자 화면 좌표 표시 유무 확인**: 업체 목록(`admin-api.js`
+  `renderCompanies`, `admin-dashboard.html`의 `companyManageView`)에는
+  좌표/지도노출 관련 표시가 전혀 없었음(지역·연락처·등급·시공사례·상태만
+  표시). API 응답(`AdminCompanyItem`)에도 좌표 필드 자체가 없었음
+  (상세보기 모달 응답인 `AdminCompanyDetailResponse`에만 존재).
+  **부수 발견**: `companyMapSettingView`("업체보기 설정" — 등급별
+  지도 노출 온오프 화면, HTML상 프리미엄1/프리미엄2/일반 체크박스와
+  "설정 저장" 버튼이 이미 있음)이 **완전히 미완성 상태**임을 확인 —
+  `admin-api.js` 전체에서 `saveCompanyMapSetting`/`companyMapSetting`/
+  `company-map-tier` 문자열이 단 한 곳도 없어서, 저장 버튼에 연결된
+  JS 핸들러 자체가 없음(눌러도 아무 일도 안 일어남). 재사용할 기존
+  로직이 없다는 뜻이라 새로 구현하기로 함.
+- **[완료] "좌표없음" 배지 추가** — 3개 파일 수정(`.bak_<timestamp>`
+  백업 후 anchor 기반 치환, `py_compile` 통과, `zipterior-api` 재시작
+  확인):
+  - `app/modules/admin/overview_schemas.py` — `AdminCompanyItem`에
+    `has_map_coordinates: bool = True` 추가.
+  - `app/modules/admin/overview_repository.py` — `list_companies` SQL에
+    `(c.latitude IS NOT NULL AND c.longitude IS NOT NULL) AS
+    has_map_coordinates` 컬럼 추가.
+  - `js/admin-api.js` `renderCompanies` — 지역 칸 아래에
+    `has_map_coordinates===false`일 때만 "좌표없음" 경고 배지 표시
+    (툴팁: "주소를 좌표로 변환하지 못해 지도에 노출되지 않습니다").
+  - 앞으로 지오코딩 실패 업체(예: id=1450)는 관리자가 업체 목록만 봐도
+    바로 찾을 수 있음.
+- **[완료] 업체 지도 노출 일괄 켜기**: 변경 전 스냅샷을
+  `/srv/zipterior/backend/db_backups/
+  companies_visibility_backup_20260826_120214.csv`로 백업 후,
+  `UPDATE companies SET is_visible_on_map=true WHERE status='active'
+  AND deleted_at IS NULL AND latitude IS NOT NULL AND longitude IS NOT
+  NULL AND is_visible_on_map=false` 실행 → **911건 적용**(지오코딩된
+  업체 전부). `is_visible_on_map`이 여전히 false인 나머지 782건은
+  애초에 좌표가 없는 업체(주소 자체가 없거나 위 1450번 케이스)라 의도한
+  대로 제외됨.
+- **[완료] 실제 노출 확인**: zipterior 자체 `/api/v1/public/map/viewport
+  ?marker_type=company`(서울 전역)에서 클러스터 48개/123개 업체 등 실제
+  데이터가 나오기 시작함을 확인.
+
+### 부수 발견 및 즉시 대응 — zippalgo360-api 2시간 다운타임
+- 집팔고360 쪽에서도 반영되는지 확인하려고
+  `https://zippalgo360.com/api/integrations/zipterior/viewport`를
+  호출했더니 **502 Bad Gateway**. `systemctl status zippalgo360-api`
+  확인 결과, **11:44:47에 정상 종료(SIGTERM, graceful shutdown) 후
+  그대로 꺼져 있었음** — 크래시가 아니라 뭔가(다른 세션의 작업 등
+  원인 미상, 이 세션에서 zippalgo360-api를 건드린 적 없음)에 의해
+  멈춘 뒤 재시작이 안 된 상태로 약 **2시간** 방치되어 있었던 것.
+  발견 즉시 `sudo systemctl start zippalgo360-api` 실행 → `active`,
+  헬스체크 `200`으로 즉시 복구.
+- **[완료] 최종 검증**: 복구 후 `https://zippalgo360.com/api/
+  integrations/zipterior/viewport?marker_type=company&...`가 정상
+  응답하며 실제 업체 클러스터 데이터를 반환함을 확인 — **집팔고360
+  지도의 `company_interior` 레이어가 코드 수정 없이 zipterior의 변경을
+  그대로 반영**한다는 애초 설계가 실증됨.
+- **[후속 조치 필요, 이 세션 범위 아님]** zippalgo360-api가 왜 멈췄는지
+  원인 조사가 안 된 채로 남아 있음. 다른 세션(데스크탑 등)이 배포/재시작
+  작업을 하다 마무리를 안 했을 가능성이 있어 보이므로, 다음 세션 시작
+  시 다른 세션과 조율 필요. 또한 이런 다운타임을 빨리 알아챌 수 있는
+  모니터링/알림이 전혀 없다는 것도 확인됨 — 우연히 이번 검증 과정에서
+  502를 마주쳐서 발견한 것.
+
+### 완료 후 — "인테리어 업체 마커 검증"(사용자 지시 "2번") 전체 완료
+- 원인 진단 → 지오코딩(911/912) → 관리자 배지 추가 → 노출 일괄 켜기 →
+  집테리어/집팔고360 양쪽 실데이터 노출 확인까지 전부 완료.
+- 매칭 실패 1건(id=1450)은 관리자가 업체 목록에서 "좌표없음" 배지로
+  바로 찾아 주소를 직접 수정하면 됨(이 세션에서 임의로 주소를 추측해
+  고치지는 않음).
+- 사용자 지시 순서상 마지막 항목인 **백업/이중화**만 남음.
