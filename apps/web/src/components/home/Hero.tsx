@@ -54,7 +54,7 @@ export default function Hero() {
 
           <div className="mt-7 flex flex-wrap items-center gap-4">
             <Link
-              href="/jipalgo/new"
+              href="/zippalgo/new"
               className="inline-flex h-14 items-center gap-2.5 rounded-lg border border-brand-red bg-gradient-to-b from-[#d70a1f] to-[#c00016] px-8 text-lg font-extrabold text-white shadow-[0_4px_10px_rgba(198,0,23,.17)] transition hover:brightness-105"
             >
               <svg viewBox="0 0 24 24" className="h-6 w-6 stroke-white stroke-[1.8]" fill="none" strokeLinecap="round" strokeLinejoin="round">
@@ -65,7 +65,7 @@ export default function Hero() {
               매물 등록하고 현금받기
             </Link>
             <Link
-              href="/jipalgo"
+              href="/zippalgo"
               className="inline-flex h-14 min-w-[180px] items-center justify-center rounded-lg border-[1.5px] border-brand-red px-6 text-lg font-extrabold text-brand-red"
             >
               집팔고 자세히 보기

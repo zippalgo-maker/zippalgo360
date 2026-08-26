@@ -5,7 +5,7 @@ import DoubleBenefit from "@/components/home/DoubleBenefit";
 import { useAuth } from "@/lib/auth-context";
 import { cardClass, primaryButtonClass, secondaryButtonClass } from "@/lib/ui";
 
-export default function JipalgoPage() {
+export default function ZippalgoPage() {
   const { user, isLoading } = useAuth();
 
   return (
@@ -48,10 +48,10 @@ export default function JipalgoPage() {
                 <>
                   <p className="text-sm font-semibold text-ink">매물을 등록해보세요</p>
                   <div className="mt-4 flex gap-2">
-                    <Link href="/jipalgo/new" className={primaryButtonClass}>
+                    <Link href="/zippalgo/new" className={primaryButtonClass}>
                       매물 등록하기
                     </Link>
-                    <Link href="/jipalgo/mine" className={secondaryButtonClass}>
+                    <Link href="/zippalgo/mine" className={secondaryButtonClass}>
                       내 매물 보기
                     </Link>
                   </div>
@@ -61,7 +61,7 @@ export default function JipalgoPage() {
                 <>
                   <p className="text-sm font-semibold text-ink">등록된 매물을 열람해보세요</p>
                   <div className="mt-4 flex gap-2">
-                    <Link href="/jipalgo/browse" className={primaryButtonClass}>
+                    <Link href="/zippalgo/browse" className={primaryButtonClass}>
                       매물 둘러보기
                     </Link>
                     <Link href="/onboarding/company" className={secondaryButtonClass}>

@@ -6,14 +6,14 @@ import { useRequireRole } from "@/lib/use-require-role";
 import { cardClass } from "@/lib/ui";
 
 const CUSTOMER_LINKS = [
-  { href: "/jipalgo/mine", title: "내 매물 관리", desc: "등록한 매물과 진행 상태를 확인하세요" },
-  { href: "/jipalgo/payouts", title: "더블베네핏 정산 내역", desc: "매물이 팔리고 받은 정산금을 확인하세요" },
+  { href: "/zippalgo/mine", title: "내 매물 관리", desc: "등록한 매물과 진행 상태를 확인하세요" },
+  { href: "/zippalgo/payouts", title: "더블베네핏 정산 내역", desc: "매물이 팔리고 받은 정산금을 확인하세요" },
   { href: "/jipsago/mine", title: "내 구매의뢰", desc: "등록한 구매의뢰와 배정 현황을 확인하세요" },
 ];
 
 const COMPANY_LINKS = [
   { href: "/partners", title: "파트너 센터", desc: "고객 요청, 열람 매물, 정산 현황을 한눈에 확인하세요" },
-  { href: "/jipalgo/browse", title: "매물 둘러보기", desc: "건당 결제로 매물 상세 정보를 열람하세요" },
+  { href: "/zippalgo/browse", title: "매물 둘러보기", desc: "건당 결제로 매물 상세 정보를 열람하세요" },
   { href: "/jipsago/assignments", title: "배정된 구매의뢰", desc: "나에게 배정된 구매의뢰에 응답하세요" },
 ];
 

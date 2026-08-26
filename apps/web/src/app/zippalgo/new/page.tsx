@@ -46,7 +46,7 @@ export default function NewListingPage() {
           move_in_date: moveInDate || undefined,
         },
       });
-      router.push(`/jipalgo/mine?highlight=${listing.id}`);
+      router.push(`/zippalgo/mine?highlight=${listing.id}`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "매물 등록에 실패했습니다.");
     } finally {

@@ -13,13 +13,13 @@ export interface ServiceInfo {
 
 export const SERVICES: ServiceInfo[] = [
   {
-    slug: "jipalgo",
+    slug: "zippalgo",
     name: "집팔고",
     tagline: "팔면서, 얻는다",
     description:
       "집을 팔고 싶은 회원이 매물을 등록하면 회원 공인중개사가 건당 결제로 열람하고 중개에 활용합니다. 매매가 완료되면 결제 금액이 매물 등록 고객에게 지급되는 더블베네핏 구조입니다.",
     status: "live",
-    href: "/jipalgo",
+    href: "/zippalgo",
     icon: "/icons/zippalgo.png",
     ctaLabel: "매물 등록하고 현금받기",
   },

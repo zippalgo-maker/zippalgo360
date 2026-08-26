@@ -1051,3 +1051,37 @@ sudo systemctl restart zippalgo360-web
   집테리어 쪽에도 로그인된 상태로 뜨는지 확인 필요.
 - 이후 사용자 지시대로 "2번"(인테리어 업체 마커 데이터 검증, 뷰포트
   엔드포인트 전환 이후 재확인 안 됨) → 마지막으로 백업/이중화 순.
+
+---
+
+## 2026-08-26 — "집팔고" 라우트 영문 표기 `jipalgo` → `zippalgo` 통일
+
+### 시작 전
+- 사용자 지시: "집팔고"의 영문 표현은 앞으로 `zippalgo`로 통일. 기존
+  `apps/web/src/app/jipalgo` 라우트는 한글 발음 로마자화(`jipalgo`)를 쓰고
+  있었는데, `services.ts`의 아이콘 경로는 이미 `/icons/zippalgo.png`로
+  불일치가 있었음 — 이번 요청으로 라우트 쪽을 `zippalgo`에 맞춰 통일.
+
+### 진행 중
+- **[완료]** `apps/web/src/app/jipalgo` 디렉터리를 `apps/web/src/app/zippalgo`로
+  `git mv`.
+- **[완료]** 하위 6개 페이지(`page.tsx`, `new/`, `mine/`, `browse/`,
+  `payouts/`, `listings/[id]/`)와 `lib/services.ts`(slug/href),
+  `app/mypage/page.tsx`, `app/map/page.tsx`, `app/partners/page.tsx`,
+  `components/home/Hero.tsx`에서 `/jipalgo` 링크·라우트 참조를 전부
+  `/zippalgo`로 수정. `JipalgoPage` 컴포넌트 함수명도 `ZippalgoPage`로 변경.
+- **[완료]** 저장소 전체에서 `jipalgo`(대소문자 무관) 검색 결과 0건 확인.
+- **[완료]** `.next` 캐시 삭제 후 `next build` 재실행 — 컴파일/타입체크
+  통과, 라우트 목록에 `/zippalgo`, `/zippalgo/browse`,
+  `/zippalgo/listings/[id]`, `/zippalgo/mine`, `/zippalgo/new`,
+  `/zippalgo/payouts` 정상 생성 확인.
+- **[완료]** 이 규칙을 다음 세션도 지키도록 `CLAUDE.md`에 "네이밍 규칙"
+  섹션 추가 — "집팔고"만 `zippalgo`로 한정, 다른 서브서비스(집사고=jipsago,
+  집테리어=zipterior/jipterior, 집이사=jipisa, 집청소=jipcheongso) 표기는
+  유지.
+
+### 완료 후
+- 로컬 빌드/타입체크만 확인됨 — 서버 배포는 아직 안 함(이 저장소는
+  git 기반 배포이므로, 다음 배포 시 `/jipalgo`로 들어오는 기존 링크/북마크가
+  있다면 깨질 수 있음. 필요하면 nginx 레벨에서 `/jipalgo` → `/zippalgo`
+  301 리다이렉트 추가를 고려할 것 — 이번 작업 범위 밖으로 남겨둠).

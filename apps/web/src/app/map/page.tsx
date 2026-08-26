@@ -214,7 +214,7 @@ function ServiceMapView() {
           `<div style="padding:10px 12px;min-width:180px;font-size:13px;line-height:1.6;">
             <strong>${item.complex_name}</strong><br/>
             ${item.asking_price.toLocaleString()}원<br/>
-            <a href="/jipalgo/listings/${item.id}" style="color:#bb1730;font-weight:600;">매물 상세보기 →</a>
+            <a href="/zippalgo/listings/${item.id}" style="color:#bb1730;font-weight:600;">매물 상세보기 →</a>
           </div>`
         );
         infoWindowRef.current.open(map, marker);

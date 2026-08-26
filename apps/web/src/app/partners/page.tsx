@@ -96,7 +96,7 @@ function PartnerDashboard() {
         <Link href="/jipsago/assignments" className={`${primaryButtonClass} w-auto px-6`}>
           배정된 구매의뢰 보기
         </Link>
-        <Link href="/jipalgo/browse" className={`${secondaryButtonClass} w-auto px-6`}>
+        <Link href="/zippalgo/browse" className={`${secondaryButtonClass} w-auto px-6`}>
           매물 둘러보기
         </Link>
       </div>

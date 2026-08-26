@@ -24,6 +24,15 @@ truth)다.
 - `apps/api` — FastAPI 백엔드 (SQLAlchemy Core + raw SQL, Alembic)
 - `docs/` — 기획/레퍼런스/작업 기록
 
+## 네이밍 규칙
+
+- "집팔고"(매물 등록/더블베네핏 서브서비스)의 영문 표현은 **`zippalgo`**다.
+  `jipalgo`처럼 한글 발음을 그대로 로마자화한 표기를 쓰지 않는다(2026-08-26,
+  `apps/web/src/app/jipalgo` → `apps/web/src/app/zippalgo`로 라우트/slug/링크
+  전체를 이 규칙에 맞춰 수정함). 다른 서브서비스(집사고=jipsago, 집테리어=
+  zipterior/jipterior, 집이사=jipisa, 집청소=jipcheongso)는 기존 표기 유지 —
+  이 규칙은 "집팔고" 한정.
+
 ## 아키텍처 원칙
 
 - 집팔고360이 아파트 단지/평형 등 공유 마스터 데이터의 **소유자(own API, own DB)**다.

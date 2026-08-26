@@ -144,7 +144,7 @@ export default function MyListingsPage() {
     <div className="mx-auto max-w-2xl px-5 py-16">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-ink">내 매물</h1>
-        <Link href="/jipalgo/new" className="text-sm font-semibold text-brand-red">
+        <Link href="/zippalgo/new" className="text-sm font-semibold text-brand-red">
           + 매물 등록
         </Link>
       </div>
@@ -191,7 +191,7 @@ export default function MyListingsPage() {
               )}
 
               {listing.status === "sold" && (
-                <Link href="/jipalgo/payouts" className="mt-3 inline-block text-sm font-semibold text-brand-red">
+                <Link href="/zippalgo/payouts" className="mt-3 inline-block text-sm font-semibold text-brand-red">
                   정산 내역 확인하기 →
                 </Link>
               )}
