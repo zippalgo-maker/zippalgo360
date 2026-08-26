@@ -1,20 +1,24 @@
 "use client";
 
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import { loadKakaoMaps } from "@/lib/kakao-maps";
-import { buildCountMarkerHtml, buildFanMarkerHtml } from "@/lib/interior-marker";
+import { buildCountMarkerHtml, buildFanMarkerHtml, type AreaUnit } from "@/lib/interior-marker";
+import { SERVICES } from "@/lib/services";
 import InteriorComplexPanel from "@/components/map/InteriorComplexPanel";
 import InteriorPortfolioPanel from "@/components/map/InteriorPortfolioPanel";
 import type {
-  ApartmentComplex,
   CompanyMapMarker,
   ListingMapMarker,
   ZipteriorComplexDetailOut,
   ZipteriorMapMarker,
   ZipteriorMapMarkerListOut,
   ZipteriorPortfolioSummary,
+  ZipteriorSearchItem,
+  ZipteriorSearchOut,
   ZipteriorViewportItem,
   ZipteriorViewportOut,
 } from "@/lib/types";
@@ -174,9 +178,29 @@ function ServiceMapView() {
   const [mapError, setMapError] = useState<string | null>(null);
 
   const [query, setQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<ApartmentComplex[]>([]);
+  const [searchResults, setSearchResults] = useState<ZipteriorSearchItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
+
+  // 집테리어 지도 컨트롤(줌/일반·위성/평·㎡/현재위치) 이식용 상태 — 전부
+  // 집테리어 js/app.js의 동일 기능을 카카오맵 SDK 호출로 그대로 옮긴 것.
+  const [areaUnit, setAreaUnit] = useState<AreaUnit>("pyeong");
+  const [mapType, setMapType] = useState<"normal" | "satellite">("normal");
+  const [isLocating, setIsLocating] = useState(false);
+
+  // 채팅/햄버거 버튼 — 집테리어 지도 화면과 같은 자리(우상단)에 우선
+  // 구조/위치만 그대로 이식한다("일단 그대로 가져와"). 채팅은 아직 우리
+  // 플랫폼에 채팅 기능 자체가 없어 안내 토스트만 띄우고, 햄버거는 우리
+  // 사이트의 실제 상단 내비게이션(Header.tsx와 동일한 목록)을 펼친다.
+  const { user, logout } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 2200);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   useEffect(() => {
     if (!KAKAO_APP_KEY) {
@@ -666,32 +690,92 @@ function ServiceMapView() {
     [deactivateLayer]
   );
 
+  // 집테리어 js/app.js: document.querySelectorAll('[data-map-zoom]')...
+  // map.zoomIn()/zoomOut() — 카카오 레벨은 낮을수록 확대이므로 부호가 반대.
+  const handleZoom = useCallback((direction: "in" | "out") => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.setLevel(map.getLevel() + (direction === "in" ? -1 : 1));
+  }, []);
+
+  // 집테리어 js/app.js: [data-map-type] 클릭 시 satelliteMapLayer/
+  // normalMapLayer 교체 — 카카오 SDK에서는 setMapTypeId로 동일하게 처리.
+  const handleMapType = useCallback((type: "normal" | "satellite") => {
+    const kakao = window.kakao;
+    const map = mapRef.current;
+    if (!kakao || !map) return;
+    map.setMapTypeId(type === "satellite" ? kakao.maps.MapTypeId.HYBRID : kakao.maps.MapTypeId.ROADMAP);
+    setMapType(type);
+  }, []);
+
+  // 집테리어 js/app.js: #locateControl 클릭 시 navigator.geolocation으로
+  // 현재 위치를 받아 map.flyTo(..., 16)으로 이동 — 카카오 지도는 flyTo가
+  // 없어 setLevel+setCenter로 동일한 효과를 낸다.
+  const handleLocate = useCallback(() => {
+    const kakao = window.kakao;
+    const map = mapRef.current;
+    if (!kakao || !map || !navigator.geolocation) return;
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        map.setLevel(3);
+        map.setCenter(new kakao.maps.LatLng(position.coords.latitude, position.coords.longitude));
+        setIsLocating(false);
+      },
+      () => setIsLocating(false),
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  }, []);
+
+  // 가운데 통합검색 — 집테리어 js/app.js의 updateSearch()와 동일하게
+  // 180ms 디바운스 후 `/public/map/search`(여기선 그 프록시)를 호출해
+  // 단지/업체/카카오 보강 장소(place)를 한 번에 받는다.
   useEffect(() => {
     const keyword = query.trim();
-    if (keyword.length < 2) {
+    if (!keyword) {
       setSearchResults([]);
       setIsSearching(false);
       return;
     }
     setIsSearching(true);
     const timer = setTimeout(() => {
-      apiFetch<ApartmentComplex[]>(`/apartments/complexes?keyword=${encodeURIComponent(keyword)}`)
-        .then((items) => setSearchResults(items))
+      apiFetch<ZipteriorSearchOut>(`/integrations/zipterior/search?q=${encodeURIComponent(keyword)}&limit=10`)
+        .then((data) => setSearchResults(data.items))
         .catch(() => setSearchResults([]))
         .finally(() => setIsSearching(false));
-    }, 300);
+    }, 180);
     return () => clearTimeout(timer);
   }, [query]);
 
-  const handleSelectComplex = useCallback((complex: ApartmentComplex) => {
-    const kakao = window.kakao;
-    const map = mapRef.current;
-    if (!kakao || !map || complex.latitude == null || complex.longitude == null) return;
-    map.setLevel(4);
-    map.setCenter(new kakao.maps.LatLng(complex.latitude, complex.longitude));
-    setQuery(complex.name);
-    setShowResults(false);
-  }, []);
+  // 집테리어 js/app.js의 selectSearchResult와 동일한 분기(단지/업체/장소)를
+  // 우리 레이어 구조에 맞게 옮긴 것 — 단지를 고르면 집테리어 레이어를 켜고
+  // (상호배타 규칙에 따라 집팔고 레이어는 자동으로 꺼짐) 그 단지 정보
+  // 패널을 연다. 마커가 아직 화면에 없어도 패널은 complexId 기준으로 열려
+  // 문제없고, redrawInteriorClusters가 이후 그 마커를 그릴 때 부챗살
+  // 상태를 알아서 복원한다(위 redrawInteriorClusters 참고).
+  const handleSelectSearchResult = useCallback(
+    (item: ZipteriorSearchItem) => {
+      setQuery(item.title);
+      setShowResults(false);
+      const kakao = window.kakao;
+      const map = mapRef.current;
+      if (!kakao || !map || item.latitude == null || item.longitude == null) return;
+      if (item.kind === "complex") {
+        if (!activeLayersRef.current.has("interiorPortfolio")) toggleLayer("interiorPortfolio", true);
+        map.setLevel(4);
+        map.setCenter(new kakao.maps.LatLng(item.latitude, item.longitude));
+        openInteriorComplex(Number(item.id));
+      } else if (item.kind === "company") {
+        if (!activeLayersRef.current.has("company_interior")) toggleLayer("company_interior", true);
+        map.setLevel(4);
+        map.setCenter(new kakao.maps.LatLng(item.latitude, item.longitude));
+      } else {
+        map.setLevel(3);
+        map.setCenter(new kakao.maps.LatLng(item.latitude, item.longitude));
+      }
+    },
+    [toggleLayer, openInteriorComplex]
+  );
 
   const isLoading = loadingLayers.size > 0;
 
@@ -699,43 +783,185 @@ function ServiceMapView() {
     <div className="relative h-[calc(100vh-4rem)] w-full">
       <div ref={mapContainerRef} className="h-full w-full bg-soft" />
 
-      <div className="absolute left-4 top-4 z-10 w-72 max-w-[calc(100%-2rem)]">
-        <input
-          type="text"
-          value={query}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            setShowResults(true);
-          }}
-          onFocus={() => setShowResults(true)}
-          onBlur={() => setTimeout(() => setShowResults(false), 150)}
-          placeholder="단지명, 지역으로 검색"
-          className="w-full rounded-full border border-line bg-white px-4 py-2.5 text-sm shadow-md outline-none focus:border-brand-red"
-        />
-        {showResults && query.trim().length >= 2 && (
-          <div className="absolute left-0 right-0 top-full mt-2 max-h-80 overflow-y-auto rounded-xl border border-line bg-white shadow-lg">
-            {isSearching ? (
-              <p className="px-4 py-3 text-sm text-muted">검색 중...</p>
-            ) : searchResults.length === 0 ? (
-              <p className="px-4 py-3 text-sm text-muted">검색 결과가 없어요</p>
-            ) : (
-              searchResults.map((complex) => (
-                <button
-                  key={complex.id}
-                  type="button"
-                  onClick={() => handleSelectComplex(complex)}
-                  className="block w-full border-b border-line px-4 py-2.5 text-left last:border-b-0 hover:bg-soft"
-                >
-                  <div className="text-sm font-semibold text-ink">{complex.name}</div>
-                  <div className="text-xs text-muted">{complex.road_address}</div>
-                </button>
-              ))
-            )}
-          </div>
-        )}
+      {/* 가운데 통합검색 — 집테리어 지도의 검색창과 같은 위치(상단 중앙). */}
+      <div className="absolute left-1/2 top-4 z-20 w-full max-w-xl -translate-x-1/2 px-4">
+        <div className="relative">
+          <input
+            type="text"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setShowResults(true);
+            }}
+            onFocus={() => setShowResults(true)}
+            onBlur={() => setTimeout(() => setShowResults(false), 150)}
+            placeholder="지역명·지하철역·아파트·인테리어 업체를 검색하세요"
+            className="w-full rounded-2xl border border-line bg-white/95 px-4 py-3 pr-11 text-sm shadow-md outline-none backdrop-blur focus:border-brand-green"
+          />
+          <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-brand-green">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.4">
+              <circle cx="10.5" cy="10.5" r="6.5" />
+              <line x1="15.3" y1="15.3" x2="21" y2="21" />
+            </svg>
+          </span>
+          {showResults && query.trim().length > 0 && (
+            <div className="absolute left-0 right-0 top-full mt-2 max-h-80 overflow-y-auto rounded-xl border border-line bg-white shadow-lg">
+              {isSearching ? (
+                <p className="px-4 py-3 text-sm text-muted">검색 중...</p>
+              ) : searchResults.length === 0 ? (
+                <p className="px-4 py-3 text-sm text-muted">검색 결과가 없습니다.</p>
+              ) : (
+                searchResults.map((item, index) => (
+                  <button
+                    key={`${item.kind}-${item.id || index}`}
+                    type="button"
+                    onClick={() => handleSelectSearchResult(item)}
+                    className="flex w-full items-center justify-between gap-3 border-b border-line px-4 py-2.5 text-left last:border-b-0 hover:bg-soft"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-ink">{item.title}</span>
+                      <span className="block truncate text-xs text-muted">{item.sub}</span>
+                    </span>
+                    <span
+                      className={`shrink-0 text-[11px] font-bold ${
+                        item.kind === "place" ? "text-muted" : "text-brand-red"
+                      }`}
+                    >
+                      {item.tail}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="absolute right-4 top-4 z-10 flex flex-col items-end gap-2">
+      {/* 채팅·햄버거 버튼 — 집테리어 지도 화면과 같은 우상단 자리. */}
+      <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setToast("채팅 기능은 준비 중입니다.")}
+          aria-label="채팅 열기"
+          className="flex h-11 w-11 items-center justify-center rounded-xl border border-line bg-white/95 text-brand-green shadow-md backdrop-blur transition hover:bg-soft"
+        >
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path d="M4 4.75h16v11.5H9l-5 3.5v-15Z" />
+          </svg>
+        </button>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setMenuOpen((open) => !open)}
+            aria-label="전체 메뉴"
+            aria-expanded={menuOpen}
+            className="flex h-11 w-11 items-center justify-center rounded-xl border border-line bg-white/95 text-lg text-ink shadow-md backdrop-blur transition hover:bg-soft"
+          >
+            ☰
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 top-12 w-52 overflow-hidden rounded-xl border border-line bg-white shadow-lg">
+              <Link href="/map" onClick={() => setMenuOpen(false)} className="block px-4 py-2.5 text-sm font-medium text-ink hover:bg-soft">
+                지도
+              </Link>
+              {SERVICES.map((service) => (
+                <Link
+                  key={service.slug}
+                  href={service.href}
+                  onClick={() => setMenuOpen(false)}
+                  className="block px-4 py-2.5 text-sm font-medium text-ink hover:bg-soft"
+                >
+                  {service.name}
+                </Link>
+              ))}
+              <Link href="/partners" onClick={() => setMenuOpen(false)} className="block px-4 py-2.5 text-sm font-semibold text-ink hover:bg-soft">
+                파트너 센터
+              </Link>
+              <div className="border-t border-line">
+                {user ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      logout();
+                      setMenuOpen(false);
+                    }}
+                    className="block w-full px-4 py-2.5 text-left text-sm font-medium text-brand-red hover:bg-soft"
+                  >
+                    로그아웃
+                  </button>
+                ) : (
+                  <Link href="/login" onClick={() => setMenuOpen(false)} className="block px-4 py-2.5 text-sm font-medium text-ink hover:bg-soft">
+                    로그인
+                  </Link>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 지도 보기 컨트롤(일반/위성, 평/㎡, 확대·축소, 현재위치) — 집테리어
+          지도 화면과 같은 우측 세로 스택. */}
+      <div className="absolute right-4 top-20 z-10 flex flex-col items-end gap-2">
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex h-9 items-center gap-0.5 rounded-xl border border-line bg-white/95 px-1.5 shadow-md backdrop-blur">
+            <button
+              type="button"
+              onClick={() => handleMapType("normal")}
+              className={`rounded-lg px-2 py-1 text-[11px] font-bold ${mapType === "normal" ? "bg-brand-green/50 text-white" : "text-ink/60"}`}
+            >
+              일반
+            </button>
+            <span className="text-line">|</span>
+            <button
+              type="button"
+              onClick={() => handleMapType("satellite")}
+              className={`rounded-lg px-2 py-1 text-[11px] font-bold ${mapType === "satellite" ? "bg-brand-green/50 text-white" : "text-ink/60"}`}
+            >
+              위성
+            </button>
+          </div>
+          <div className="flex h-9 items-center gap-0.5 rounded-xl border border-line bg-white/95 px-1.5 shadow-md backdrop-blur">
+            <button
+              type="button"
+              onClick={() => setAreaUnit("pyeong")}
+              className={`rounded-lg px-2 py-1 text-[11px] font-bold ${areaUnit === "pyeong" ? "bg-brand-green/50 text-white" : "text-ink/60"}`}
+            >
+              평
+            </button>
+            <span className="text-line">|</span>
+            <button
+              type="button"
+              onClick={() => setAreaUnit("m2")}
+              className={`rounded-lg px-2 py-1 text-[11px] font-bold ${areaUnit === "m2" ? "bg-brand-green/50 text-white" : "text-ink/60"}`}
+            >
+              ㎡
+            </button>
+          </div>
+          <div className="flex w-[42px] flex-col overflow-hidden rounded-xl border border-line bg-white/95 shadow-md backdrop-blur">
+            <button type="button" onClick={() => handleZoom("in")} aria-label="지도 확대" className="h-[42px] text-xl font-bold text-ink/80 hover:bg-soft">
+              +
+            </button>
+            <div className="border-t border-line" />
+            <button type="button" onClick={() => handleZoom("out")} aria-label="지도 축소" className="h-[42px] text-xl font-bold text-ink/80 hover:bg-soft">
+              −
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={handleLocate}
+            aria-label="현재 위치로 이동"
+            className={`flex h-[42px] w-[42px] items-center justify-center rounded-xl border border-line bg-white/95 shadow-md backdrop-blur ${
+              isLocating ? "text-brand-green" : "text-ink/80"
+            } hover:bg-soft`}
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="7" />
+              <circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none" />
+            </svg>
+          </button>
+        </div>
+
         <div className="w-56 rounded-xl border border-line bg-white/95 p-3 shadow-md">
           <p className="mb-2 text-xs font-semibold text-muted">지도에 표시할 레이어</p>
           <ul className="flex flex-col gap-1.5">
@@ -791,11 +1017,22 @@ function ServiceMapView() {
           selectedArea={selectedArea}
           onSelectArea={setSelectedArea}
           onClose={closeInteriorPanels}
+          areaUnit={areaUnit}
           onOpenPortfolio={setSelectedPortfolio}
         />
       )}
       {selectedPortfolio && (
-        <InteriorPortfolioPanel portfolioId={selectedPortfolio.id} onClose={() => setSelectedPortfolio(null)} />
+        <InteriorPortfolioPanel
+          portfolioId={selectedPortfolio.id}
+          onClose={() => setSelectedPortfolio(null)}
+          areaUnit={areaUnit}
+        />
+      )}
+
+      {toast && (
+        <div className="absolute bottom-6 left-1/2 z-30 -translate-x-1/2 rounded-full bg-ink/90 px-4 py-2 text-xs font-medium text-white shadow-lg">
+          {toast}
+        </div>
       )}
 
       {mapError && (

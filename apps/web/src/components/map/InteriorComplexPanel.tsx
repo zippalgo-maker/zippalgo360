@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { formatAreaLabel, type AreaUnit } from "@/lib/interior-marker";
 import type {
   ZipteriorComplexDetailOut,
   ZipteriorComplexPortfolioListOut,
@@ -14,6 +15,7 @@ interface InteriorComplexPanelProps {
   onSelectArea: (area: string | null) => void;
   onClose: () => void;
   onOpenPortfolio: (portfolio: ZipteriorPortfolioSummary) => void;
+  areaUnit: AreaUnit;
 }
 
 const BASIC_INFO_KEYS: Array<{ key: keyof ZipteriorComplexDetailOut; label: string }> = [
@@ -31,6 +33,7 @@ export default function InteriorComplexPanel({
   onSelectArea,
   onClose,
   onOpenPortfolio,
+  areaUnit,
 }: InteriorComplexPanelProps) {
   const [complex, setComplex] = useState<ZipteriorComplexDetailOut | null>(null);
   const [portfolios, setPortfolios] = useState<ZipteriorPortfolioSummary[]>([]);
@@ -168,8 +171,8 @@ export default function InteriorComplexPanel({
                           : "border-line text-ink/70 hover:border-brand-green"
                       }`}
                     >
-                      {type.area}
-                      {type.type === "A" ? "" : type.type}평 · {type.count}건
+                      {formatAreaLabel(type.area, areaUnit)}
+                      {type.type === "A" ? "" : type.type} · {type.count}건
                     </button>
                   );
                 })}
@@ -204,7 +207,7 @@ export default function InteriorComplexPanel({
                       <p className="text-[11px] font-semibold text-brand-green">{portfolio.company_name}</p>
                       <p className="mt-0.5 truncate text-xs font-medium text-ink">{portfolio.title || portfolio.scope}</p>
                       <p className="mt-1 text-[10px] text-muted">
-                        {portfolio.area}평 · {portfolio.type}타입 · {portfolio.date}
+                        {formatAreaLabel(portfolio.area, areaUnit)} · {portfolio.type}타입 · {portfolio.date}
                       </p>
                     </div>
                   </button>

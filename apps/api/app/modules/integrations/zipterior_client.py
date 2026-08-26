@@ -17,6 +17,8 @@ from app.modules.integrations.schemas import (
     ZipteriorPortfolioImage,
     ZipteriorPortfolioListOut,
     ZipteriorPortfolioSummary,
+    ZipteriorSearchItem,
+    ZipteriorSearchOut,
     ZipteriorViewportItem,
     ZipteriorViewportOut,
 )
@@ -484,3 +486,53 @@ def get_portfolio_detail(portfolio_id: int) -> ZipteriorPortfolioDetailOut:
             images=[],
             available=False,
         )
+
+
+def search(*, q: str, limit: int = 10) -> ZipteriorSearchOut:
+    """집테리어 지도의 가운데 통합검색창(`/public/map/search`)을 그대로
+    프록시한다 — 집테리어 js/app.js의 updateSearch()가 하는 것과 동일하게
+    단지/업체/카카오 보강 장소(place)를 한 번에 돌려받아, 지도 페이지의
+    검색창이 집테리어와 같은 결과·같은 클릭 이동 동작을 내도록 한다.
+    """
+    try:
+        response = httpx.get(
+            f"{settings.zipterior_api_base_url}/api/v1/public/map/search",
+            params={"q": q, "limit": limit},
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        data = response.json()
+        items = []
+        for item in data.get("items", []):
+            result_type = item.get("result_type")
+            latitude = float(item["latitude"]) if item.get("latitude") is not None else None
+            longitude = float(item["longitude"]) if item.get("longitude") is not None else None
+            if result_type == "place":
+                items.append(
+                    ZipteriorSearchItem(
+                        kind="place",
+                        id="",
+                        title=item.get("name") or "",
+                        sub="카카오맵 검색결과",
+                        tail=item.get("place_category") or "",
+                        latitude=latitude,
+                        longitude=longitude,
+                    )
+                )
+            else:
+                sub = " · ".join(filter(None, [item.get("sido"), item.get("sigungu"), item.get("eupmyeondong")]))
+                items.append(
+                    ZipteriorSearchItem(
+                        kind=result_type or "complex",
+                        id=str(item.get("id")),
+                        title=item.get("name") or "",
+                        sub=sub,
+                        tail=f"{item.get('portfolio_count') or 0}건",
+                        latitude=latitude,
+                        longitude=longitude,
+                    )
+                )
+    except (httpx.HTTPError, ValueError, KeyError, TypeError):
+        return ZipteriorSearchOut(items=[], available=False)
+
+    return ZipteriorSearchOut(items=items, available=True)

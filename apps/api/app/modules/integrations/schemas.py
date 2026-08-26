@@ -179,3 +179,22 @@ class ZipteriorPortfolioDetailOut(BaseModel):
     images: list[ZipteriorPortfolioImage]
     available: bool
     """집테리어 API에 접속할 수 없거나 포트폴리오를 못 찾으면 False."""
+
+
+class ZipteriorSearchItem(BaseModel):
+    """집테리어 통합검색(`/public/map/search`) 결과 한 건 — 단지/업체/
+    카카오 보강 장소(place, 아파트·오피스텔·지하철역 등) 셋 중 하나."""
+
+    kind: str
+    id: str
+    title: str
+    sub: str
+    tail: str
+    latitude: float | None = None
+    longitude: float | None = None
+
+
+class ZipteriorSearchOut(BaseModel):
+    items: list[ZipteriorSearchItem]
+    available: bool
+    """집테리어 API에 접속할 수 없으면 False."""

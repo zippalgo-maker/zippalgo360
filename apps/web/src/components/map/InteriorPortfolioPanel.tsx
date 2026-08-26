@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { formatAreaLabel, type AreaUnit } from "@/lib/interior-marker";
 import type { ZipteriorPortfolioDetailOut } from "@/lib/types";
 
 interface InteriorPortfolioPanelProps {
   portfolioId: number;
   onClose: () => void;
+  areaUnit: AreaUnit;
 }
 
-export default function InteriorPortfolioPanel({ portfolioId, onClose }: InteriorPortfolioPanelProps) {
+export default function InteriorPortfolioPanel({ portfolioId, onClose, areaUnit }: InteriorPortfolioPanelProps) {
   const [portfolio, setPortfolio] = useState<ZipteriorPortfolioDetailOut | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -84,7 +86,7 @@ export default function InteriorPortfolioPanel({ portfolioId, onClose }: Interio
               <div className="rounded-xl bg-soft px-3 py-2.5">
                 <p className="text-[11px] text-muted">평형 · 타입</p>
                 <p className="mt-0.5 text-sm font-semibold text-ink">
-                  {portfolio.area}평 · {portfolio.type || "-"}
+                  {formatAreaLabel(portfolio.area, areaUnit)} · {portfolio.type || "-"}
                 </p>
               </div>
               <div className="rounded-xl bg-soft px-3 py-2.5">

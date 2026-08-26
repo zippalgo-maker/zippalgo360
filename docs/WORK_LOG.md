@@ -1757,4 +1757,78 @@ sudo systemctl restart zippalgo360-web
 - 세부 작업 2/5/6/7을 위해 집테리어 `index.html` 전체 + `js/app.js`/
   `css/style.css`의 검색·컨트롤·채팅·햄버거·brand-box 관련 부분을
   읽기 전용으로 덤프하는 조회 스크립트(`inspect-zipterior-ui.sh`)를
-  준비해 사용자에게 전달, 결과 대기 중.
+  준비해 사용자에게 전달, 결과 수신.
+- 수신한 결과에서 확인한 핵심 사실:
+  - `.brand-box`는 `<a class="brand-box" href="/">` — index.html의
+    `.topbar` 안, `nativeMap=1` 감지 스크립트 바로 뒤가 좋은 삽입 지점.
+    집테리어는 이미 자기 모바일 앱 셸(m.html) 임베드를 위해
+    `window.self!==window.top` 대신 **쿼리스트링**(`nativeMap=1`)으로
+    임베드 여부를 판정하고 `zt-embedded` 클래스를 붙이는 패턴을 쓰고
+    있음(검색창/채팅/메뉴까지 통째로 숨김, 우리 용도보다 훨씬 넓음) —
+    똑같은 쿼리스트링 패턴을 그대로 따라가되 로고 하나만 숨기는 별도
+    클래스(`zp-zippalgo-embedded`)를 새로 만들기로 함(기존 zt-embedded
+    재사용 시 검색창까지 같이 숨어버려 사용자 요청과 충돌).
+  - 줌: `document.querySelectorAll('[data-map-zoom]')`+`map.zoomIn()/
+    zoomOut()`. 일반/위성: `[data-map-type]` 클릭 시 satellite/normal
+    타일레이어 교체(카카오 SDK에선 `setMapTypeId`로 대응). 현재위치:
+    `navigator.geolocation.getCurrentPosition`+`map.flyTo(...,16)`.
+    평/㎡: `applyAreaUnit(unit)` — 전역 `areaUnit` 변수를 바꾸고 선택된
+    단지 마커/패널/업체 패널/포트폴리오 상세를 다시 그림(우리는 판넬
+    쪽만 좁게 적용, 아래 스코프 결정 참고).
+  - 검색: `updateSearch()`가 180ms 디바운스 후 `/public/map/search?q=
+    &limit=10`을 호출, `result_type`이 `place`면 카카오 보강 결과로
+    지도만 이동, `complex`/`company`면 단지·업체 상세를 염
+    (`selectSearchResult()`).
+- **[완료] 세부 작업 7(백엔드)**: `apps/api/app/modules/integrations/`
+  에 `ZipteriorSearchItem`/`ZipteriorSearchOut` 스키마,
+  `zipterior_client.search(q, limit)`(집테리어 `/api/v1/public/map/
+  search` 프록시, place/complex/company 매핑은 js/app.js의
+  updateSearch() 로직 그대로), `GET /integrations/zipterior/search`
+  라우터 추가.
+- **[완료] 세부 작업 7(프론트)**: `apps/web/src/app/map/page.tsx`의
+  검색창을 좌상단 → **가운데 상단**(`left-1/2 -translate-x-1/2`)으로
+  이동, 우리 자체 `/apartments/complexes` 검색을 버리고 새 백엔드
+  프록시(`/integrations/zipterior/search`)를 180ms 디바운스로 호출하는
+  집테리어 방식으로 교체. 결과 클릭 시(`handleSelectSearchResult`):
+  `complex` → interiorPortfolio 레이어 활성화(상호배타 규칙에 따라
+  집팔고 그룹은 자동 해제) + 지도 이동 + `openInteriorComplex` 호출로
+  단지 패널 오픈, `company` → company_interior 레이어 활성화 + 지도
+  이동(업체 상세 패널은 아직 없어 이동까지만), `place` → 지도만 이동.
+- **[완료] 세부 작업 5**: 같은 파일에 지도 컨트롤 스택(일반/위성,
+  평/㎡, 확대·축소, 현재위치) 추가 — 우측 상단, 집테리어와 같은 자리.
+  `handleZoom`/`handleMapType`(카카오 `setMapTypeId` +
+  `MapTypeId.HYBRID`/`ROADMAP`)/`handleLocate`
+  (`navigator.geolocation`+`setLevel`+`setCenter`, 집테리어의
+  `flyTo(...,16)`을 카카오 SDK에 맞게 치환) 전부 실제로 동작.
+  평/㎡ 토글은 `AreaUnit` 상태로 관리하되 **스코프를 좁혀서**
+  단지/포트폴리오 패널의 평형 표시(`formatAreaLabel`, `apps/web/src/
+  lib/interior-marker.ts`에 신설, 집테리어 PYEONG_TO_M2=3.305785 계수
+  그대로)에만 연결했고, 지도 위 부챗살(fan) 마커의 조각 라벨은 그대로
+  평형 숫자만 표시(집테리어처럼 단위 접미사까지 바꾸진 않음) — 미세한
+  트림이라 여기 명시적으로 기록해 둠(필요하면 후속 작업으로 확장 가능).
+- **[완료] 세부 작업 6**: 채팅·햄버거 버튼을 우상단(검색창 옆, 집테리어와
+  같은 자리)에 추가. 채팅은 우리 플랫폼에 아직 채팅 기능 자체가 없어
+  클릭 시 "채팅 기능은 준비 중입니다" 안내 토스트만 뜨는 자리표시자로
+  둠. 햄버거는 집테리어의 로그인 상태별 메뉴 시스템이 없어서, 대신 우리
+  사이트의 실제 상단 내비게이션(`Header.tsx`와 동일한 지도/서비스
+  목록/파트너센터/로그인·로그아웃)을 펼치는 드롭다운으로 구현 —
+  "일단 그대로 가져와"라는 사용자 지시를 우리 플랫폼 현실에 맞게
+  최소한으로 각색함.
+- **[완료] 검증**: `next build` 클린 통과(23개 라우트), 백엔드 3개
+  수정 파일 `ast.parse` 통과. `npx eslint`로 새로 만든 코드가 이
+  저장소에 기존에 이미 있던 것과 같은 종류의 사전 존재 오류
+  (`react-hooks/set-state-in-effect`, 이펙트 안에서 setState 직접
+  호출 — 이 코드베이스 전역에 만연, 빌드는 막지 않음, 이전 세션에서
+  이미 비차단으로 판단됨)만 새로 만들었는지 확인, 새로운 종류의 오류는
+  없음.
+- **다음(세부 작업 2, 아직 미완)**: 집테리어 서버(`/var/www/zipterior`)
+  쪽 코드라 이 세션이 직접 못 건드림 — 앵커 기반 파이썬 패치 스크립트
+  (`patch-zipterior-hide-logo.py`)를 준비해 사용자에게 전달, 실행 결과
+  대기 중. 패치 내용: (1) `index.html`의 `nativeMap` 감지 스크립트
+  바로 뒤에 `zpEmbed=1` 쿼리스트링을 감지해 `zp-zippalgo-embedded`
+  클래스를 붙이는 스크립트 추가 + `style.css` 캐시버스터 버전 올림,
+  (2) `style.css` 끝에 `html.zp-zippalgo-embedded .brand-box{display:
+  none!important}` 규칙 추가. 우리 쪽 `/zipterior` 임베드 페이지
+  (`apps/web/src/app/zipterior/page.tsx`)는 이미 iframe src에
+  `?zpEmbed=1`을 붙이도록 수정 완료(SSO 코드가 있을 땐
+  `&sso=...`를 추가로 붙임) — 서버 패치가 적용되면 바로 맞물려 동작.

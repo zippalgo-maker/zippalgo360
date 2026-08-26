@@ -334,6 +334,21 @@ export interface ZipteriorPortfolioImage {
   caption: string | null;
 }
 
+export interface ZipteriorSearchItem {
+  kind: "complex" | "company" | "place";
+  id: string;
+  title: string;
+  sub: string;
+  tail: string;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+export interface ZipteriorSearchOut {
+  items: ZipteriorSearchItem[];
+  available: boolean;
+}
+
 export interface ZipteriorPortfolioDetailOut {
   id: number;
   company_id: number | null;

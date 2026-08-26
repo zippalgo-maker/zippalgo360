@@ -17,6 +17,18 @@ const FAN_COLORS = [
   "#75a593",
 ];
 
+export type AreaUnit = "pyeong" | "m2";
+
+// 집테리어 js/app.js의 PYEONG_TO_M2 상수와 동일한 변환 계수.
+const PYEONG_TO_M2 = 3.305785;
+
+/** "34" 같은 평형 숫자 문자열을 선택된 단위(평/㎡)에 맞는 표시 문자열로 바꾼다. */
+export function formatAreaLabel(area: string, unit: AreaUnit): string {
+  const num = Number.parseFloat(String(area).replace(/[^0-9.]/g, ""));
+  if (!num) return area;
+  return unit === "pyeong" ? `${area}평` : `${Math.round(num * PYEONG_TO_M2)}㎡`;
+}
+
 function point(cx: number, cy: number, r: number, deg: number) {
   const rad = ((deg - 90) * Math.PI) / 180;
   return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };

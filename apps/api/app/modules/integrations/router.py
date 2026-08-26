@@ -8,6 +8,7 @@ from app.modules.integrations.schemas import (
     ZipteriorMapMarkerListOut,
     ZipteriorPortfolioDetailOut,
     ZipteriorPortfolioListOut,
+    ZipteriorSearchOut,
     ZipteriorViewportOut,
 )
 
@@ -91,3 +92,8 @@ def get_complex_portfolios(
 @router.get("/portfolios/{portfolio_id}", response_model=ZipteriorPortfolioDetailOut)
 def get_portfolio_detail(portfolio_id: int) -> ZipteriorPortfolioDetailOut:
     return zipterior_client.get_portfolio_detail(portfolio_id)
+
+
+@router.get("/search", response_model=ZipteriorSearchOut)
+def search(q: str = Query(..., min_length=1), limit: int = Query(10, ge=1, le=20)) -> ZipteriorSearchOut:
+    return zipterior_client.search(q=q, limit=limit)
