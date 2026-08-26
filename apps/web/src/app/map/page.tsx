@@ -207,6 +207,7 @@ function ServiceMapView() {
   const [areaUnit, setAreaUnit] = useState<AreaUnit>("pyeong");
   const [mapType, setMapType] = useState<"normal" | "satellite">("normal");
   const [isLocating, setIsLocating] = useState(false);
+  const [layerPanelOpen, setLayerPanelOpen] = useState(false);
 
   // 채팅/햄버거 버튼 — 집테리어 지도 화면과 같은 자리(우상단)에 우선
   // 구조/위치만 그대로 이식한다("일단 그대로 가져와"). 채팅은 아직 우리
@@ -982,16 +983,40 @@ function ServiceMapView() {
           </button>
         </div>
 
-        <div className="w-64 overflow-hidden rounded-2xl border border-line bg-white/95 shadow-lg backdrop-blur">
-          <div className="flex items-center gap-2 border-b border-line px-4 py-3">
-            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-brand-green/10 text-brand-green">
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="12 2 22 8.5 12 15 2 8.5 12 2" />
-                <polyline points="2 15.5 12 22 22 15.5" />
-                <polyline points="2 12 12 18.5 22 12" />
-              </svg>
-            </span>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setLayerPanelOpen((open) => !open)}
+            aria-label="지도 레이어 선택"
+            aria-expanded={layerPanelOpen}
+            className={`relative flex h-11 w-11 items-center justify-center rounded-xl border border-line bg-white/95 shadow-md backdrop-blur transition hover:bg-soft ${
+              layerPanelOpen ? "border-brand-green text-brand-green" : "text-ink/80"
+            }`}
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="12 2 22 8.5 12 15 2 8.5 12 2" />
+              <polyline points="2 15.5 12 22 22 15.5" />
+              <polyline points="2 12 12 18.5 22 12" />
+            </svg>
+            {activeLayers.size > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-brand-red text-[9px] font-bold text-white">
+                {activeLayers.size}
+              </span>
+            )}
+          </button>
+
+          {layerPanelOpen && (
+        <div className="absolute right-0 top-12 w-64 overflow-hidden rounded-2xl border border-line bg-white shadow-lg">
+          <div className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
             <p className="text-sm font-bold text-ink">지도 레이어</p>
+            <button
+              type="button"
+              onClick={() => setLayerPanelOpen(false)}
+              aria-label="레이어 패널 닫기"
+              className="flex h-6 w-6 items-center justify-center rounded-full text-muted hover:bg-soft hover:text-ink"
+            >
+              ×
+            </button>
           </div>
 
           <div className="flex flex-col divide-y divide-line">
@@ -1065,6 +1090,8 @@ function ServiceMapView() {
                 </p>
               )}
             </div>
+          )}
+        </div>
           )}
         </div>
 
