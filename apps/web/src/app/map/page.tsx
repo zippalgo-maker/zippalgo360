@@ -12,6 +12,8 @@ import type {
   CompanyMapMarker,
   ListingMapMarker,
   ZipteriorComplexDetailOut,
+  ZipteriorMapMarker,
+  ZipteriorMapMarkerListOut,
   ZipteriorPortfolioSummary,
   ZipteriorViewportItem,
   ZipteriorViewportOut,
@@ -66,14 +68,33 @@ const COMPANY_LAYER_COLOR: Partial<Record<LayerKey, string>> = {
 const CLUSTERED_LAYERS: ReadonlySet<LayerKey> = new Set(["listings"]);
 // 우리 DB(인덱스 있음, 직접 제어 가능)로 가는 요청은 넉넉하게.
 const MARKER_FETCH_LIMIT = 5000;
-// 집테리어로 프록시되는 두 레이어(인테리어 시공사례/업체)는 원본 마커 대신
-// 집테리어가 줌 레벨에 맞춰 미리 클러스터링해서 내려주는
-// /api/v1/public/map/viewport를 쓴다(집테리어 자체 지도와 같은 방식,
-// 2026-08-25 소스 확인) — 그래서 여기 보내는 source_limit은 "화면에
-// 그릴 개수"가 아니라 "서버가 클러스터링 전에 얼마나 원본을 모을지"라,
-// 서버 클러스터링 덕에 브라우저 성능과 무관함. 집테리어 라우터의 실제
-// 상한(le=5000)까지 그대로 씀.
+// company_interior(인테리어 업체) 레이어는 집테리어가 줌 레벨에 맞춰
+// 미리 클러스터링해서 내려주는 /api/v1/public/map/viewport를 그대로 쓴다
+// — source_limit은 "화면에 그릴 개수"가 아니라 "서버가 클러스터링 전에
+// 얼마나 원본을 모을지"라, 서버 클러스터링 덕에 브라우저 성능과 무관함.
+// 집테리어 라우터의 실제 상한(le=5000)까지 그대로 씀.
+// (2026-08-26 정정: interiorPortfolio 레이어는 더 이상 이 엔드포인트를
+// 안 씀 — 아래 INTERIOR_* 상수/redrawInteriorClusters 설명 참고. 실제
+// 집테리어 데스크톱 지도(js/app.js)를 다시 확인해보니 이 서버 사전
+// 클러스터링이 아니라 원본 마커를 받아 클라이언트에서 직접 격자
+// 클러스터링하는 방식이었음 — 이전 조사가 틀렸었다.)
 const ZIPTERIOR_SOURCE_LIMIT = 5000;
+
+// interiorPortfolio 레이어는 집테리어 데스크톱 지도(js/app.js +
+// js/map-provider.js)와 완전히 동일하게 동작하도록, 서버 사전
+// 클러스터링(/viewport) 대신 원본 마커(/map-markers, bbox 제한)를 받아
+// **클라이언트에서** 집테리어와 똑같은 격자 클러스터링을 직접 수행한다.
+// 집테리어 프론트가 쓰는 그대로:
+//   clusterCell(zoom) = 20 / 1.8^zoom  (zoom은 leaflet 스타일 — 즉
+//   toZipteriorZoom과 동일한 변환이 필요)
+//   disableClusteringAtZoom: 15 (그 줌 이상은 클러스터링 없이 개별 마커)
+// 이 두 상수/공식이 다르면 축척이 같아도 뭉치는 개수·위치가 달라진다는
+// 걸 사용자가 같은 화면을 나란히 캡처해서 실측으로 증명함(2026-08-26).
+const INTERIOR_DISABLE_CLUSTERING_AT_ZOOM = 15;
+const INTERIOR_MARKERS_FETCH_LIMIT = 3000; // 집테리어 /public/map/markers 자체 상한과 동일
+function interiorClusterCellDegrees(leafletZoom: number): number {
+  return 20 / Math.pow(1.8, leafletZoom);
+}
 
 const KAKAO_APP_KEY = process.env.NEXT_PUBLIC_KAKAO_MAP_JS_KEY ?? "";
 // 집테리어 자체 지도(js/app.js)의 시작 위치/축척과 동일하게 맞춘다
@@ -113,10 +134,15 @@ function ServiceMapView() {
   // 마커별 DOM 엘리먼트와 원본 데이터를 계속 들고 있어야 해서 별도 ref로
   // 관리한다(다른 레이어처럼 클릭 즉시 인포윈도우만 띄우고 끝나지 않음).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const interiorMarkerElementsRef = useRef<Map<number, { el: HTMLDivElement; overlay: any; item: ZipteriorViewportItem }>>(
+  const interiorMarkerElementsRef = useRef<Map<number, { el: HTMLDivElement; overlay: any; item: ZipteriorMapMarker }>>(
     new Map()
   );
   const interiorComplexCacheRef = useRef<Map<number, ZipteriorComplexDetailOut>>(new Map());
+  // 지도를 이동하며 지금까지 불러온 원본(비클러스터) 단지 마커 전체 —
+  // 집테리어 자체 지도(js/app.js의 complexes 배열)와 동일하게, bbox 밖으로
+  // 나가도 지우지 않고 계속 누적한다. 클러스터링은 이 누적분 전체를
+  // 대상으로 매번 다시 계산한다(redrawInteriorClusters).
+  const interiorRawMarkersRef = useRef<Map<number, ZipteriorMapMarker>>(new Map());
   const [selectedComplexId, setSelectedComplexId] = useState<number | null>(null);
   const [selectedArea, setSelectedArea] = useState<string | null>(null);
   const [selectedPortfolio, setSelectedPortfolio] = useState<ZipteriorPortfolioSummary | null>(null);
@@ -309,55 +335,101 @@ function ServiceMapView() {
     [collapseInteriorMarker, bindFanInteractions]
   );
 
-  // interiorPortfolio 레이어 전용 렌더러 — 다른 레이어(renderViewportItems)와
-  // 달리 개별 마커를 클릭하면 인포윈도우 대신 그 마커 자체가 부챗살로
-  // 바뀌고 옆에 단지 정보 패널이 열린다(집테리어 자체 지도와 동일한 UX).
-  const renderInteriorComplexMarkers = useCallback(
-    (items: ZipteriorViewportItem[]) => {
+  // 지금까지 누적된 원본 단지 마커 하나를 "표준 배지" 상태로 그린다
+  // (클러스터에 안 묶이고 혼자 남은 마커, 또는 클러스터링이 꺼지는 최대
+  // 줌에서의 개별 마커).
+  const renderInteriorStandardMarker = useCallback(
+    (marker: ZipteriorMapMarker) => {
       const kakao = window.kakao;
       const map = mapRef.current;
-      interiorMarkerElementsRef.current.clear();
-      items.forEach((item) => {
-        const position = new kakao.maps.LatLng(item.latitude, item.longitude);
-        const isCluster = item.item_type === "cluster";
-        const el = document.createElement("div");
-        el.innerHTML = buildCountMarkerHtml(item.portfolio_count, isCluster ? undefined : item.name ?? undefined);
-        const overlay = new kakao.maps.CustomOverlay({
-          position,
-          content: el,
-          map,
-          yAnchor: 0.5,
-          xAnchor: 0.5,
-          zIndex: 0,
-        });
-        if (isCluster) {
-          el.addEventListener("click", () => {
-            map.setLevel(Math.max(1, map.getLevel() - 2));
-            map.setCenter(position);
-          });
-        } else if (item.id != null) {
-          const complexId = item.id;
-          interiorMarkerElementsRef.current.set(complexId, { el, overlay, item });
-          el.addEventListener("click", () => openInteriorComplex(complexId));
+      const position = new kakao.maps.LatLng(marker.latitude, marker.longitude);
+      const el = document.createElement("div");
+      el.innerHTML = buildCountMarkerHtml(marker.portfolio_count, marker.name);
+      const overlay = new kakao.maps.CustomOverlay({
+        position,
+        content: el,
+        map,
+        yAnchor: 0.5,
+        xAnchor: 0.5,
+        zIndex: 0,
+      });
+      interiorMarkerElementsRef.current.set(marker.id, { el, overlay, item: marker });
+      el.addEventListener("click", () => openInteriorComplex(marker.id));
+      markersByLayerRef.current.interiorPortfolio.push(overlay);
+    },
+    [openInteriorComplex]
+  );
+
+  // interiorPortfolio 레이어의 클러스터링+렌더 — 집테리어 데스크톱 지도
+  // (js/map-provider.js의 ClusterGroup.redraw())와 완전히 동일한 알고리즘
+  // 을 그대로 옮긴 것: 지금까지 누적된 원본 마커 전체를 매번 다시 격자로
+  // 묶어서 클러스터/개별 마커를 새로 그린다. 개별 마커를 클릭하면
+  // 인포윈도우 대신 그 마커 자체가 부챗살로 바뀌고 옆에 단지 정보 패널이
+  // 열린다(집테리어와 동일한 UX, 다른 레이어의 renderViewportItems와는
+  // 다름).
+  const redrawInteriorClusters = useCallback(() => {
+    const kakao = window.kakao;
+    const map = mapRef.current;
+    if (!kakao || !map || !activeLayersRef.current.has("interiorPortfolio")) return;
+
+    clearLayerMarkers("interiorPortfolio");
+    interiorMarkerElementsRef.current.clear();
+
+    const markers = Array.from(interiorRawMarkersRef.current.values());
+    const leafletZoom = toZipteriorZoom(map.getLevel());
+    let totalPortfolios = 0;
+
+    if (leafletZoom >= INTERIOR_DISABLE_CLUSTERING_AT_ZOOM) {
+      markers.forEach((marker) => {
+        totalPortfolios += marker.portfolio_count;
+        renderInteriorStandardMarker(marker);
+      });
+    } else {
+      const cell = interiorClusterCellDegrees(leafletZoom);
+      const buckets = new Map<string, ZipteriorMapMarker[]>();
+      markers.forEach((marker) => {
+        const key = `${Math.floor(marker.latitude / cell)}:${Math.floor(marker.longitude / cell)}`;
+        const bucket = buckets.get(key);
+        if (bucket) bucket.push(marker);
+        else buckets.set(key, [marker]);
+      });
+      buckets.forEach((bucket) => {
+        const portfolioSum = bucket.reduce((sum, m) => sum + m.portfolio_count, 0);
+        totalPortfolios += portfolioSum;
+        if (bucket.length === 1) {
+          renderInteriorStandardMarker(bucket[0]);
+          return;
         }
+        const lat = bucket.reduce((sum, m) => sum + m.latitude, 0) / bucket.length;
+        const lng = bucket.reduce((sum, m) => sum + m.longitude, 0) / bucket.length;
+        const position = new kakao.maps.LatLng(lat, lng);
+        const el = document.createElement("div");
+        el.innerHTML = buildCountMarkerHtml(portfolioSum);
+        const overlay = new kakao.maps.CustomOverlay({ position, content: el, map, yAnchor: 0.5, xAnchor: 0.5, zIndex: 0 });
+        el.addEventListener("click", () => {
+          map.setLevel(Math.max(1, map.getLevel() - 2));
+          map.setCenter(position);
+        });
         markersByLayerRef.current.interiorPortfolio.push(overlay);
       });
-      // 지도를 살짝 움직여서 이 레이어가 다시 로드돼도(idle 재조회), 이미
-      // 펼쳐 놓았던 단지가 여전히 화면 안에 있으면 부챗살 상태를 그대로
-      // 복원한다 — 새로 만든 마커는 기본적으로 표준 배지 상태이기 때문.
-      const currentComplexId = selectedComplexIdRef.current;
-      if (currentComplexId != null) {
-        const cached = interiorComplexCacheRef.current.get(currentComplexId);
-        const entry = interiorMarkerElementsRef.current.get(currentComplexId);
-        if (cached?.available && entry) {
-          entry.el.innerHTML = buildFanMarkerHtml(cached, selectedAreaRef.current);
-          entry.overlay.setZIndex?.(10000);
-          bindFanInteractions(entry.el, cached);
-        }
+    }
+
+    setLayerCounts((prev) => ({ ...prev, interiorPortfolio: totalPortfolios }));
+
+    // 재계산 중에도 이미 펼쳐 놓았던 단지가 여전히 개별 마커로 남아있으면
+    // 부챗살 상태를 그대로 복원한다 — 새로 만든 마커는 기본적으로 표준
+    // 배지 상태이기 때문.
+    const currentComplexId = selectedComplexIdRef.current;
+    if (currentComplexId != null) {
+      const cached = interiorComplexCacheRef.current.get(currentComplexId);
+      const entry = interiorMarkerElementsRef.current.get(currentComplexId);
+      if (cached?.available && entry) {
+        entry.el.innerHTML = buildFanMarkerHtml(cached, selectedAreaRef.current);
+        entry.overlay.setZIndex?.(10000);
+        bindFanInteractions(entry.el, cached);
       }
-    },
-    [openInteriorComplex, bindFanInteractions]
-  );
+    }
+  }, [clearLayerMarkers, renderInteriorStandardMarker, bindFanInteractions]);
 
   // 단지 정보 패널에서 평형 타입 탭을 눌러 selectedArea가 바뀌면, 지도
   // 위 부챗살 마커의 활성 조각(active 표시)도 같이 갱신한다.
@@ -405,6 +477,11 @@ function ServiceMapView() {
     setLayerCounts((prev) => ({ ...prev, listings: markers.length }));
   }, [clearLayerMarkers]);
 
+  // 원본(비클러스터) 단지 마커를 bbox 범위로 받아 누적한 뒤, 집테리어와
+  // 동일한 클라이언트 격자 클러스터링으로 다시 그린다 — 서버 사전
+  // 클러스터링(/viewport)은 더 이상 이 레이어에 안 씀(위 INTERIOR_* 상수
+  // 설명 참고). 집테리어 자체 지도가 새 bbox 마커를 받을 때마다 하는 것과
+  // 동일하게, 이미 알고 있는 단지는 건너뛰고 새로 들어온 것만 누적한다.
   const loadInteriorMarkers = useCallback(async () => {
     const kakao = window.kakao;
     const map = mapRef.current;
@@ -412,20 +489,16 @@ function ServiceMapView() {
     const bounds = map.getBounds();
     const sw = bounds.getSouthWest();
     const ne = bounds.getNorthEast();
-    const data = await apiFetch<ZipteriorViewportOut>(
-      `/integrations/zipterior/viewport?marker_type=complex&has_portfolio=true&zoom=${toZipteriorZoom(map.getLevel())}&north=${ne.getLat()}&south=${sw.getLat()}&east=${ne.getLng()}&west=${sw.getLng()}&source_limit=${ZIPTERIOR_SOURCE_LIMIT}`
+    const data = await apiFetch<ZipteriorMapMarkerListOut>(
+      `/integrations/zipterior/map-markers?north=${ne.getLat()}&south=${sw.getLat()}&east=${ne.getLng()}&west=${sw.getLng()}&limit=${INTERIOR_MARKERS_FETCH_LIMIT}`
     );
     if (!activeLayersRef.current.has("interiorPortfolio")) return;
-    clearLayerMarkers("interiorPortfolio");
     setLayerUnavailable("interiorPortfolio", !data.available);
-    renderInteriorComplexMarkers(data.items);
-    // "인테리어 시공사례" 배지는 단지(마커) 개수가 아니라 실제 시공사례
-    // (포트폴리오) 합계를 보여줘야 이름과 맞는다 — 한 단지에 여러 업체가
-    // 각각 시공사례를 등록할 수 있어서 항상 단지 수보다 많다.
-    // source_marker_count(단지 수)를 쓰면 라벨과 안 맞는 숫자가 뜬다.
-    const totalPortfolios = data.items.reduce((sum, item) => sum + item.portfolio_count, 0);
-    setLayerCounts((prev) => ({ ...prev, interiorPortfolio: totalPortfolios }));
-  }, [clearLayerMarkers, setLayerUnavailable, renderInteriorComplexMarkers]);
+    data.items.forEach((marker) => {
+      interiorRawMarkersRef.current.set(marker.id, marker);
+    });
+    redrawInteriorClusters();
+  }, [setLayerUnavailable, redrawInteriorClusters]);
 
   const loadInteriorCompanyMarkers = useCallback(async () => {
     const kakao = window.kakao;

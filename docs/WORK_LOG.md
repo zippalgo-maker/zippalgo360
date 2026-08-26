@@ -1590,3 +1590,60 @@ sudo systemctl restart zippalgo360-web
   `git pull` → (백엔드) `alembic upgrade head` 실행 후
   `zippalgo360-api` 재시작 → (프론트) `npm run build` +
   `zippalgo360-web` 재시작 — 순서대로 전부 필요.
+
+---
+
+## 2026-08-26 — 인테리어 마커, 이전 zoom 수정으로도 여전히 안 맞음 → 클러스터링 방식 자체가 잘못됐던 것으로 확인, 근본 재구현
+
+### 시작 전
+- 사용자가 완전히 같은 화면(같은 위치·같은 축척)을 우리 지도와 집테리어
+  지도에서 나란히 캡처해서 첨부 — 마커 개수·위치·뭉치는 정도가 확연히
+  다름(우리: 큰 덩어리 몇 개, 집테리어: 훨씬 세밀하게 흩어진 여러 개).
+  "완전히 같게 하라고 했지" — 이전 zoom 단위 수정만으로는 부족했다는
+  지적.
+
+### 진행 중 — 진짜 원인 재확인
+- 다시 소스를 뜯어본 결과, **애초에 이전 조사(이 문서 앞부분 "집테리어
+  자체 지도와 같은 방식"이라던 기록)가 틀렸었음**을 확인:
+  - 집테리어 데스크톱 지도(`js/app.js` + `js/map-provider.js`)는
+    `/api/v1/public/map/viewport`(서버 사전 클러스터링)를 **아예 안
+    씀**. 대신 `/public/map/markers`로 원본 마커를 bbox 단위로 점진적
+    으로 받아 `complexes` 배열에 누적하고, **클라이언트에서**
+    `ClusterGroup`(리플렛 스타일)으로 직접 격자 클러스터링함 —
+    공식은 `clusterCell(zoom) = 20 / 1.8^zoom`(zoom은 leaflet 스타일),
+    `disableClusteringAtZoom: 15`.
+  - `/viewport`가 쓰는 서버 쪽 `PublicMapService.cluster_cell_degrees
+    (zoom)`(계단형: 7/9/11/13/15 구간)는 **완전히 다른 별도의 공식**
+    이라, zoom 단위를 아무리 정확히 맞춰도 두 알고리즘 자체가 달라서
+    절대 100% 일치할 수 없었음 — 지난 수정(zoom 방향 반전)은 방향은
+    맞았지만 애초에 잘못된 엔드포인트/알고리즘을 쓰고 있었던 것.
+
+### 진행 중 — 재구현 (`apps/web/src/app/map/page.tsx`)
+- **[완료]** interiorPortfolio 레이어를 `/viewport` 대신
+  `/integrations/zipterior/map-markers`(이미 있던 프록시, bbox 제한
+  원본 마커)로 전환.
+- **[완료]** `interiorRawMarkersRef` — 집테리어의 `complexes` 배열과
+  동일하게, 지도를 이동하며 받은 원본 마커를 id 기준으로 계속 누적
+  (bbox 밖으로 나가도 안 지움).
+- **[완료]** `redrawInteriorClusters()` — 집테리어의
+  `ClusterGroup.redraw()`를 그대로 이식: 매번 누적된 마커 전체를
+  대상으로 `interiorClusterCellDegrees(zoom) = 20/1.8^zoom` 격자로
+  다시 묶고, `INTERIOR_DISABLE_CLUSTERING_AT_ZOOM=15` 이상이면
+  클러스터링 없이 개별 마커만 그림. 개별 마커 클릭 시 부챗살+단지
+  패널이 뜨는 기존 동작은 그대로 유지(`renderInteriorStandardMarker`
+  로 분리, `openInteriorComplex`/`bindFanInteractions` 재사용).
+  클러스터 클릭은 기존처럼 확대(집테리어는 클러스터 클릭 시 목록
+  표시지만, 이번 수정 범위는 "뭉치는 기준·위치를 동일하게"였고 클릭
+  동작은 이전에 이미 성능 절충안으로 합의된 부분이라 유지).
+- **[완료]** `company_interior`(인테리어 업체) 레이어는 이번 수정
+  범위 밖(사용자 요청이 "인테리어 시공사례" 레이어 한정) — 여전히
+  `/viewport` 사용, 동일한 잠재적 불일치가 있을 수 있음을 인지만
+  해둠(필요시 후속 작업).
+- **[완료]** `next build` 성공, `npx eslint`로 새 코드가 새로운 오류를
+  만들지 않았는지 확인(기존에 있던 5개 pre-existing 오류만 그대로).
+
+### 완료 후
+- 로컬 빌드/린트만 확인됨 — 서버 배포(`npm run build` + `zippalgo360
+  -web` 재시작, API는 안 건드렸으니 재시작 불필요) 및 사용자가 같은
+  화면을 다시 나란히 캡처해서 실제로 뭉치는 개수·위치가 일치하는지
+  재확인은 다음 단계.
