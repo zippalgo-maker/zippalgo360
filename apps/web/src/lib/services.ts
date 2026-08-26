@@ -3,6 +3,7 @@ export type ServiceStatus = "live" | "preparing";
 export interface ServiceInfo {
   slug: string;
   name: string;
+  navSubtitle?: string;
   tagline: string;
   description: string;
   status: ServiceStatus;
@@ -46,23 +47,15 @@ export const SERVICES: ServiceInfo[] = [
     ctaLabel: "시공사례 찾기",
   },
   {
-    slug: "zipisa",
-    name: "집이사",
-    tagline: "이사도 집팔고360에서, 곧 만나요",
-    description: "이사 업체 매칭 서비스를 준비하고 있습니다.",
+    slug: "zipservice",
+    name: "집서비스",
+    navSubtitle: "이사·청소·가전·가구",
+    tagline: "이사부터 생활까지, 집의 모든 순간",
+    description:
+      "이사, 이사청소, 생활청소는 물론 내 집 평형과 스타일에 맞는 가전·가구를 AI가 추천해주고, 인터넷·TV·정수기 같은 생활 구독 서비스까지 한 번에 신청할 수 있는 집팔고360의 통합 라이프스타일 서비스입니다.",
     status: "preparing",
-    href: "/zipisa",
+    href: "/zipservice",
     icon: "/icons/zipmove.png",
-    ctaLabel: "관심 등록하기",
-  },
-  {
-    slug: "zipcheongso",
-    name: "집청소",
-    tagline: "이사 후 청소까지, 곧 만나요",
-    description: "청소 업체 매칭 서비스를 준비하고 있습니다.",
-    status: "preparing",
-    href: "/zipcheongso",
-    icon: "/icons/zipclean.png",
     ctaLabel: "관심 등록하기",
   },
 ];

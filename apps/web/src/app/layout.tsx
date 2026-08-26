@@ -7,7 +7,7 @@ import { AuthProvider } from "@/lib/auth-context";
 export const metadata: Metadata = {
   title: "집팔고360 | Home Lifecycle Platform",
   description:
-    "부동산 거래에서 주거 생활까지 연결하는 집팔고360. 집팔고, 집사고, 집테리어, 집이사, 집청소를 한 곳에서.",
+    "부동산 거래에서 주거 생활까지 연결하는 집팔고360. 집팔고, 집사고, 집테리어, 집서비스를 한 곳에서.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

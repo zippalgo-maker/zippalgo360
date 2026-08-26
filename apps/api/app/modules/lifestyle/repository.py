@@ -6,12 +6,12 @@ def create_registration(conn: Connection, *, user_id: int | None, **fields) -> d
         text(
             """
             INSERT INTO lifestyle_interest_registrations (
-                user_id, service_type, name, phone, region, desired_date, memo
+                user_id, service_type, name, phone, region, desired_date, memo, pyeong, home_style
             )
             VALUES (
-                :user_id, :service_type, :name, :phone, :region, :desired_date, :memo
+                :user_id, :service_type, :name, :phone, :region, :desired_date, :memo, :pyeong, :home_style
             )
-            RETURNING id, service_type, name, phone, region, desired_date, memo, created_at
+            RETURNING id, service_type, name, phone, region, desired_date, memo, pyeong, home_style, created_at
             """
         ),
         {"user_id": user_id, **fields},
@@ -22,7 +22,7 @@ def create_registration(conn: Connection, *, user_id: int | None, **fields) -> d
 
 def list_registrations(conn: Connection, service_type: str | None = None) -> list[dict]:
     query = """
-        SELECT id, service_type, name, phone, region, desired_date, memo, created_at
+        SELECT id, service_type, name, phone, region, desired_date, memo, pyeong, home_style, created_at
         FROM lifestyle_interest_registrations
     """
     params: dict = {}

@@ -1495,3 +1495,69 @@ sudo systemctl restart zippalgo360-web
 - 로컬 빌드만 확인됨 — 서버 배포(`npm run build` + `zippalgo360-web`
   재시작, API는 안 건드렸으니 재시작 불필요) 및 실브라우저로 마커
   겹침이 실제로 해소됐는지 확인은 다음 단계.
+
+---
+
+## 2026-08-26 — 집이사/집청소를 "집서비스"로 통합 (다른 세션과의 브랜치 충돌 발견 및 복구)
+
+### 시작 전
+- 사용자 지시: 상단 서비스 목록에서 집이사/집청소를 빼고 "집서비스" 하나로
+  통합. 이사, 이사청소, 생활청소, 가전(평형/스타일 맞춤 AI 추천), 가구(AI
+  추천), 인터넷·TV·정수기까지 포함. 상단 메뉴에 "집서비스" 아래 작은 글씨로
+  "이사·청소·가전·가구" 노출.
+
+### 진행 중 — 브랜치 충돌 발견
+- 작업을 마치고 push하려다 **rejected(fetch first)** 에러 발생. 확인해보니
+  이 세션이 마지막으로 pull한 이후 **다른(데스크탑) 세션이 같은 브랜치에
+  방대한 작업을 이미 push해놓은 상태**였음: SSO 통합(집팔고360을 SSO
+  issuer로), 전체 라우트 `jip*` → `zip*` 로마자화 통일(집팔고→zippalgo
+  포함), `/map`을 부챗살 마커·단지 패널·포트폴리오 패널이 있는 멀티레이어
+  지도로 대규모 재구축, 업체 지오코딩(911/912건), 관리자 "좌표없음" 배지 등.
+- **안전 조치**: 기존 로컬 커밋을 `backup/pre-sync-jipservice-76b0c55`
+  브랜치로 백업 후, 로컬을 `origin/claude/jippalgo360-platform-6bvrfh`로
+  `git reset --hard` — 데스크탑 세션의 작업을 절대 덮어쓰지 않도록 함.
+- `CLAUDE.md`에 데스크탑 세션이 추가한 네이밍 규칙("집으로 시작하는 모든
+  서브서비스는 zip으로 로마자화") 확인 → 원래 계획했던 `/jipservice`가
+  아니라 **`/zipservice`**로, 컴포넌트도 `ZipServiceForm`으로 이 규칙에
+  맞춰 새로 작성함.
+- alembic 마이그레이션도 데스크탑 세션이 이미 `0003`(업체 지오코딩용)을
+  써서, 이번 것은 `0004_expand_lifestyle_service_types.py`(down_revision
+  `0003`)로 번호를 다시 매김.
+
+### 진행 중 — 구현 (현재 브랜치 최신 상태 기준으로 재작성)
+- **[완료]** `lifestyle_interest_registrations`: `service_type` CHECK
+  제약을 `(moving, cleaning)` → `(moving, move_out_cleaning,
+  living_cleaning, appliance, furniture, subscription)` 6종으로 확장.
+  `pyeong INTEGER`, `home_style VARCHAR(50)` 컬럼 추가(가전/가구 AI 추천용
+  컨텍스트 데이터 사전 수집).
+- **[완료]** `/zipservice` 페이지 + `ZipServiceForm` 컴포넌트 신규 작성 —
+  카테고리 6개 카드 선택, 가전/가구 선택 시 평형·선호 스타일 조건부 입력
+  필드, 나머지는 기존 관심 등록 폼과 동일한 흐름.
+- **[완료]** `/zipisa`, `/zipcheongso` → `/zipservice` 영구 리다이렉트
+  (`next.config.ts`), 옛 페이지 파일과 이제 안 쓰는 `ComingSoonService`
+  컴포넌트 삭제.
+- **[완료]** `services.ts`에 `navSubtitle` 필드 추가, `Header.tsx`
+  데스크톱 nav(2줄: 이름 + 작은 부제)·모바일 nav(인라인) 양쪽에 렌더링 —
+  데스크탑 세션이 이미 추가해둔 "지도" 링크는 그대로 보존.
+- **[완료] 로컬 검증**: 마이그레이션 체인 `0001→0002→0003→0004` 전부
+  클린 적용 확인(로컬 DB를 완전히 새로 만들어서 처음부터 검증).
+  `POST /lifestyle/interest`가 `pyeong`/`home_style` 정상 반영 확인(curl).
+  Playwright로 실제 브라우저 흐름(가전 선택 → 평형/스타일 입력 → 이름/
+  연락처/지역 입력 → 제출 → "관심 등록이 완료됐어요!" 표시)까지 확인.
+  `next build` 클린(라우트 목록에 `/zipservice` 정상 포함, 나머지
+  `zip*` 라우트들도 전부 그대로 유지됨 확인).
+- **[완료]** origin을 다시 fetch해 추가 변경 없음을 확인 후 rebase,
+  재빌드까지 통과한 뒤 push 완료 (`952ff9d`).
+
+### 완료 후
+- 로컬 커밋/빌드/브라우저 검증까지 전부 완료, GitHub push 완료.
+- **서버 재배포 아직 안 함** — 다음에 이어서 진행할 때, 사용자에게 서버에서
+  `git pull` → (백엔드) `alembic upgrade head` + `zippalgo360-api` 재시작
+  → (프론트) `npm run build` + `zippalgo360-web` 재시작 요청 필요.
+- **다른 세션과의 협업 참고**: 이 세션과 데스크탑 세션이 같은 브랜치에
+  동시에 작업 중임이 확인됨. 앞으로 작업 시작 전에 항상 `git fetch` +
+  `git log HEAD..origin/...`로 다른 세션이 먼저 push한 게 있는지 확인하고,
+  있으면 그 변경사항을 먼저 읽고 반영한 뒤 작업을 시작해야 함(이번처럼
+  뒤늦게 발견해서 되돌리는 것보다 훨씬 안전).
+- `backup/pre-sync-jipservice-76b0c55` 브랜치는 참고용으로 남겨둠(실제
+  작업에는 반영 안 됨, 필요 없어지면 삭제해도 무방).
