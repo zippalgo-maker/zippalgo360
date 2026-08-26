@@ -870,3 +870,59 @@ sudo systemctl restart zippalgo360-web
   - 원본 백업(`uploads.bak_pre_migration_*`)은 며칠 안정성 확인 후
     사용자 판단하에 삭제 — 이 세션에서 먼저 지우지 않음.
 - 1단계 스크립트 사용자에게 전달함, 실행 결과 대기 중.
+
+### 실행 중 계획 정정 — "며칠 보관 후 삭제"는 불가능했음
+- 1단계(`vdb` 포맷/마운트)부터 막힘: `mkdir /mnt/vdb_data`조차
+  "No space left on device" — `/`(vda2) 여유 공간이 20K 수준이라 새
+  디렉토리 하나 만들 공간도 없었음. `/tmp`의 오래된 릴리스 tarball
+  (~150MB, `/srv/zipterior/releases`에 버전별로 이미 보관된 것들의
+  임시 복사본으로 판단, 사용자 확인 후 삭제)을 지워서 43M 확보 후 진행.
+- **원래 계획("원본을 이름만 바꿔서 며칠 보관")은 의미가 없다는 걸 실행
+  중 깨달음** — 같은 디스크(vda) 안에서 `mv`로 이름만 바꾸는 건 용량을
+  전혀 안 비움(데이터가 물리적으로 그대로 vda에 남아있음). 지금 위기의
+  본질이 "vda 공간 부족"이라, 실제로 vda에서 지워야만 해결됨. 계획을
+  수정: 복사본 검증(파일 개수·용량 일치, 샘플 이미지 실제 HTTP 200
+  서빙 확인) 후 **원본을 실제로 삭제**하는 것으로 진행(대신 검증을
+  충분히 거친 뒤에만 삭제하도록 안전장치를 강화함).
+- 사용자가 밤새 자동등록(포트폴리오 일괄등록) 작업이 있었다며 정리부터
+  하려 했으나, 확인 결과 디스크 문제로 이미 그 작업 자체가 멈춰있는
+  상태였음(worker가 DB 연결 실패로 폴링마다 에러, 실행 중인 프로세스도
+  없음) — 그래서 마이그레이션을 먼저 진행해도 안전하다고 판단.
+
+### 진행 중 (실행 완료)
+- **[완료] 1단계**: `vdb` ext4 포맷 → `/mnt/vdb_data` 마운트(`/etc/fstab`
+  등록) → `rsync`로 `/var/www/zipterior/uploads/`(75G, 1,234,771개 파일)
+  전량 복사, 원본 무변경 확인.
+- **[완료] 2단계**: `zipterior-api` 정지 → 델타 재동기화 → 원본을
+  `uploads.old_pending_delete`로 개명 → `/var/www/zipterior/uploads`를
+  새로 만들고 `/mnt/vdb_data/zipterior-uploads`를 bind mount(`/etc/fstab`
+  등록) → `zipterior-api` 재시작.
+- **[완료] 검증**: 새 경로와 원본의 파일 개수(1,234,771 = 1,234,771)·
+  용량(75G = 75G) 완전 일치 확인. 샘플 이미지 1개를 실제 URL로 curl —
+  `HTTP 200`, 정상 크기(1.4MB) 확인.
+- **[완료] 원본 삭제** — 검증 통과 후 `uploads.old_pending_delete`(vda
+  위 실제 75G) 삭제 → **`df -h /` : 100% → 25%(76G 여유)** 로 확보됨.
+- **[완료] 서비스 정상화**: `postgresql` 재시작 → recovery 정상 완료,
+  `SELECT 1` 성공. `zippalgo360-api`/`zippalgo360-web`/`zipterior-api`
+  전부 재시작, 전부 `active` + 헬스체크 200. `zippalgo360.com`,
+  `zippalgo360.com/api/listings/map/markers`,
+  `zippalgo360.com/api/companies/map/markers`,
+  `zipterior.zippalgo360.com` 전부 200 최종 확인.
+
+### 완료 후 — 서버 최종 상태 요약
+- 디스크: `vda`(100G, `/`) 25% 사용(76G 여유). `vdb`(100G)는 ext4로
+  포맷되어 `/mnt/vdb_data`에 마운트됨, 재부팅해도 유지(`/etc/fstab`
+  등록됨).
+- `/var/www/zipterior/uploads`는 이제 `/mnt/vdb_data/zipterior-uploads`로
+  bind mount된 상태(코드/nginx 설정 변경 없이 경로는 그대로 유지, 물리적
+  위치만 다른 디스크). 이것도 `/etc/fstab`에 등록되어 재부팅 후에도 유지됨.
+- 앞으로 새로 업로드되는 포트폴리오 이미지는 자동으로 `vdb`(19G 남음,
+  이 작업 시점 기준)에 쌓임 — vda는 더 이상 이미지로 안 채워짐.
+- **후속 조치 필요(이 세션 범위 아님, 데스크탑 세션과 조율)**: 지금은
+  이미지가 vdb 하나에만 있음(원본 vda 복사본은 검증 후 삭제함) — RAID나
+  스냅샷 같은 이중화가 없다는 뜻이라, vdb 자체 장애 시 이미지 유실
+  위험이 있음. 정기 백업(예: 외부 스토리지로 주기적 동기화)을 데스크탑
+  세션과 상의해서 마련하는 걸 권장.
+- `/tmp`의 오래된 릴리스 tarball(~150MB)도 이번에 삭제됨(사용자 확인
+  후 진행) — `/srv/zipterior/releases`의 버전별 보관본과는 별개로, 그냥
+  임시 작업 복사본이었던 것으로 보임.
