@@ -1015,17 +1015,39 @@ sudo systemctl restart zippalgo360-web
   스크립트를 별도로 실행 — **해시/길이 완전 일치 확인**(`307ed1c91ac1...`,
   64자). 두 서버가 같은 비밀키를 쓰고 있음이 확정됨.
 
+### 진행 중 (프론트엔드 연동)
+- 집테리어 프론트는 SPA 프레임워크 없이 정적 HTML + `js/api-client.js`의
+  전역 `window.ZipteriorAPI`(로그인/토큰 저장 공용 모듈) 구조. 이미
+  `ZipteriorAPI.save(data)`가 `{access_token, refresh_token, expires_in,
+  user}` 형식을 그대로 localStorage에 저장하는 공용 함수로 존재했고
+  (SNS 로그인 콜백 `oauth-callback.html`이 동일 패턴을 이미 사용 중),
+  우리 `/sso/exchange` 응답 형식과 정확히 일치해서 새 저장 로직을 따로
+  만들 필요 없이 그대로 재사용함.
+- 집팔고360 쪽 `apps/web/src/app/jipterior/page.tsx`가 iframe src를
+  `https://zipterior.zippalgo360.com/?sso=<code>`(루트 경로)로 설정하는
+  것을 재확인 → 패치 대상은 그 루트를 서빙하는 `/var/www/zipterior/index.html`.
+- **[완료]** `index.html`을 `.bak_20260826_094446_before_sso_frontend`로
+  백업 후, `js/api-client.js` 로드 직후(다른 스크립트들이 초기화되기
+  전)에 인라인 스크립트를 삽입(anchor 기반 Python 치환, 1회 매치 확인):
+  `?sso=` 파라미터가 있으면 즉시 `history.replaceState`로 URL에서
+  제거 → `ZipteriorAPI.request('/auth/sso/exchange', ...)` 호출 →
+  성공하면 `ZipteriorAPI.save(data)`로 토큰 저장 후 `location.reload()`
+  (데스크톱/모바일 스크립트 모두가 이미 로그인된 상태로 일관되게
+  다시 그려지도록 전체 새로고침 방식 선택 — app.js는 auth-changed
+  이벤트를 안 듣고 mobile-app.js만 들어서, 부분 갱신 대신 리로드가
+  더 안전하다고 판단함). 코드가 없거나 실패하면 아무 것도 안 하고
+  조용히 넘어감(집테리어 자체 로그인 화면/흐름 전혀 영향 없음).
+- **[완료] 검증**: `curl https://zipterior.zippalgo360.com/`에 삽입한
+  스크립트가 실제로 포함되어 서빙됨 확인. `?sso=fake-test-code`로
+  접속해도 페이지는 정상 `HTTP 200`(가짜 코드라 exchange만 조용히
+  실패하고 페이지 자체는 깨지지 않음 확인).
+
 ### 남은 작업 (다음 세션 이어서 진행)
-- **[미완료]** 집테리어 **프론트엔드**는 아직 전혀 손대지 않음 — 현재
-  클라이언트 쪽 어디에도 `?sso=` 쿼리 파라미터를 읽어서
-  `/api/v1/auth/sso/exchange`를 호출하는 코드가 없음. 백엔드만 준비된
-  상태이고, 실제로 iframe 진입 시 자동 로그인되는 기능은 아직 동작하지
-  않음. 다음 단계: 집테리어 부트스트랩 JS(로그인 성공 시 토큰을
-  localStorage에 저장하는 기존 코드)를 찾아서, 페이지 로드 시 `?sso=`
-  파라미터가 있으면 exchange 호출 → 같은 localStorage 키로 토큰 저장 →
-  `history.replaceState`로 URL에서 파라미터 제거, 순서로 연동.
-- **[미완료]** 실제 로그인된 집팔고360 사용자로 전체 흐름(발급 →
-  iframe 진입 → 교환 → 자동 로그인) end-to-end 테스트는 아직 안 함
-  (지금까지는 잘못된 코드로 400만 확인한 상태).
+- **[미완료]** 실제 로그인된 집팔고360 사용자로 전체 흐름(zippalgo360.com
+  로그인 → `/jipterior` 진입 → 코드 발급 → iframe에서 exchange → 자동
+  로그인 확인)의 **실사용 브라우저 end-to-end 테스트**는 아직 안 함.
+  지금까지는 서버 쪽에서 가짜/잘못된 코드로만 확인한 상태 — 사용자가
+  브라우저로 직접 `zippalgo360.com` 로그인 후 `/jipterior` 메뉴 진입해서
+  집테리어 쪽에도 로그인된 상태로 뜨는지 확인 필요.
 - 이후 사용자 지시대로 "2번"(인테리어 업체 마커 데이터 검증, 뷰포트
   엔드포인트 전환 이후 재확인 안 됨) → 마지막으로 백업/이중화 순.
