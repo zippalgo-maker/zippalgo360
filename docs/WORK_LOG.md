@@ -1638,3 +1638,79 @@ sudo systemctl restart zippalgo360-web
   스키마(카테고리 값 6종, `pyeong`/`home_style`)는 이미 나가 있으니 굳이
   다시 바꿀 필요 없으면 그대로 재사용 가능. 바꾸게 되면 이 문서에 기록
   남겨줄 것(다른 세션이 만든 걸 이 세션이 임의로 되돌리지 않도록).
+
+---
+
+## 2026-08-26 — (이 세션) 집서비스 화면 재설계 — 숨고/아정당 스타일 + 회원가 비교
+
+### 시작 전
+- 위 인계 기록을 이어받아 이 세션이 진행. 사용자 요청: 최신 트렌드
+  (숨고·아정당류 견적 매칭 플랫폼)에 맞는 디자인으로 PC/모바일 모두
+  재설계하고, 집사고/집테리어처럼 "견적 신청 → 업체 매칭" 흐름을 갖추되,
+  **집팔고360 회원(집팔고/집테리어 이용 고객)이면 더 저렴한 회원가**를
+  일반가와 비교해서 부각시켜 보여줄 것.
+- 백엔드는 건드리지 않기로 함 — 인계 기록의 권고대로 기존
+  `POST /lifestyle/interest` 스키마(6개 카테고리 + `pyeong`/`home_style`)를
+  그대로 재사용. "회원"은 별도 등급 데이터가 없어 **집팔고360에 로그인된
+  사용자 = 회원가 적용 대상**으로 단순화(이미 집팔고360이 통합회원 신원
+  기준이라는 아키텍처 원칙과 일치).
+- 가격 비교에 쓸 실제 시세 데이터가 없어(서비스 자체가 아직
+  `preparing` 상태, 실제 업체 매칭 전) **참고용 평균 시세 범위 +
+  회원 할인율(정적 값)**로 구현하고, 화면/FAQ에 "참고용" 문구를 명시해
+  확정 견적으로 오인되지 않게 함 — 실제 매칭 데이터가 쌓이면 이 정적
+  값을 교체하면 됨.
+
+### 진행 중
+- **[완료] `apps/web/src/lib/lifestyle-data.ts` 신규** — 카테고리 6종
+  메타데이터(라벨/설명/지역 라벨/카테고리별 빠른 질문 2개 내외/평균
+  시세 범위/회원 할인율)를 한 곳에 정의. 견적 마법사와 랜딩 페이지가
+  공유.
+- **[완료] `apps/web/src/components/lifestyle/` 신규 컴포넌트**
+  - `CategoryIcon.tsx` — 의존성 추가 없이 인라인 SVG로 카테고리별
+    라인 아이콘 6종(트럭/반짝임/스프레이/냉장고/소파/와이파이).
+  - `CategoryGrid.tsx` — 랜딩의 카테고리 6칸 그리드(아이콘+평균가+CTA,
+    `/zipservice/new?category=`로 이동).
+  - `MemberBenefitSection.tsx` — 일반가 vs 회원가 비교 카드 섹션
+    (로그인 상태에 따라 "회원가 적용 대상" 배지 또는 "가입하고 확인"
+    CTA 전환).
+  - `ZipServiceFaq.tsx` — 아코디언 FAQ(참고 시세라는 점 등 고지).
+  - `MobileStickyCta.tsx` — 모바일 전용 하단 고정 CTA 바.
+  - `ZipServiceWizard.tsx` — 기존 단일 폼(`ZipServiceForm.tsx`, 삭제됨)을
+    대체하는 4단계 마법사(카테고리 선택 → 카테고리별 빠른 질문(칩
+    선택, appliance/furniture는 기존 평형/스타일 입력 유지) → 일정·지역
+    → 신청자 정보+가격 요약+제출). 빠른 질문 응답은 백엔드 스키마 변경
+    없이 `memo` 필드에 읽기 좋은 텍스트로 합쳐서 전송.
+- **[완료] `/zipservice` 페이지 재설계** — 히어로(카피+일반가/회원가
+  예시 카드) → 신뢰 요소 4종 → 회원가 비교 섹션 → 카테고리 그리드 →
+  진행 단계(4단계) → FAQ → 하단 CTA 배너, 모바일은 하단 고정 CTA 바.
+- **[완료] `/zipservice/new` 신규 라우트** — `zipsago/new`와 동일한
+  패턴으로 `Suspense`로 감싸 `useSearchParams`(카테고리 쿼리 파라미터
+  프리셋) 사용.
+- **[완료] 검증**: `npm run build`(Next 16 Turbopack) 클린 통과,
+  `npm run lint` 통과(기존에 있던 무관한 15개 lint 오류는 이 세션이
+  건드리지 않은 파일들 — `auth-context.tsx`, `zipterior/page.tsx`,
+  `zipsago/assignments/page.tsx`, `InteriorComplexPanel.tsx`,
+  `InteriorPortfolioPanel.tsx`, `kakao-maps.ts` — 이번 작업 범위 밖이라
+  손대지 않음). `npm run dev` 띄운 뒤 Playwright로 PC(1440px)/모바일
+  (390px) 스크린샷 확인 — 히어로 카드 하단 "누적 카테고리" 플로팅
+  배지가 참고 문구 텍스트와 겹치는 버그를 발견해 `absolute -bottom-5`
+  배치를 카드 아래 일반 흐름 배치로 수정, 재스크린샷으로 해결 확인.
+  마법사 4단계 진행/칩 선택/유효성 검증(다음 버튼 비활성화)도 브라우저
+  상호작용으로 확인.
+
+### 완료 후
+- 로컬 검증 완료. **서버 미배포** — 이 세션은 서버에 SSH 직접 접속이
+  안 되므로, 사용자가 아래 명령어를 서버에서 실행해야 반영됨(백엔드
+  변경 없음, `zippalgo360-api` 재시작 불필요):
+  ```bash
+  cd /srv/zippalgo360
+  git pull origin claude/jippalgo360-service-screen-lmv8de
+  cd apps/web
+  npm run build
+  sudo systemctl restart zippalgo360-web
+  ```
+- 다음에 이어받는 세션이 알아야 할 것: 가격 비교에 쓰인 시세/할인율은
+  전부 `apps/web/src/lib/lifestyle-data.ts`의 정적 값(참고용, 실제
+  업체 매칭 데이터 없음)이다. 실제 업체가 붙거나 실 견적 데이터가
+  쌓이면 이 파일의 `priceRange`/`memberDiscountPct`를 실데이터 기반으로
+  교체할 것.
