@@ -2177,16 +2177,18 @@ sudo systemctl restart zippalgo360-web
   (active) 상태** — `rgba(33,70,59,.15)`(반투명 파스텔 그린)도 위성
   지도 위에서 마찬가지로 묻힘. 사용자 지시: 선택 상태도 배경은 그냥
   흰색으로 두고, 글자색만 빨간색으로 바꾸자.
-- **[완료] 집테리어 서버**: `css/style.css`의 `.locate-control.active`,
-  `.map-type-control/.area-unit-control button.active`,
-  `.zipterior-zoom-control button:hover/:active` 전부 배경을
-  `rgba(33,70,59,.15)` → `#fff`(고정 불투명), 글자·테두리 색을
-  `#21463b`(그린) → `#bb1730`(브랜드 레드)로 변경. `index.html`
-  캐시버스터 `v=2.5.83-opaque-controls` → `v=2.5.84-active-red-text`.
-  사용자가 SSH로 패치 스크립트 실행(중간에 제가 이 세션 로컬
-  샌드박스에서 실수로 먼저 실행해봐서 "No such file" 에러가 났었음 —
-  서버 명령은 반드시 사용자 SSH 세션에서 실행해야 함, 실수 인지 후
-  올바른 블록을 다시 전달함).
+- **[진행 중, 서버 실행 확인 안 됨] 집테리어 서버**: `css/style.css`의
+  `.locate-control.active`, `.map-type-control/.area-unit-control
+  button.active`, `.zipterior-zoom-control button:hover/:active`
+  전부 배경을 `rgba(33,70,59,.15)` → `#fff`(고정 불투명), 글자·테두리
+  색을 `#21463b`(그린) → `#bb1730`(브랜드 레드)로 바꾸는 패치 스크립트
+  준비함. `index.html` 캐시버스터도 `v=2.5.83-opaque-controls` →
+  `v=2.5.84-active-red-text`로 올리게 되어있음. **중간에 제가 이 세션
+  로컬 샌드박스에서 실수로 먼저 이 스크립트를 실행해봐서 "No such
+  file" 에러가 났음(서버가 아니라 세션 자체 컨테이너에서 실행됨) —
+  실수 인지 후 사용자에게 올바른 블록을 다시 전달했으나, 사용자가
+  실제로 서버 SSH에서 실행했다는 확인은 아직 못 받음.** 다음 턴에
+  꼭 확인/재요청 필요.
 - **[완료] 우리 저장소**: 사용자가 "PC버전도 같이 바꿔야지"라고
   지적 — 저희 자체 `apps/web/src/app/map/page.tsx`의
   `controlButtonClass`도 선택 상태에 동일한 반투명 파스텔 그린
