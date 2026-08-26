@@ -2094,3 +2094,34 @@ sudo systemctl restart zippalgo360-web
   (`zippalgo360.com/zipterior`를 PC로 접속)에서도 지금은 집테리어
   로고가 다시 노출될 가능성 있음 — 이번 세션 범위 밖이라 손대지
   않았고, 사용자에게 별도 확인 요청 필요.
+
+### 후속: PC 로고 숨김 복원 + 모바일 검색창 확대 버그 수정
+- 사용자 실사용 확인 결과: (1) 위에서 보류했던 PC 로고 노출 실제로
+  재현됨 → 수정 요청. (2) 모바일에서 `/zipterior` 메인화면 검색창을
+  누르면 "아파트 검색" 전체화면 오버레이가 뜨면서 화면 자체가 확대된
+  것처럼 리사이징되는 버그 리포트(스크린샷 첨부).
+- **원인(2번)**: iOS Safari는 포커스되는 `<input>`의 `font-size`가
+  16px 미만이면 자동으로 페이지를 확대한다 — `.m-search-box input`이
+  `font-size:14px`였음(로그인 폼의 `.m-login-id-row/.m-login-pw-row
+  input`도 동일하게 14px, 같은 버그 소지가 있어 같이 고침).
+- **[완료]** `index.html` — `m.html`에 넣은 것과 동일한 패턴으로
+  `zpEmbed=1` 감지 스크립트 신규 추가(이전엔 아예 없었음, `nativeMap`
+  스크립트와는 별개), `css/style.css` 링크 캐시버스터
+  `v=2.5.80-map-compact` → `v=2.5.81-zp-embed`.
+- **[완료]** `css/style.css` 파일 끝에
+  `html.zp-zippalgo-embedded .brand-box{display:none!important}` 추가.
+- **[완료]** `css/mobile.css` — `.m-search-box input`,
+  `.m-login-id-row/.m-login-pw-row input` 두 곳 모두
+  `font-size:14px` → `16px`.
+- **[완료] 검증**: 패치 직후 터미널 출력이 큰 heredoc 붙여넣기로
+  한 번 뒤섞여서(`anchor1 매치 0개` AssertionError로 보이는 텍스트가
+  같이 찍힘) 실제 반영 여부가 불확실했으나, 재확인 결과 오탐으로
+  확인됨 — `grep -c`로 `index.html`/`style.css` 양쪽 다
+  `zp-zippalgo-embedded` 정확히 1개씩만 존재(중복 삽입 없음),
+  `index.html`의 `<link>` 버전도 `v=2.5.81-zp-embed`로 정상 반영,
+  **원격 `curl -s https://zipterior.zippalgo360.com/?zpEmbed=1`로도
+  스크립트/버전 정상 서빙 확인**(정적 파일이라 서버 재시작 불필요,
+  파일 저장 즉시 반영). `mobile.css`의 `font-size:16px` 두 곳도
+  로컬 grep으로 확인.
+- **미검증(실사용 확인 필요)**: 브라우저로 PC 로고 안 보이는지,
+  모바일 검색창 눌렀을 때 더 이상 확대 안 되는지.
