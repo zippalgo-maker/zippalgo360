@@ -1821,14 +1821,23 @@ sudo systemctl restart zippalgo360-web
   호출 — 이 코드베이스 전역에 만연, 빌드는 막지 않음, 이전 세션에서
   이미 비차단으로 판단됨)만 새로 만들었는지 확인, 새로운 종류의 오류는
   없음.
-- **다음(세부 작업 2, 아직 미완)**: 집테리어 서버(`/var/www/zipterior`)
-  쪽 코드라 이 세션이 직접 못 건드림 — 앵커 기반 파이썬 패치 스크립트
-  (`patch-zipterior-hide-logo.py`)를 준비해 사용자에게 전달, 실행 결과
-  대기 중. 패치 내용: (1) `index.html`의 `nativeMap` 감지 스크립트
-  바로 뒤에 `zpEmbed=1` 쿼리스트링을 감지해 `zp-zippalgo-embedded`
-  클래스를 붙이는 스크립트 추가 + `style.css` 캐시버스터 버전 올림,
-  (2) `style.css` 끝에 `html.zp-zippalgo-embedded .brand-box{display:
-  none!important}` 규칙 추가. 우리 쪽 `/zipterior` 임베드 페이지
-  (`apps/web/src/app/zipterior/page.tsx`)는 이미 iframe src에
-  `?zpEmbed=1`을 붙이도록 수정 완료(SSO 코드가 있을 땐
-  `&sso=...`를 추가로 붙임) — 서버 패치가 적용되면 바로 맞물려 동작.
+- **[완료] 세부 작업 2**: 집테리어 서버(`/var/www/zipterior`)에 앵커
+  기반 파이썬 패치를 SSH 릴레이로 실행 완료 — `index.html`의
+  `nativeMap` 감지 스크립트 바로 뒤에 `zpEmbed=1` 쿼리스트링을 감지해
+  `zp-zippalgo-embedded` 클래스를 붙이는 스크립트 추가 + `style.css`
+  캐시버스터 버전 올림, `style.css` 끝에 `html.zp-zippalgo-embedded
+  .brand-box{display:none!important}` 규칙 추가. 사용자가 처음엔
+  파이썬 코드를 bash 프롬프트에 직접 붙여넣어 셸이 코드로 해석하려다
+  실패(SSH 세션 끊김) — `python3 - <<'PYEOF' ... PYEOF` heredoc으로
+  감싸서 다시 전달하니 정상 실행됨(`index.html 패치 완료`/`style.css
+  패치 완료` 출력 확인). **교훈**: 이후 세션도 원격 실행용 파이썬
+  스크립트는 파일 저장 대신 heredoc(`python3 - <<'EOF'...EOF`) 형태로
+  전달하는 편이 사용자가 한 번에 붙여넣기 안전함.
+  우리 쪽 `/zipterior` 임베드 페이지(`apps/web/src/app/zipterior/
+  page.tsx`)는 이미 iframe src에 `?zpEmbed=1`을 붙이도록 수정
+  완료(SSO 코드가 있을 땐 `&sso=...`를 추가로 붙임) — 양쪽이 맞물려
+  동작하는 것은 실사용자 화면(zippalgo360.com/zipterior)에서 아직
+  최종 확인 전, 다음 단계에서 확인 예정.
+- **7개 세부 작업 전부 코드 레벨 완료.** 남은 건: 이 저장소(집팔고360)
+  배포 스크립트 실행 → `/map`, `/zipterior` 실제 화면에서 사용자가
+  스크린샷으로 최종 검증.
