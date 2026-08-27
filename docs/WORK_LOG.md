@@ -2830,3 +2830,49 @@ sudo systemctl restart zippalgo360-web
   `https://zippalgo360.com`으로 직접 curl 검증을 시도했으나 이 환경의
   네트워크 아웃바운드가 허용목록 방식이라 외부 도메인 접근 자체가
   막혀있어(연결 실패, exit 56) 원격에서 대신 확인할 수 없었음.
+
+---
+
+## 2026-08-27 — (이 세션) `/map`이 예전 화면으로 되돌아간 사고: 세 번째 브랜치로 전환된 서버가 원인
+
+### 시작 전
+- 사용자가 배포 후 스크린샷 첨부: `/map`이 오늘 만든 모든 것(우측
+  컨트롤 스택, 아이콘 토글 레이어 패널, 왼쪽 단지 패널, 부챗살 마커)
+  없이 훨씬 예전 모습으로 보임. "니가 뭐 잘못 건드린거 아냐??"
+
+### 진행 중
+- **[완료] 원인 확인**: 사용자에게 진단 스크립트 요청 → 서버
+  (`/srv/zippalgo360`)가 이 세션이 계속 배포해온 브랜치가 아니라
+  **세 번째 브랜치** `claude/jippalgo360-service-screen-lmv8de`
+  (집서비스 화면 재설계 작업용, 커밋 `9abf8c7`)에 체크아웃돼 있었고,
+  그 브랜치는 오늘 지도 재작업이 시작되기 전부터 갈라진 브랜치라
+  `apps/web/src/app/map/page.tsx`에 오늘 만든 어떤 코드도 없었음
+  (`grep -c "지도 레이어 선택"` → 0으로 확인). 집서비스 작업을 하던
+  또 다른 세션이 이 서버에서 자기 배포(`npm run build` +
+  `systemctl restart`)를 하면서, 같은 모노레포라 `map/page.tsx`까지
+  그 브랜치의 예전 버전으로 통째로 덮어써진 것 — 이 세션이 직접
+  손댄 적 없음, 브랜치 전환의 부작용.
+- **[완료] 병합**: `git diff --stat`으로 두 브랜치가 건드린 파일이
+  겹치는지 먼저 확인 — `docs/WORK_LOG.md` 말고는 **전혀 안 겹침**
+  (집서비스 쪽은 `apps/web/src/app/zipservice/*`,
+  `apps/web/src/components/lifestyle/*`,
+  `apps/web/public/images/zipservice/*`만 건드림, 이 세션은
+  `map`/`zipterior`/`integrations` 쪽만) — 코드 충돌 없이 병합
+  가능함을 미리 확인 후 `git merge origin/claude/jippalgo360
+  -service-screen-lmv8de` 실행. 예상대로 `docs/WORK_LOG.md`만
+  충돌(양쪽이 같은 지점에서 갈라져 각자 긴 기록을 이어붙인 단일
+  구간) — 파이썬 스크립트로 마커만 제거하고 두 쪽 다 유지, 사이에
+  `---` 구분선만 추가(어느 쪽도 삭제 안 함).
+- **[완료] 검증**: `next build` 클린 — `/zipservice/companies`,
+  `/zipservice/companies/[id]`, `/zipservice/new` 라우트가 새로
+  생성되는 것으로 집서비스 쪽 작업도 정상 포함됐음을 확인.
+  `grep -c "지도 레이어 선택" apps/web/src/app/map/page.tsx` → 1로
+  이 세션의 지도 작업도 그대로 살아있음을 재확인.
+- **다음**: 이번엔 관련 브랜치가 3개(`claude/jippalgo360-platform
+  -6bvrfh`, `claude/zippalgo360-interior-service-tz2qfv`,
+  `claude/jippalgo360-service-screen-lmv8de`)로 늘어났음 — 병합 결과를
+  세 브랜치 전부에 fast-forward 푸시해서 서버가 **어느 브랜치에
+  있든** 그냥 `git pull`이면 전부 반영되게 만들 예정. 사용자가 방금
+  또 다른 진단 결과를 보내왔는데(`origin/claude/jippalgo360-service
+  -screen-lmv8de`가 `9abf8c7`보다 한 커밋(`6231697`) 더 앞서 있음)
+  이것도 fetch해서 같이 병합해야 함 — 아직 안 함, 이어서 진행.
