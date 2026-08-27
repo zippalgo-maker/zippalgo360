@@ -3061,3 +3061,43 @@ sudo systemctl restart zippalgo360-web
   상품이 없어 스키마에 넣지 않음(과설계 방지, CLAUDE.md에 이미 기록된
   방침 그대로 유지) — 실제 결제 기능이 생기면 그때 SSO verify 응답에
   얹는다.
+
+## 2026-08-27 — 사용자가 로컬 서버 이전 + 목표 DB/서버 아키텍처 참고자료 3건 전달
+
+- 사용자가 업로드한 3개 문서를 저장소에 보관(세션 첨부파일은 컨테이너에만
+  존재하고 저장소엔 안 남아서, 다음 세션이 참고할 수 있게 커밋):
+  - `docs/zippalgo360-db-architecture-guide.md` — 목표 DB 스키마 설계서
+    (Core users/companies/orders/payments/oauth_accounts 등 + 서비스별
+    schema 분리안)
+  - `docs/zippalgo360-server-architecture-guide.md` — 클라우드→로컬 서버
+    이전 아키텍처 지침(하드웨어, 서비스별 포트 분리, Nginx, 백업/UPS 등)
+  - `docs/zippalgo360-local-server-migration-guide.md` — 위 두 문서의
+    운영 체크리스트 요약판(원본은 .docx, 텍스트만 추출해 마크다운으로
+    보관)
+- **아직 코드 변경 없음** — 사용자가 "참고하고 다시 이야기 하자"고 해서
+  읽기만 하고 반영은 보류, 다음 턴에 방향 논의 예정.
+- **[참고: 다음에 논의할 때 짚어야 할 것]** 이 문서들이 그리는 목표
+  스키마와 지금 실제 코드(`apps/api`)의 스키마 사이에 몇 가지 차이가
+  있음 — 그대로 맞출지, 지금 스키마를 유지하고 미래 목표로만 남길지
+  결정 필요:
+  1. `users.role`(customer/company/admin, 현재 코드) vs 문서의
+     `users.user_type`(general/company/admin) — 이름·값 다름.
+  2. 카카오 로그인을 이번 세션에서 `users.kakao_id` 컬럼으로 구현했는데,
+     문서는 provider별 다중 소셜로그인(kakao/naver/google/apple)을 위한
+     별도 `oauth_accounts` 테이블을 제안 — 지금 구조는 카카오 전용,
+     구조적으로 미래 목표와 다름.
+  3. 지금 `companies.owner_user_id`는 1:1(업체당 대표 유저 1명)인데,
+     문서의 `company_memberships`(company_id, user_id, role: owner/
+     manager/staff)는 업체당 여러 직원 계정을 지원하는 다대다 구조.
+  4. 문서가 쓰는 서비스 코드 `ZIPBUY`(집사고)가 CLAUDE.md에 이미 확정된
+     로마자 표기 규칙(집사고=**zipsago**)과 다름 — 그대로 채택하면
+     기존 네이밍 규칙과 충돌.
+  5. 서버 아키텍처 문서는 Core/집팔고/집사고/집테리어/집서비스를 **포트가
+     분리된 개별 systemd 서비스**로 그리는데, 지금 `apps/api`는 이
+     모듈들을 전부 한 FastAPI 프로세스에 모듈로 얹은 모놀리스 — 로컬
+     서버 이전 시점에 분리할지, 지금처럼 모놀리스 유지하며 논리적
+     경계만 지킬지는 별개 결정.
+  - 결제/포인트/쿠폰/주문(Core orders/payments/points/coupons) 스키마는
+    지금 코드에 전혀 없음 — 이건 문서도 "결제 기능이 실제로 생기면"
+    이라는 전제라 지금 급하게 만들 필요는 없어 보임(기존에 이미 CLAUDE.md
+    에 남긴 "과설계 방지" 방침과 일치).
