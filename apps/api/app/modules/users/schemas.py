@@ -33,6 +33,15 @@ class UserLogin(BaseModel):
     password: str
 
 
+class KakaoLoginIn(BaseModel):
+    code: str
+    redirect_uri: str | None = None
+
+
+class UserRoleUpdate(BaseModel):
+    role: UserRole
+
+
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"

@@ -11,6 +11,7 @@ from app.modules.lifestyle.router import router as lifestyle_router
 from app.modules.listings.router import router as listings_router
 from app.modules.payments.router import router as payments_router
 from app.modules.purchase_requests.router import router as purchase_requests_router
+from app.modules.users.router import router as users_router
 
 settings = get_settings()
 
@@ -25,6 +26,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router, prefix="/api")
+app.include_router(users_router, prefix="/api")
 app.include_router(companies_router, prefix="/api")
 app.include_router(apartments_router, prefix="/api")
 app.include_router(listings_router, prefix="/api")

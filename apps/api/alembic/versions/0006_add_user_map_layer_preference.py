@@ -5,15 +5,15 @@
 레이어 키 목록을 users 테이블에 저장한다. 비로그인 사용자는 프론트엔드에서
 쿠키로만 저장하므로 이 컬럼과 무관하다.
 
-Revision ID: 0005
-Revises: 0004
+Revision ID: 0006
+Revises: 0005
 Create Date: 2026-08-27
 
 """
 from alembic import op
 
-revision = "0005"
-down_revision = "0004"
+revision = "0006"
+down_revision = "0005"
 branch_labels = None
 depends_on = None
 

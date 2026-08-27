@@ -9,6 +9,7 @@ from app.deps import get_current_user
 from app.modules.auth import service, sso
 from app.modules.users import repository as users_repository
 from app.modules.users.schemas import (
+    KakaoLoginIn,
     MapLayerPreferenceIn,
     MapLayerPreferenceOut,
     SsoCodeOut,
@@ -32,6 +33,11 @@ def register(payload: UserCreate, conn: Connection = Depends(get_db)) -> TokenOu
 @router.post("/login", response_model=TokenOut)
 def login(payload: UserLogin, conn: Connection = Depends(get_db)) -> TokenOut:
     return service.login(conn, payload)
+
+
+@router.post("/kakao/login", response_model=TokenOut)
+def kakao_login(payload: KakaoLoginIn, conn: Connection = Depends(get_db)) -> TokenOut:
+    return service.kakao_login(conn, payload)
 
 
 @router.get("/me", response_model=UserOut)
