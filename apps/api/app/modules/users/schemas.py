@@ -38,6 +38,10 @@ class KakaoLoginIn(BaseModel):
     redirect_uri: str | None = None
 
 
+class UserRoleUpdate(BaseModel):
+    role: UserRole
+
+
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"

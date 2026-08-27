@@ -101,3 +101,50 @@ def get_user_by_id(conn: Connection, user_id: int) -> dict | None:
         {"id": user_id},
     ).mappings().first()
     return dict(row) if row else None
+
+
+def list_users(conn: Connection, *, role: str | None = None) -> list[dict]:
+    query = """
+        SELECT id, email, name, phone, role, is_active, created_at
+        FROM users
+    """
+    params: dict = {}
+    if role:
+        query += " WHERE role = :role"
+        params["role"] = role
+    query += " ORDER BY created_at DESC"
+
+    rows = conn.execute(text(query), params).mappings().all()
+    return [dict(r) for r in rows]
+
+
+def set_user_active(conn: Connection, user_id: int, is_active: bool) -> dict | None:
+    row = conn.execute(
+        text(
+            """
+            UPDATE users
+            SET is_active = :is_active, updated_at = now()
+            WHERE id = :id
+            RETURNING id, email, name, phone, role, is_active, created_at
+            """
+        ),
+        {"id": user_id, "is_active": is_active},
+    ).mappings().first()
+    conn.commit()
+    return dict(row) if row else None
+
+
+def set_user_role(conn: Connection, user_id: int, role: str) -> dict | None:
+    row = conn.execute(
+        text(
+            """
+            UPDATE users
+            SET role = :role, updated_at = now()
+            WHERE id = :id
+            RETURNING id, email, name, phone, role, is_active, created_at
+            """
+        ),
+        {"id": user_id, "role": role},
+    ).mappings().first()
+    conn.commit()
+    return dict(row) if row else None

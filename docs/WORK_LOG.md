@@ -3013,3 +3013,51 @@ sudo systemctl restart zippalgo360-web
 - 이 브랜치(`claude/jippalgo-360-member-features-hf7hxt`)는 앞으로
   안 쓰고, 이후 모든 커밋은 `claude/jippalgo360-platform-6bvrfh`에
   바로 푸시.
+
+## 2026-08-27 — 업체 승인 관리 API + 통합회원(집팔고360) 관리자 화면 구현
+
+- 코드에 이미 남아 있던 메모("이 코드베이스엔 아직 업체를 승인
+  (is_verified=true로 전환)하는 관리자 기능이 없어서" —
+  `apps/api/app/modules/companies/repository.py`의 `list_map_markers`
+  독스트링)를 그대로 채우는 작업. 회원가입/카카오로그인에 이어 CLAUDE.md
+  "회원/SSO/등급·결제 아키텍처" 원칙대로 **회원·업체 관리를 집팔고360
+  통합 관리자로** 만듦.
+- **[완료] 백엔드**:
+  - `companies`: `GET /companies/me`(본인 업체 조회), `GET /companies/
+    admin`(관리자용 전체 목록, `owner_email`/`owner_name` 조인 포함,
+    `is_verified` 필터), `POST /companies/{id}/verify`·`/suspend`·
+    `/reactivate`(전부 `require_role("admin")`) 추가.
+  - `users`: 라우터가 아예 없었어서 `app/modules/users/router.py` 신설
+    — `GET /users`(role 필터), `POST /users/{id}/activate`·
+    `/deactivate`, `POST /users/{id}/role`(역할 변경). `service.py`에
+    자기 자신을 비활성화/역할변경하지 못하게 막는 방어 추가(관리자가
+    실수로 자기 권한을 잠그는 사고 방지). `main.py`에 라우터 등록.
+  - 검증: venv에서 `import app.main` 통과, 등록된 전체 라우트 목록을
+    직접 찍어서 `/companies/me`, `/companies/admin`,
+    `/companies/{id}/verify` 등 경로 충돌 없이 올바르게 등록됐는지 확인.
+- **[완료] 프론트**:
+  - `/admin`(신설) — 회원관리/업체승인/단지마스터데이터/매도증빙검토
+    4개 관리자 화면으로 가는 인덱스 페이지(그동안 admin 하위 페이지가
+    서로 링크 없이 URL로만 접근 가능했던 것을 이번에 처음으로 하나로
+    묶음).
+  - `/admin/companies`(신설) — 업체별 대표자/소유자(이메일)/사업자
+    등록번호 표시, 승인 배지(심사중/승인됨/정지됨), 승인·정지·정지해제
+    버튼.
+  - `/admin/members`(신설) — 역할별 필터(전체/일반회원/업체/관리자),
+    회원 목록 테이블(이름/이메일/역할 드롭다운/활성상태 배지/가입일/
+    활성-비활성 토글). 본인 계정은 역할변경·비활성화 버튼을 비활성화
+    처리(백엔드 방어와 동일한 취지를 프론트에도 반영).
+  - `mypage`에 업체(company) 역할 사용자를 위한 상태 배너 추가
+    (`GET /companies/me` 호출) — 아직 업체 미등록이면 온보딩 유도,
+    심사중/정지됨/승인됨 상태를 그 자리에서 바로 보여줌(기존엔 업체
+    등록 후 자기 상태를 확인할 방법이 마이페이지에 전혀 없었음).
+  - 검증: `next build` 클린(29개 라우트, 신규 4개 포함).
+    `npx eslint 'src/**/*.{ts,tsx}'` 전체 20건 중 신규 3건(admin/
+    companies, admin/members, mypage)은 전부 기존 sale-proofs 페이지와
+    동일한 `useEffect(() => { refresh(); }, [token])` 패턴에서 나오는
+    `react-hooks/set-state-in-effect` — 이 저장소에 이미 확립된 비차단
+    사전 존재 오류와 완전히 같은 종류, 새로운 종류 없음.
+- **참고**: 등급/결제(tier/payment) 필드는 이번에도 실제 결제·구독
+  상품이 없어 스키마에 넣지 않음(과설계 방지, CLAUDE.md에 이미 기록된
+  방침 그대로 유지) — 실제 결제 기능이 생기면 그때 SSO verify 응답에
+  얹는다.
