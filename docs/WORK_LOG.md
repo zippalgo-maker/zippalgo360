@@ -1981,3 +1981,15 @@ cd apps/web
 npm run build
 sudo systemctl restart zippalgo360-web
 ```
+
+- **[진행 중] 배포 실행 결과** — 사용자가 위 명령어를 서버에서 실행함.
+  `git checkout`/`pull` 정상(이미 최신), `npm run build` 클린 성공(라우트
+  목록에 `/zipservice` 계열 정상 출력). `systemctl restart` 명령 자체는
+  출력 없이 조용히 끝나는 게 정상이라 성공 여부를 `systemctl status
+  zippalgo360-web`로 재확인해달라고 요청했고, 사용자가 "일단 어느정도
+  구동되는건 확인했어 이따가 다시 확인해보고 요청할게"라고 답함 —
+  **최종 active 상태 확인 및 브라우저 실사진 렌더 확인은 아직 미완료,
+  사용자가 나중에 다시 요청하면 이어서 확인할 것.** 이 세션에서
+  `https://zippalgo360.com`으로 직접 curl 검증을 시도했으나 이 환경의
+  네트워크 아웃바운드가 허용목록 방식이라 외부 도메인 접근 자체가
+  막혀있어(연결 실패, exit 56) 원격에서 대신 확인할 수 없었음.
