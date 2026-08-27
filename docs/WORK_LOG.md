@@ -2085,6 +2085,15 @@ sudo systemctl restart zippalgo360-web
   이 세션은 매번 가정만 하고 실제로 확인한 적이 없었다 — 다음부터는
   배포 스크립트에 `git branch --show-current`를 첫 줄로 넣어서 이런
   불일치를 배포 실패 전에 미리 드러내는 게 나음.
+- **[완료] 양쪽 브랜치 모두 갱신**: 병합 커밋(`80b88bf`)을
+  `claude/jippalgo360-platform-6bvrfh`에 푸시한 뒤, 같은 커밋을
+  `claude/zippalgo360-interior-service-tz2qfv`에도 fast-forward로
+  푸시(둘 다 그냥 `git push origin <ref>`로 안전하게 fast-forward
+  가능함을 push 전에 `git merge-base --is-ancestor`로 미리 확인) —
+  서버가 지금 체크아웃돼 있는 브랜치를 그대로 두고 평범한 `git pull`
+  한 번이면 두 세션 작업이 전부 반영되도록 만듦(브랜치 전환 요청
+  불필요, 다른 세션이 이어서 그 브랜치를 계속 써도 히스토리 그대로
+  보존됨 — force push 전혀 안 씀).
 
 ---
 
