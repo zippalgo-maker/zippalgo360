@@ -1,6 +1,8 @@
+import Image from "next/image";
 import SectionHeading from "@/components/lifestyle/SectionHeading";
 import Icon from "@/components/lifestyle/Icon";
 import { MAGAZINE_STORIES } from "@/lib/mock-content";
+import { PHOTOS } from "@/lib/lifestyle-photos";
 
 export default function MagazineStoriesSection() {
   return (
@@ -14,11 +16,18 @@ export default function MagazineStoriesSection() {
               className="relative flex aspect-[4/3] flex-col justify-between overflow-hidden rounded-2xl p-5 text-white"
               style={{ background: story.accent }}
             >
-              <p className="text-xs font-bold opacity-80">{story.label}</p>
-              <p className="max-w-[70%] break-keep text-lg font-extrabold leading-snug">{story.teaser}</p>
-              <span className="absolute -bottom-3 -right-3 h-24 w-24 opacity-20">
-                <Icon name={story.icon} />
-              </span>
+              {story.photo ? (
+                <>
+                  <Image src={PHOTOS[story.photo]} alt="" fill sizes="360px" className="object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-black/10" />
+                </>
+              ) : (
+                <span className="absolute -bottom-3 -right-3 h-24 w-24 opacity-20">
+                  <Icon name={story.icon} />
+                </span>
+              )}
+              <p className="relative z-10 text-xs font-bold opacity-80">{story.label}</p>
+              <p className="relative z-10 max-w-[70%] break-keep text-lg font-extrabold leading-snug">{story.teaser}</p>
             </div>
             <p className="mt-3 break-keep font-semibold text-ink">{story.articleTitle}</p>
             <p className="mt-1 line-clamp-2 break-keep text-sm text-muted">{story.snippet}</p>

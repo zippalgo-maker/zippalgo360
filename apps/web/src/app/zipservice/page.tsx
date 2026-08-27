@@ -12,7 +12,9 @@ import CompanyRecruitSection from "@/components/lifestyle/CompanyRecruitSection"
 import ZipServiceFaq from "@/components/lifestyle/ZipServiceFaq";
 import MobileStickyCta from "@/components/lifestyle/MobileStickyCta";
 import { HOUSEHOLD_ROW, MOVING_MOMENT_ROW, LIFE_MOMENT_BUNDLES, INTERIOR_GRID } from "@/lib/mock-content";
+import { PHOTOS } from "@/lib/lifestyle-photos";
 import Icon from "@/components/lifestyle/Icon";
+import Image from "next/image";
 import Link from "next/link";
 
 export default function ZipServicePage() {
@@ -54,10 +56,14 @@ export default function ZipServicePage() {
                 <p className="text-xs font-medium text-muted">{bundle.label}</p>
                 <p className="mt-1 text-lg font-bold text-ink">{bundle.title}</p>
               </div>
-              <div className="relative mt-auto flex h-24 items-center justify-end pr-5" style={{ background: bundle.accent }}>
-                <span className="h-14 w-14 text-white/85">
-                  <Icon name={bundle.icon} />
-                </span>
+              <div className="relative mt-auto flex h-24 items-center justify-end overflow-hidden pr-5" style={{ background: bundle.accent }}>
+                {bundle.photo ? (
+                  <Image src={PHOTOS[bundle.photo]} alt="" fill sizes="280px" className="object-cover" />
+                ) : (
+                  <span className="h-14 w-14 text-white/85">
+                    <Icon name={bundle.icon} />
+                  </span>
+                )}
               </div>
               <div className="flex items-center justify-between px-5 py-3 text-xs font-semibold text-brand-red">
                 {bundle.count}

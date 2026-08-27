@@ -4,12 +4,17 @@
  * 숨고 홈 화면 구조(트렌딩 카드/서브카테고리 로우/매거진/인기글/지역 칩 등)를
  * 참고해 집서비스 화면을 목업하기 위한 프론트엔드 전용 샘플 텍스트. 실제
  * 서비스에 적용할 땐 실 이용자 후기·콘텐츠로 교체해야 한다.
+ *
+ * 사진(photo 필드)은 사용자가 제공한 카테고리별 사진 팩을 사용한다(실사진).
+ * 매핑은 `@/lib/lifestyle-photos`를 참고.
  */
 import type { IconName } from "@/components/lifestyle/Icon";
 import type { ServiceCategory } from "@/lib/lifestyle-data";
+import type { PhotoKey } from "@/lib/lifestyle-photos";
 
 export interface PhotoCardItem {
   icon: IconName;
+  photo?: PhotoKey;
   title: string;
   subtitle?: string;
   accent: string;
@@ -27,51 +32,51 @@ export const TRENDING_FILTERS = ["이사·이사청소", "생활청소", "가전
 
 export const TRENDING_CARDS: Record<string, PhotoCardItem[]> = {
   "이사·이사청소": [
-    { icon: "truck", title: "이사 준비만으로도 진 빠지는데, 견적은 한 번에", subtitle: "서울 강남구 · 이사", accent: BLUE, href: "/zipservice/new?category=moving" },
-    { icon: "ladder", title: "포장이사 견적, 업체마다 얼마나 차이 날까요", subtitle: "서울 강남구 · 이사", accent: GREEN_2, href: "/zipservice/new?category=moving" },
-    { icon: "box", title: "반포장이사로 비용 아끼는 법", subtitle: "경기 성남시 · 이사", accent: RED, href: "/zipservice/new?category=moving" },
-    { icon: "sparkle", title: "입주 전 청소, 언제 예약해야 할까요", subtitle: "서울 마포구 · 이사청소", accent: GREEN_3, href: "/zipservice/new?category=move_out_cleaning" },
-    { icon: "shield", title: "너무너무 깨끗하게 잘해주셨어요", subtitle: "서울 강남구 · 이사청소", accent: RED_DARK, href: "/zipservice/companies?category=move_out_cleaning" },
-    { icon: "chat", title: "이사청소 후기, 실제로 믿을 수 있을까요", subtitle: "인천 · 이사청소", accent: GREEN, href: "/zipservice/companies?category=move_out_cleaning" },
+    { icon: "truck", photo: "mv_pack1", title: "이사 준비만으로도 진 빠지는데, 견적은 한 번에", subtitle: "서울 강남구 · 이사", accent: BLUE, href: "/zipservice/new?category=moving" },
+    { icon: "ladder", photo: "mv_pack2", title: "포장이사 견적, 업체마다 얼마나 차이 날까요", subtitle: "서울 강남구 · 이사", accent: GREEN_2, href: "/zipservice/new?category=moving" },
+    { icon: "box", photo: "mv_cart", title: "반포장이사로 비용 아끼는 법", subtitle: "경기 성남시 · 이사", accent: RED, href: "/zipservice/new?category=moving" },
+    { icon: "sparkle", photo: "moc_vacuum_room", title: "입주 전 청소, 언제 예약해야 할까요", subtitle: "서울 마포구 · 이사청소", accent: GREEN_3, href: "/zipservice/new?category=move_out_cleaning" },
+    { icon: "shield", photo: "moc_bath_sink", title: "너무너무 깨끗하게 잘해주셨어요", subtitle: "서울 강남구 · 이사청소", accent: RED_DARK, href: "/zipservice/companies?category=move_out_cleaning" },
+    { icon: "chat", photo: "moc_toilet", title: "이사청소 후기, 실제로 믿을 수 있을까요", subtitle: "인천 · 이사청소", accent: GREEN, href: "/zipservice/companies?category=move_out_cleaning" },
   ],
   생활청소: [
-    { icon: "spray", title: "정기청소 맡기고 나서 주말이 달라졌어요", subtitle: "서울 강남구 · 생활청소", accent: GREEN_3, href: "/zipservice/new?category=living_cleaning" },
-    { icon: "calendar", title: "청소 주기, 우리 집엔 몇 번이 적당할까", subtitle: "서울 송파구 · 생활청소", accent: BLUE, href: "/zipservice/new?category=living_cleaning" },
-    { icon: "leaf", title: "반려동물 있어도 정기청소 가능할까요", subtitle: "경기 고양시 · 생활청소", accent: GREEN, href: "/zipservice/new?category=living_cleaning" },
-    { icon: "sun", title: "여름철 곰팡이 청소, 셀프 말고 전문가에게", subtitle: "서울 강남구 · 생활청소", accent: RED, href: "/zipservice/new?category=living_cleaning" },
-    { icon: "shield", title: "동일 매니저 배정, 실제로 되나요", subtitle: "서울 강남구 · 생활청소", accent: RED_DARK, href: "/zipservice/companies?category=living_cleaning" },
-    { icon: "chat", title: "회원가로 첫 이용 20% 할인 받았어요", subtitle: "서울 강남구 · 생활청소", accent: GREEN_2, href: "/zipservice/new?category=living_cleaning" },
+    { icon: "spray", photo: "lc_vacuum", title: "정기청소 맡기고 나서 주말이 달라졌어요", subtitle: "서울 강남구 · 생활청소", accent: GREEN_3, href: "/zipservice/new?category=living_cleaning" },
+    { icon: "calendar", photo: "lc_living", title: "청소 주기, 우리 집엔 몇 번이 적당할까", subtitle: "서울 송파구 · 생활청소", accent: BLUE, href: "/zipservice/new?category=living_cleaning" },
+    { icon: "leaf", photo: "lc_fridge", title: "반려동물 있어도 정기청소 가능할까요", subtitle: "경기 고양시 · 생활청소", accent: GREEN, href: "/zipservice/new?category=living_cleaning" },
+    { icon: "sun", photo: "lc_sink", title: "여름철 곰팡이 청소, 셀프 말고 전문가에게", subtitle: "서울 강남구 · 생활청소", accent: RED, href: "/zipservice/new?category=living_cleaning" },
+    { icon: "shield", photo: "lc_stove", title: "동일 매니저 배정, 실제로 되나요", subtitle: "서울 강남구 · 생활청소", accent: RED_DARK, href: "/zipservice/companies?category=living_cleaning" },
+    { icon: "chat", photo: "lc_table", title: "회원가로 첫 이용 20% 할인 받았어요", subtitle: "서울 강남구 · 생활청소", accent: GREEN_2, href: "/zipservice/new?category=living_cleaning" },
   ],
   "가전·가구": [
-    { icon: "fridge", title: "24평 신혼집, 냉장고 용량 이 정도면 될까요", subtitle: "가전 · AI 추천", accent: RED, href: "/zipservice/new?category=appliance" },
-    { icon: "sofa", title: "거실 소파 배치, 3D로 미리 보고 골랐어요", subtitle: "가구 · AI 추천", accent: RED_DARK, href: "/zipservice/new?category=furniture" },
-    { icon: "box", title: "1인가구 미니 세탁기 추천 받아보세요", subtitle: "가전 · AI 추천", accent: BLUE, href: "/zipservice/new?category=appliance" },
-    { icon: "leaf", title: "북유럽풍 식탁 세트, 평형에 맞게 고르는 법", subtitle: "가구 · AI 추천", accent: GREEN_3, href: "/zipservice/new?category=furniture" },
-    { icon: "sun", title: "공기청정기 렌탈, 캐시백까지 비교해보세요", subtitle: "가전 · AI 추천", accent: GREEN, href: "/zipservice/new?category=appliance" },
-    { icon: "key", title: "붙박이장으로 수납 늘리는 배치 팁", subtitle: "가구 · AI 추천", accent: GREEN_2, href: "/zipservice/new?category=furniture" },
+    { icon: "fridge", photo: "ap_fridge_kitchen", title: "24평 신혼집, 냉장고 용량 이 정도면 될까요", subtitle: "가전 · AI 추천", accent: RED, href: "/zipservice/new?category=appliance" },
+    { icon: "sofa", photo: "fu_sofa", title: "거실 소파 배치, 3D로 미리 보고 골랐어요", subtitle: "가구 · AI 추천", accent: RED_DARK, href: "/zipservice/new?category=furniture" },
+    { icon: "box", photo: "ap_washer", title: "1인가구 미니 세탁기 추천 받아보세요", subtitle: "가전 · AI 추천", accent: BLUE, href: "/zipservice/new?category=appliance" },
+    { icon: "leaf", photo: "fu_table", title: "북유럽풍 식탁 세트, 평형에 맞게 고르는 법", subtitle: "가구 · AI 추천", accent: GREEN_3, href: "/zipservice/new?category=furniture" },
+    { icon: "sun", photo: "ap_purifier", title: "공기청정기 렌탈, 캐시백까지 비교해보세요", subtitle: "가전 · AI 추천", accent: GREEN, href: "/zipservice/new?category=appliance" },
+    { icon: "key", photo: "fu_closet", title: "붙박이장으로 수납 늘리는 배치 팁", subtitle: "가구 · AI 추천", accent: GREEN_2, href: "/zipservice/new?category=furniture" },
   ],
   "인터넷·구독": [
-    { icon: "wifi", title: "인터넷·TV, 결합하면 얼마나 저렴할까요", subtitle: "인터넷·구독", accent: GREEN, href: "/zipservice/new?category=subscription" },
-    { icon: "bell", title: "가입 축하 사은품, 상품별로 비교해보세요", subtitle: "인터넷·구독", accent: RED, href: "/zipservice/new?category=subscription" },
-    { icon: "shield", title: "무약정 옵션도 안내해드려요", subtitle: "인터넷·구독", accent: BLUE, href: "/zipservice/new?category=subscription" },
-    { icon: "leaf", title: "정수기 렌탈, 관리 주기까지 한 번에", subtitle: "인터넷·구독", accent: GREEN_3, href: "/zipservice/new?category=subscription" },
-    { icon: "gift", title: "회원이면 사은품 최대 30만원", subtitle: "인터넷·구독", accent: RED_DARK, href: "/zipservice/new?category=subscription" },
-    { icon: "chat", title: "이사할 때 인터넷 이전 신청도 같이하세요", subtitle: "인터넷·구독", accent: GREEN_2, href: "/zipservice/new?category=subscription" },
+    { icon: "wifi", photo: "sb_wallpad", title: "인터넷·TV, 결합하면 얼마나 저렴할까요", subtitle: "인터넷·구독", accent: GREEN, href: "/zipservice/new?category=subscription" },
+    { icon: "bell", photo: "sb_purifier_machine", title: "가입 축하 사은품, 상품별로 비교해보세요", subtitle: "인터넷·구독", accent: RED, href: "/zipservice/new?category=subscription" },
+    { icon: "shield", photo: "sb_filter_replace", title: "무약정 옵션도 안내해드려요", subtitle: "인터넷·구독", accent: BLUE, href: "/zipservice/new?category=subscription" },
+    { icon: "leaf", photo: "sb_filter_cartridges", title: "정수기 렌탈, 관리 주기까지 한 번에", subtitle: "인터넷·구독", accent: GREEN_3, href: "/zipservice/new?category=subscription" },
+    { icon: "gift", photo: "sb_phone_app", title: "회원이면 사은품 최대 30만원", subtitle: "인터넷·구독", accent: RED_DARK, href: "/zipservice/new?category=subscription" },
+    { icon: "chat", photo: "mv_sofa", title: "이사할 때 인터넷 이전 신청도 같이하세요", subtitle: "인터넷·구독", accent: GREEN_2, href: "/zipservice/new?category=subscription" },
   ],
 };
 
 export const HOUSEHOLD_ROW: PhotoCardItem[] = [
-  { icon: "truck", title: "포장이사", subtitle: "이사", accent: BLUE, href: "/zipservice/new?category=moving" },
-  { icon: "box", title: "반포장·용달이사", subtitle: "이사", accent: GREEN_2, href: "/zipservice/new?category=moving" },
-  { icon: "sparkle", title: "입주청소", subtitle: "이사청소", accent: GREEN_3, href: "/zipservice/new?category=move_out_cleaning" },
-  { icon: "spray", title: "정기청소", subtitle: "생활청소", accent: RED, href: "/zipservice/new?category=living_cleaning" },
+  { icon: "truck", photo: "mv_pack1", title: "포장이사", subtitle: "이사", accent: BLUE, href: "/zipservice/new?category=moving" },
+  { icon: "box", photo: "mv_pack2", title: "반포장·용달이사", subtitle: "이사", accent: GREEN_2, href: "/zipservice/new?category=moving" },
+  { icon: "sparkle", photo: "moc_window", title: "입주청소", subtitle: "이사청소", accent: GREEN_3, href: "/zipservice/new?category=move_out_cleaning" },
+  { icon: "spray", photo: "lc_curtain", title: "정기청소", subtitle: "생활청소", accent: RED, href: "/zipservice/new?category=living_cleaning" },
 ];
 
 export const MOVING_MOMENT_ROW: PhotoCardItem[] = [
-  { icon: "truck", title: "이사·입주청소업체", subtitle: "포장이사부터 입주청소까지", accent: BLUE, href: "/zipservice/companies?category=moving" },
-  { icon: "box", title: "원룸/소형 이사", subtitle: "1인가구 특화 이사팀", accent: RED, href: "/zipservice/new?category=moving" },
-  { icon: "sparkle", title: "가정이사(투룸 이상)", subtitle: "포장·정리까지 한 번에", accent: GREEN_3, href: "/zipservice/new?category=moving" },
-  { icon: "spray", title: "거주청소업체", subtitle: "매주·격주 정기 방문청소", accent: GREEN, href: "/zipservice/companies?category=living_cleaning" },
+  { icon: "truck", photo: "mv_truck", title: "이사·입주청소업체", subtitle: "포장이사부터 입주청소까지", accent: BLUE, href: "/zipservice/companies?category=moving" },
+  { icon: "box", photo: "mv_box_room", title: "원룸/소형 이사", subtitle: "1인가구 특화 이사팀", accent: RED, href: "/zipservice/new?category=moving" },
+  { icon: "sparkle", photo: "mv_livingroom", title: "가정이사(투룸 이상)", subtitle: "포장·정리까지 한 번에", accent: GREEN_3, href: "/zipservice/new?category=moving" },
+  { icon: "spray", photo: "moc_screen", title: "거주청소업체", subtitle: "매주·격주 정기 방문청소", accent: GREEN, href: "/zipservice/companies?category=living_cleaning" },
 ];
 
 export interface LifeMomentBundle {
@@ -79,37 +84,39 @@ export interface LifeMomentBundle {
   title: string;
   count: string;
   icon: IconName;
+  photo?: PhotoKey;
   accent: string;
   href: string;
 }
 
 export const LIFE_MOMENT_BUNDLES: LifeMomentBundle[] = [
-  { label: "이사할 때 놓치기 쉬운", title: "이사 한 번에 준비", count: "이사 서비스 2종", icon: "truck", accent: BLUE, href: "/zipservice/companies?category=moving" },
-  { label: "새집으로 가볍게", title: "입주청소 예약", count: "청소 서비스 2종", icon: "sparkle", accent: GREEN_3, href: "/zipservice/companies?category=move_out_cleaning" },
-  { label: "평형에 딱 맞는", title: "가전·가구 AI 추천", count: "가전·가구 2종", icon: "sofa", accent: RED, href: "/zipservice/companies?category=appliance" },
-  { label: "매달 나가는 돈 줄이는", title: "생활 구독 비교", count: "구독 서비스 1종", icon: "wifi", accent: GREEN, href: "/zipservice/new?category=subscription" },
+  { label: "이사할 때 놓치기 쉬운", title: "이사 한 번에 준비", count: "이사 서비스 2종", icon: "truck", photo: "bd_moving", accent: BLUE, href: "/zipservice/companies?category=moving" },
+  { label: "새집으로 가볍게", title: "입주청소 예약", count: "청소 서비스 2종", icon: "sparkle", photo: "bd_cleaning_kit", accent: GREEN_3, href: "/zipservice/companies?category=move_out_cleaning" },
+  { label: "평형에 딱 맞는", title: "가전·가구 AI 추천", count: "가전·가구 2종", icon: "sofa", photo: "bd_livingroom", accent: RED, href: "/zipservice/companies?category=appliance" },
+  { label: "매달 나가는 돈 줄이는", title: "생활 구독 비교", count: "구독 서비스 1종", icon: "wifi", photo: "sb_phone_app", accent: GREEN, href: "/zipservice/new?category=subscription" },
 ];
 
 export interface PortfolioCollage {
   title: string;
   subtitle: string;
   icons: IconName[];
+  photos?: [PhotoKey, PhotoKey, PhotoKey];
   accent: string;
   companyId: string;
 }
 
 export const PORTFOLIO_COLLAGE: PortfolioCollage[] = [
-  { title: "이사 후 입주청소 시공사례", subtitle: "서울 강남구", icons: ["sparkle", "truck", "box"], accent: GREEN_3, companyId: "moc-1" },
-  { title: "정기청소로 관리한 거실", subtitle: "경기 성남시", icons: ["spray", "leaf", "sun"], accent: GREEN_2, companyId: "lc-1" },
+  { title: "이사 후 입주청소 시공사례", subtitle: "서울 강남구", icons: ["sparkle", "truck", "box"], photos: ["moc_window", "moc_sink", "moc_toilet"], accent: GREEN_3, companyId: "moc-1" },
+  { title: "정기청소로 관리한 거실", subtitle: "경기 성남시", icons: ["spray", "leaf", "sun"], photos: ["lc_living", "lc_curtain", "lc_stove"], accent: GREEN_2, companyId: "lc-1" },
 ];
 
 export const INTERIOR_GRID: PhotoCardItem[] = [
-  { icon: "fridge", title: "24평 신혼집 냉장고 추천", subtitle: "가전 · 리빙테크 가전스토어", accent: RED, href: "/zipservice/companies/appliance-1" },
-  { icon: "key", title: "붙박이장으로 수납 늘리기", subtitle: "가구 · 우드리빙 퍼니처", accent: GREEN_2, href: "/zipservice/companies/furniture-1" },
-  { icon: "sofa", title: "거실 소파 배치 3D 시뮬레이션", subtitle: "가구 · 우드리빙 퍼니처", accent: RED_DARK, href: "/zipservice/companies/furniture-1" },
-  { icon: "box", title: "1인가구 미니 세탁기 추천", subtitle: "가전 · 리빙테크 가전스토어", accent: BLUE, href: "/zipservice/companies/appliance-1" },
-  { icon: "leaf", title: "북유럽풍 식탁 세트 배치", subtitle: "가구 · 우드리빙 퍼니처", accent: GREEN_3, href: "/zipservice/companies/furniture-1" },
-  { icon: "sun", title: "공기청정기 렌탈 캐시백 비교", subtitle: "가전 · 리빙테크 가전스토어", accent: GREEN, href: "/zipservice/companies/appliance-1" },
+  { icon: "fridge", photo: "ap_fridge_kitchen", title: "24평 신혼집 냉장고 추천", subtitle: "가전 · 리빙테크 가전스토어", accent: RED, href: "/zipservice/companies/appliance-1" },
+  { icon: "key", photo: "fu_closet", title: "붙박이장으로 수납 늘리기", subtitle: "가구 · 우드리빙 퍼니처", accent: GREEN_2, href: "/zipservice/companies/furniture-1" },
+  { icon: "sofa", photo: "fu_sofa", title: "거실 소파 배치 3D 시뮬레이션", subtitle: "가구 · 우드리빙 퍼니처", accent: RED_DARK, href: "/zipservice/companies/furniture-1" },
+  { icon: "box", photo: "ap_washer", title: "1인가구 미니 세탁기 추천", subtitle: "가전 · 리빙테크 가전스토어", accent: BLUE, href: "/zipservice/companies/appliance-1" },
+  { icon: "leaf", photo: "fu_table", title: "북유럽풍 식탁 세트 배치", subtitle: "가구 · 우드리빙 퍼니처", accent: GREEN_3, href: "/zipservice/companies/furniture-1" },
+  { icon: "sun", photo: "ap_purifier", title: "공기청정기 렌탈 캐시백 비교", subtitle: "가전 · 리빙테크 가전스토어", accent: GREEN, href: "/zipservice/companies/appliance-1" },
 ];
 
 export interface MagazineStory {
@@ -120,6 +127,7 @@ export interface MagazineStory {
   views: number;
   accent: string;
   icon: IconName;
+  photo?: PhotoKey;
 }
 
 export const MAGAZINE_STORIES: MagazineStory[] = [
@@ -131,6 +139,7 @@ export const MAGAZINE_STORIES: MagazineStory[] = [
     views: 1056,
     accent: GREEN_3,
     icon: "truck",
+    photo: "mag_moving",
   },
   {
     label: "생활의 기술",
@@ -140,6 +149,7 @@ export const MAGAZINE_STORIES: MagazineStory[] = [
     views: 834,
     accent: RED,
     icon: "spray",
+    photo: "mag_cleaning",
   },
   {
     label: "생활의 기술",
@@ -181,6 +191,15 @@ export const CATEGORY_GALLERY_ICONS: Record<ServiceCategory, IconName[]> = {
   appliance: ["fridge", "sun", "box"],
   furniture: ["sofa", "key", "leaf"],
   subscription: ["wifi", "gift", "bell"],
+};
+
+export const CATEGORY_GALLERY_PHOTOS: Record<ServiceCategory, [PhotoKey, PhotoKey, PhotoKey]> = {
+  moving: ["mv_truck", "mv_pack1", "mv_cart"],
+  move_out_cleaning: ["moc_window", "moc_sink", "moc_toilet"],
+  living_cleaning: ["lc_vacuum", "lc_stove", "lc_curtain"],
+  appliance: ["ap_fridge_kitchen", "ap_washer", "ap_purifier"],
+  furniture: ["fu_sofa", "fu_table", "fu_closet"],
+  subscription: ["sb_wallpad", "sb_purifier_machine", "sb_filter_replace"],
 };
 
 export interface RecruitNotification {

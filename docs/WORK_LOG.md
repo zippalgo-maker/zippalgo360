@@ -1898,3 +1898,71 @@ sudo systemctl restart zippalgo360-web
   - 업체 데이터는 여전히 전부 `mock-companies.ts`/`mock-content.ts`
     목업(실제 아님) — 이전 라운드 기록과 동일한 제약이 그대로
     적용됨.
+
+## 2026-08-27 — (이 세션) 집서비스 목업(실사진 프로토타입)을 실제 `/zipservice`에 반영
+
+### 시작 전
+- 사용자가 아이콘/플랫컬러 타일에 불만을 표해 실제 사진을 요청했고,
+  이 환경엔 이미지 생성·외부 이미지 호스트 접근이 없어 사용자가
+  80장짜리 사진 ZIP을 직접 업로드함. 지난 라운드(별도 세션 컨텍스트,
+  이 기록엔 없음)에서 그 사진들로 독립 실행형 HTML 프로토타입을
+  만들어 Claude Artifact로 먼저 검증했고, 이번엔 그 프로토타입의
+  사진 매핑을 실제 Next.js 코드베이스(`apps/web`)의 `/zipservice`
+  라우트에 그대로 이식하는 작업.
+
+### 진행 중
+- **[완료] 사진 파일 이식** — 업로드된 ZIP에서 선별한 실사진 35장을
+  케밥케이스로 정리해 `apps/web/public/images/zipservice/`에 정적
+  파일로 추가(총 2.1MB).
+- **[완료] `apps/web/src/lib/lifestyle-photos.ts` 신규** — 시맨틱
+  키(`mv_truck`, `moc_window` 등) → 정적 파일 경로 매핑 + `PhotoKey`
+  타입. 업체 커버(`co_*_cover`)·매거진 표지(`mag_*`)처럼 같은 파일을
+  여러 키가 재사용하는 경우도 프로토타입과 동일하게 유지.
+- **[완료] 목업 데이터 확장** — `mock-content.ts`(`PhotoCardItem`/
+  `LifeMomentBundle`/`PortfolioCollage`/`MagazineStory`에 `photo`/
+  `photos` 옵셔널 필드 추가 + 전 항목에 값 채움, `ProCardCompact`용
+  `CATEGORY_GALLERY_PHOTOS` 신규 export)와 `mock-companies.ts`
+  (`MockCompany.cover` 필드 + 7개 업체 전부에 커버 사진 지정)를
+  확장. 매거진 3번째 카드(회원가 혜택 안내)는 프로토타입과 동일하게
+  실사진이 없어 아이콘 워터마크 그대로 둠(의도적 누락 아님).
+- **[완료] 컴포넌트 7곳에 `next/image` 렌더링 추가** — `photo`/
+  `cover`/`photos` 값이 있으면 실사진을, 없으면 기존 아이콘/그라디
+  언트로 폴백하는 조건부 렌더링을 모두 동일한 패턴으로 적용:
+  `PhotoCard.tsx`(공용 타일 컴포넌트, `PhotoCardGrid` 경유로 여러
+  섹션에 자동 반영), `zipservice/page.tsx`의 "지금 필요한 서비스"
+  묶음 카드 인라인 블록, `ProCardCompact.tsx`(3칸 갤러리),
+  `ProCard.tsx`(업체 목록 카드 커버 배너), `PortfolioCollageCard.tsx`
+  (3분할 콜라주), `MagazineStoriesSection.tsx`(매거진 타일 — 텍스트
+  가독성용 하단 그라디언트 오버레이 추가), `zipservice/companies/
+  [id]/page.tsx`(업체 상세 커버 배너).
+- **[완료] 검증**: `npm run build`(Turbopack) 클린 통과. `npm run
+  lint` — 이번에 건드린 8개 파일에서는 오류 0건(기존에 있던 다른
+  파일 15건의 `react-hooks/set-state-in-effect`/`no-explicit-any`
+  오류는 이번 작업과 무관, 그대로 둠). `npm run dev` 띄운 뒤
+  Playwright(PC 1440×1000~1200)로 `/zipservice` 전 구간, `/zipservice
+  /companies`, `/zipservice/companies/moving-1` 스크린샷 확인 —
+  트렌딩 카드·업체 갤러리·서비스 묶음·필요한 순간 로우·포트폴리오
+  콜라주·가전가구 그리드·매거진·업체 목록 카드·업체 상세 커버까지
+  전부 실사진 정상 렌더, 콘솔/페이지 에러 0건. 지난 라운드에서
+  발견했던 "이사 트럭" 사진 오매핑(청소 사진이 잘못 들어갔던 문제)
+  이 이번 실제 코드에도 정확히 고친 채로(`05_원스톱준비/07` 원본)
+  반영된 것도 스크린샷으로 재확인함.
+
+### 완료 후
+- 로컬 검증 완료, 이 기록 직후 커밋/푸시 진행. **서버 미배포** —
+  사용자가 서버에서 `git pull` → `npm run build` →
+  `zippalgo360-web` 재시작 필요(백엔드 변경 없음, 정적 이미지 35장이
+  새로 추가됐으므로 배포 시 `public/` 디렉터리가 빌드 산출물에
+  포함되는지만 확인하면 됨).
+- **다음 세션이 알아야 할 것**:
+  - 여전히 전부 프론트엔드 목업. 사진 35장도 `apps/web/public`
+    아래 정적 파일일 뿐, `apps/api`/DB에는 업체 사진 관련 컬럼·API가
+    전혀 없음 — 이 디자인을 실제 서비스로 전환하기로 하면 그때
+    백엔드에 업체 프로필(사진 URL 등) 스키마와 공개 조회 API를
+    추가하고 `mock-companies.ts`/`mock-content.ts`/
+    `lifestyle-photos.ts`를 실 데이터 fetch로 교체해야 함.
+  - 사용 안 된 나머지 사진(80장 중 35장만 선별)은 이식하지 않았음
+    — 필요하면 `lifestyle-photos.ts`에 키만 추가하고 파일을
+    복사하면 됨.
+  - 모바일 반응형 스크린샷 검증은 이번에도 하지 않음(PC만 확인) —
+    이전 라운드와 동일한 제약.

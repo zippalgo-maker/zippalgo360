@@ -1,7 +1,9 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { MockCompany } from "@/lib/mock-companies";
 import { getCategoryMeta } from "@/lib/lifestyle-data";
-import { CATEGORY_GALLERY_ICONS } from "@/lib/mock-content";
+import { CATEGORY_GALLERY_ICONS, CATEGORY_GALLERY_PHOTOS } from "@/lib/mock-content";
+import { PHOTOS } from "@/lib/lifestyle-photos";
 import Icon from "@/components/lifestyle/Icon";
 
 function StarIcon() {
@@ -15,6 +17,7 @@ function StarIcon() {
 export default function ProCardCompact({ company }: { company: MockCompany }) {
   const meta = getCategoryMeta(company.category);
   const galleryIcons = CATEGORY_GALLERY_ICONS[company.category];
+  const galleryPhotos = CATEGORY_GALLERY_PHOTOS[company.category];
 
   return (
     <Link
@@ -32,12 +35,16 @@ export default function ProCardCompact({ company }: { company: MockCompany }) {
         {galleryIcons.map((iconName, i) => (
           <div
             key={i}
-            className="flex aspect-square items-center justify-center rounded-lg"
+            className="relative flex aspect-square items-center justify-center overflow-hidden rounded-lg"
             style={{ background: `${company.gradient[i % 2]}1a` }}
           >
-            <span className="h-5 w-5" style={{ color: company.gradient[i % 2] }}>
-              <Icon name={iconName} />
-            </span>
+            {galleryPhotos?.[i] ? (
+              <Image src={PHOTOS[galleryPhotos[i]]} alt="" fill sizes="120px" className="object-cover" />
+            ) : (
+              <span className="h-5 w-5" style={{ color: company.gradient[i % 2] }}>
+                <Icon name={iconName} />
+              </span>
+            )}
           </div>
         ))}
       </div>

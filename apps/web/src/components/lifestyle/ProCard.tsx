@@ -1,6 +1,8 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { MockCompany } from "@/lib/mock-companies";
 import CompanyLogo from "@/components/lifestyle/CompanyLogo";
+import { PHOTOS } from "@/lib/lifestyle-photos";
 import { secondaryButtonClass } from "@/lib/ui";
 
 function StarIcon() {
@@ -15,9 +17,11 @@ export default function ProCard({ company }: { company: MockCompany }) {
   return (
     <div className="flex flex-col overflow-hidden rounded-2xl border border-line bg-white shadow-brand">
       <div
-        className="h-16 w-full"
+        className="relative h-16 w-full overflow-hidden"
         style={{ background: `linear-gradient(120deg, ${company.gradient[0]}, ${company.gradient[1]})` }}
-      />
+      >
+        {company.cover && <Image src={PHOTOS[company.cover]} alt="" fill sizes="400px" className="object-cover opacity-90" />}
+      </div>
 
       <div className="flex-1 px-5 pb-5">
         <div className="-mt-8 flex items-end gap-3">

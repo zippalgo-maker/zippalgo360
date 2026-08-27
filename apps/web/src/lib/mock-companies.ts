@@ -8,6 +8,7 @@
  * 공개 조회 API를 추가하고 이 파일을 실 데이터 fetch로 교체해야 한다.
  */
 import type { ServiceCategory } from "@/lib/lifestyle-data";
+import type { PhotoKey } from "@/lib/lifestyle-photos";
 
 export interface MockCompany {
   id: string;
@@ -24,6 +25,7 @@ export interface MockCompany {
   regions: string[];
   gradient: [string, string];
   memberBenefit: string;
+  cover?: PhotoKey;
 }
 
 export const MOCK_COMPANIES: MockCompany[] = [
@@ -43,6 +45,7 @@ export const MOCK_COMPANIES: MockCompany[] = [
     regions: ["서울 전역", "경기 남부"],
     gradient: ["#21463b", "#447466"],
     memberBenefit: "집팔고360 회원 최대 12% 할인",
+    cover: "co_moving1_cover",
   },
   {
     id: "moving-2",
@@ -60,6 +63,7 @@ export const MOCK_COMPANIES: MockCompany[] = [
     regions: ["서울 전역"],
     gradient: ["#bb1730", "#951125"],
     memberBenefit: "집팔고360 회원 최대 12% 할인",
+    cover: "co_moving2_cover",
   },
   {
     id: "moc-1",
@@ -77,6 +81,7 @@ export const MOCK_COMPANIES: MockCompany[] = [
     regions: ["서울 전역", "인천"],
     gradient: ["#427cff", "#21463b"],
     memberBenefit: "집팔고360 회원 최대 10% 할인",
+    cover: "co_moc1_cover",
   },
   {
     id: "lc-1",
@@ -94,6 +99,7 @@ export const MOCK_COMPANIES: MockCompany[] = [
     regions: ["서울 전역", "경기 전역"],
     gradient: ["#2f5c4e", "#427cff"],
     memberBenefit: "집팔고360 회원 첫 이용 20% 할인",
+    cover: "co_lc1_cover",
   },
   {
     id: "appliance-1",
@@ -111,6 +117,7 @@ export const MOCK_COMPANIES: MockCompany[] = [
     regions: ["전국 배송"],
     gradient: ["#447466", "#bb1730"],
     memberBenefit: "집팔고360 회원 최대 15% 캐시백",
+    cover: "co_appliance1_cover",
   },
   {
     id: "furniture-1",
@@ -128,6 +135,7 @@ export const MOCK_COMPANIES: MockCompany[] = [
     regions: ["전국 배송"],
     gradient: ["#951125", "#21463b"],
     memberBenefit: "집팔고360 회원 최대 15% 캐시백",
+    cover: "co_furniture1_cover",
   },
   {
     id: "subscription-1",
@@ -145,6 +153,7 @@ export const MOCK_COMPANIES: MockCompany[] = [
     regions: ["전국"],
     gradient: ["#21463b", "#427cff"],
     memberBenefit: "집팔고360 회원 가입 축하 사은품 최대 30만원",
+    cover: "co_subscription1_cover",
   },
 ];
 

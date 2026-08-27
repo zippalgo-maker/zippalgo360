@@ -1,8 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import Icon, { type IconName } from "@/components/lifestyle/Icon";
+import { PHOTOS, type PhotoKey } from "@/lib/lifestyle-photos";
 
 function BookmarkIcon({ active }: { active: boolean }) {
   return (
@@ -14,6 +16,7 @@ function BookmarkIcon({ active }: { active: boolean }) {
 
 export default function PhotoCard({
   icon,
+  photo,
   title,
   subtitle,
   accent,
@@ -21,6 +24,7 @@ export default function PhotoCard({
   bookmark = true,
 }: {
   icon: IconName;
+  photo?: PhotoKey;
   title: string;
   subtitle?: string;
   accent: string;
@@ -31,11 +35,15 @@ export default function PhotoCard({
 
   const tile = (
     <div className="relative aspect-square overflow-hidden rounded-2xl transition group-hover:brightness-95" style={{ background: accent }}>
-      <div className="absolute inset-0 flex items-center justify-center">
-        <span className="h-11 w-11 text-white/90">
-          <Icon name={icon} />
-        </span>
-      </div>
+      {photo ? (
+        <Image src={PHOTOS[photo]} alt="" fill sizes="280px" className="object-cover" />
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="h-11 w-11 text-white/90">
+            <Icon name={icon} />
+          </span>
+        </div>
+      )}
       {bookmark && (
         <button
           type="button"

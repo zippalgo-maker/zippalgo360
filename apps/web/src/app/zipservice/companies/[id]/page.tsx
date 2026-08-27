@@ -1,10 +1,12 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { getCategoryMeta } from "@/lib/lifestyle-data";
 import { getMockCompany } from "@/lib/mock-companies";
 import CompanyLogo from "@/components/lifestyle/CompanyLogo";
+import { PHOTOS } from "@/lib/lifestyle-photos";
 import { secondaryButtonClass } from "@/lib/ui";
 
 function StarIcon() {
@@ -46,9 +48,11 @@ export default function CompanyProfilePage() {
 
       <div className="mt-4 overflow-hidden rounded-3xl border border-line bg-white shadow-brand">
         <div
-          className="h-28 w-full sm:h-36"
+          className="relative h-28 w-full overflow-hidden sm:h-36"
           style={{ background: `linear-gradient(120deg, ${company.gradient[0]}, ${company.gradient[1]})` }}
-        />
+        >
+          {company.cover && <Image src={PHOTOS[company.cover]} alt="" fill sizes="768px" className="object-cover opacity-90" />}
+        </div>
 
         <div className="px-6 pb-6 sm:px-8 sm:pb-8">
           <div className="-mt-10 flex items-end gap-4 sm:-mt-12">
