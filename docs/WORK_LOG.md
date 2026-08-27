@@ -2094,6 +2094,15 @@ sudo systemctl restart zippalgo360-web
   한 번이면 두 세션 작업이 전부 반영되도록 만듦(브랜치 전환 요청
   불필요, 다른 세션이 이어서 그 브랜치를 계속 써도 히스토리 그대로
   보존됨 — force push 전혀 안 씀).
+- **[완료] 서버 배포 확인**: 사용자가 `git pull`(브랜치 이름 없이,
+  현재 체크아웃된 `claude/zippalgo360-interior-service-tz2qfv` 기준)
+  실행 → `f4d37f2..4387fd1` fast-forward 성공, 충돌 없음(두 브랜치
+  모두 fast-forward 푸시해둔 대로 정확히 동작함). `npm run build`
+  클린, `zippalgo360-api`/`web` 재시작 상태 `active`, `/map` HTTP 200
+  확인. 이번 병합/배포로 이 세션의 최근 작업(인테리어 패널 왼쪽+2단
+  레이아웃, 클러스터 선택 목록, 부챗살 안정성 수정)과 다른 세션의
+  작업(위성지도 컨트롤 버튼 가시성 수정, 모바일 `/m` 임베드)이 실서비스
+  에 동시에 반영됨.
 
 ---
 
