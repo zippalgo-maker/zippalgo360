@@ -3061,3 +3061,67 @@ sudo systemctl restart zippalgo360-web
   상품이 없어 스키마에 넣지 않음(과설계 방지, CLAUDE.md에 이미 기록된
   방침 그대로 유지) — 실제 결제 기능이 생기면 그때 SSO verify 응답에
   얹는다.
+
+---
+
+## 2026-08-27 — /map 레이어 설정 저장 기능 추가 (+ 다른 세션과의 브랜치 병합)
+
+### 시작 전
+- 사용자 요청: /map의 레이어 선택("매물"/"인테리어 시공사례"/업체 레이어
+  등)에 "설정 저장하기"를 추가 — 비로그인은 쿠키, 로그인 사용자는 계정에
+  저장해서 다음 방문 때 그대로 복원. 매물/시공사례 중복선택 금지는 그대로
+  유지, 생활서비스(이사/청소/부동산/인테리어 업체) 레이어는 자유롭게 추가
+  가능. **추가로: 매물/시공사례 중 최소 하나는 항상 켜져 있어야 함**(새
+  요구사항).
+
+### 진행 중
+- **[완료] 백엔드**: `users.map_layers`(nullable, 콤마구분 문자열) 컬럼
+  추가하는 마이그레이션, `GET/PUT /auth/me/map-layers` 엔드포인트.
+  백엔드는 레이어 키의 의미를 모르고 그냥 문자열 목록으로 저장/반환만
+  하도록 일부러 느슨하게 설계(프론트 레이어가 늘어나도 백엔드 재배포
+  불필요).
+- **[완료] 프론트엔드**(`apps/web/src/app/map/page.tsx`): "이 레이어 설정
+  저장하기" 버튼(레이어 패널 하단). 초기값 우선순위: 쿠키(비로그인 저장분)
+  → URL `?mode=` → 기본값(매물); 로그인 확인되면 서버 저장값으로 한 번
+  더 덮어씀. "최소 하나는 항상 켜져 있어야 함" 규칙은 두 경로 모두에서
+  강제: (1) 매물/시공사례 자체를 직접 끄려는 시도 차단(토스트 안내),
+  (2) 부동산업체 등 비-프라이머리 레이어를 켜다가 반대 그룹(상호배타)이
+  꺼지면서 매물/시공사례가 둘 다 꺼지는 간접 경로도 자동으로 감지해
+  같은 그룹의 프라이머리를 자동으로 같이 켜서 복구.
+- **[완료] 검증**: 마이그레이션 클린 적용, curl로 저장/조회 왕복 확인,
+  Playwright로 (비로그인) 차단+자동복구+쿠키 저장/재방문 복원, (로그인)
+  서버 저장값이 기본값을 덮어쓰는 것까지 전부 확인.
+
+### 진행 중 — 다른 세션과의 브랜치 병합 (충돌 해결)
+- push 시도 중 origin이 한참 앞서 있는 것 확인 — 다른 세션이 카카오
+  간편로그인, 집팔고360 통합회원 관리자 화면(업체 승인/회원 관리) 등을
+  이미 push해놓은 상태였음.
+- **충돌 1**: alembic 마이그레이션 리비전 번호 충돌 — 이 세션이 만든
+  `0005_add_user_map_layer_preference.py`와 다른 세션의
+  `0005_kakao_login_support.py`가 똑같이 `revision = "0005"`를 씀.
+  → 이 세션 것을 `0006`으로 리넘버링(`down_revision = "0005"`), 파일명도
+  `0006_add_user_map_layer_preference.py`로 변경. `alembic heads`로 단일
+  head(`0006`) 확인, 새 DB에 `0001→0006` 전체 체인 클린 적용 재확인.
+- **충돌 2**: `apps/api/app/modules/auth/router.py` — import 블록만 충돌
+  (양쪽 다 새 스키마를 추가한 것뿐이라 단순 병합: `KakaoLoginIn`과
+  `MapLayerPreferenceIn/Out` 둘 다 유지).
+- **충돌 3**: `apps/api/app/modules/users/repository.py` — 함수 추가만
+  충돌(`get_map_layers`/`set_map_layers` vs `list_users`/
+  `set_user_active`/`set_user_role`), 전부 유지.
+- 나머지 대부분의 변경(카카오 로그인 프론트/백엔드, 관리자 회원·업체
+  화면, `/zipservice/*` 확장 등)은 git이 자동 병합함 — 이 세션이 건드린
+  파일과 겹치지 않았음.
+- **[완료] 병합 후 검증**: 백엔드 import 정상, 마이그레이션 체인 클린,
+  `POST /auth/register` + `PUT/GET /auth/me/map-layers` curl 왕복 확인,
+  `next build` 클린(다른 세션이 추가한 `/admin`, `/login/kakao/callback`,
+  `/zipservice/*` 라우트까지 전부 포함해서 정상 생성 확인).
+- 병합 커밋(`369eb79`) push 완료.
+
+### 완료 후
+- 로컬 검증 전부 완료, GitHub push 완료. **서버 재배포 필요**:
+  ```bash
+  cd /srv/zippalgo360
+  git pull origin claude/jippalgo360-platform-6bvrfh
+  cd apps/api && source venv/bin/activate && alembic upgrade head && sudo systemctl restart zippalgo360-api
+  cd ../web && npm run build && sudo systemctl restart zippalgo360-web
+  ```
