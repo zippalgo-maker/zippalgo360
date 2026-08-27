@@ -53,3 +53,11 @@ class SsoVerifyOut(BaseModel):
     email: str
     name: str
     role: UserRole
+
+
+class MapLayerPreferenceIn(BaseModel):
+    layers: list[str]
+
+
+class MapLayerPreferenceOut(BaseModel):
+    layers: list[str]

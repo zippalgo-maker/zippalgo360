@@ -3,6 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import { loadKakaoMaps } from "@/lib/kakao-maps";
 import { buildCountMarkerHtml, buildFanMarkerHtml, type AreaUnit } from "@/lib/interior-marker";
 import InteriorComplexPanel from "@/components/map/InteriorComplexPanel";
@@ -84,6 +85,39 @@ const COMPANY_LAYER_TYPE: Partial<Record<LayerKey, string>> = {
 const LAYER_GROUP_ZIPPALGO: ReadonlySet<LayerKey> = new Set(["listings", "company_real_estate"]);
 const LAYER_GROUP_ZIPTERIOR: ReadonlySet<LayerKey> = new Set(["interiorPortfolio", "company_interior"]);
 
+// 매물/시공사례는 지도의 핵심 두 축이라 상호배타(위 두 그룹)일 뿐 아니라,
+// 사용자가 실수로 둘 다 꺼서 지도가 텅 비는 상태를 만들 수 없도록 "최소
+// 하나는 항상 켜져 있어야 함"도 강제한다(2026-08-27 사용자 요청).
+const PRIMARY_LAYERS: ReadonlySet<LayerKey> = new Set(["listings", "interiorPortfolio"]);
+
+// 지도 레이어 선택 저장 — 비로그인은 쿠키에, 로그인 사용자는 계정에
+// 저장한다(handleSaveLayerPreference/useEffect 참고). 쿠키/서버 양쪽 다
+// "레이어 키 콤마 목록" 문자열 하나로 주고받는다.
+const MAP_LAYER_COOKIE = "zp_map_layers";
+const MAP_LAYER_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
+const KNOWN_LAYER_KEYS: ReadonlySet<string> = new Set(LAYER_DEFS.map((def) => def.key));
+
+// 알 수 없는 키(예전 저장분에 남은 폐기된 레이어 등)는 걸러내고, 매물/
+// 시공사례 중 하나도 안 남으면 그 저장값 자체를 무시한다(항상 최소 하나는
+// 켜져 있어야 한다는 규칙을 저장/복원 양쪽에서 동일하게 지킴).
+function sanitizeStoredLayers(raw: string[]): Set<LayerKey> | null {
+  const filtered = raw.filter((key): key is LayerKey => KNOWN_LAYER_KEYS.has(key));
+  if (!filtered.some((key) => PRIMARY_LAYERS.has(key))) return null;
+  return new Set(filtered);
+}
+
+function readLayerCookie(): Set<LayerKey> | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(/(?:^|;\s*)zp_map_layers=([^;]*)/);
+  if (!match) return null;
+  return sanitizeStoredLayers(decodeURIComponent(match[1]).split(",").filter(Boolean));
+}
+
+function writeLayerCookie(layers: Set<LayerKey>) {
+  const csv = Array.from(layers).join(",");
+  document.cookie = `${MAP_LAYER_COOKIE}=${encodeURIComponent(csv)}; path=/; max-age=${MAP_LAYER_COOKIE_MAX_AGE}`;
+}
+
 const COMPANY_LAYER_COLOR: Partial<Record<LayerKey, string>> = {
   company_real_estate: "#427cff",
   company_interior: "#21463b",
@@ -150,8 +184,15 @@ function toZipteriorZoom(kakaoLevel: number): number {
 
 function ServiceMapView() {
   const searchParams = useSearchParams();
+  const { token } = useAuth();
+  // 초기값 우선순위: 쿠키에 저장된 값(비로그인 때 저장한 것) > URL의
+  // ?mode=interior > 기본값(매물). 로그인 사용자의 서버 저장값은 토큰이
+  // 비동기로 확인된 뒤에만 알 수 있어서, 아래 별도 useEffect에서 도착하는
+  // 대로 한 번 더 덮어쓴다(그새 사용자가 이미 조작했어도 "마지막에 로그인
+  // 확인된 저장값"이 이기는 게 이 기능의 목적과 맞음).
   const initialLayers: Set<LayerKey> =
-    searchParams.get("mode") === "interior" ? new Set(["interiorPortfolio"]) : new Set(["listings"]);
+    readLayerCookie() ??
+    (searchParams.get("mode") === "interior" ? new Set(["interiorPortfolio"]) : new Set(["listings"]));
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -215,6 +256,7 @@ function ServiceMapView() {
   const [mapType, setMapType] = useState<"normal" | "satellite">("normal");
   const [isLocating, setIsLocating] = useState(false);
   const [layerPanelOpen, setLayerPanelOpen] = useState(false);
+  const [isSavingLayerPreference, setIsSavingLayerPreference] = useState(false);
 
   // 채팅 버튼 — 우측 지도 컨트롤 스택에 함께 둔다(햄버거는 이미 상단
   // 헤더(Header.tsx)에 같은 메뉴가 있어 지도 위에 따로 두지 않기로
@@ -231,6 +273,49 @@ function ServiceMapView() {
     const timer = setTimeout(() => setToast(null), 2200);
     return () => clearTimeout(timer);
   }, [toast]);
+
+  // 로그인 사용자가 저장해둔 레이어 선택을 한 번 불러와 복원한다. 비로그인
+  // 상태에서 시작한 초기값(쿠키 or 기본값)이 먼저 화면에 반짝 보일 수
+  // 있지만, 로그인 확인 자체가 비동기(useAuth)라 어쩔 수 없다 — 서버에
+  // 저장된 값이 있으면(빈 목록이 아니면) 이걸로 덮어쓴다. 세션당 한 번만
+  // 시도하도록 ref로 막는다(토큰이 갱신돼도 재요청하지 않음).
+  const appliedServerLayerPrefRef = useRef(false);
+  useEffect(() => {
+    if (!token || appliedServerLayerPrefRef.current) return;
+    appliedServerLayerPrefRef.current = true;
+    apiFetch<{ layers: string[] }>("/auth/me/map-layers", { token })
+      .then((data) => {
+        const sanitized = sanitizeStoredLayers(data.layers);
+        if (sanitized) setActiveLayers(sanitized);
+      })
+      .catch(() => {
+        // 저장된 적이 없거나 요청이 실패해도 지도는 이미 다른 기본값으로
+        // 잘 떠 있으므로 조용히 무시한다.
+      });
+  }, [token]);
+
+  // "설정 저장하기" — 로그인 상태면 계정에, 아니면 쿠키에 지금 켜진
+  // 레이어 목록을 저장한다. 다음 방문 때 위 두 초기화 경로가 이 값을
+  // 읽어 복원한다.
+  const handleSaveLayerPreference = useCallback(async () => {
+    setIsSavingLayerPreference(true);
+    try {
+      if (token) {
+        await apiFetch("/auth/me/map-layers", {
+          method: "PUT",
+          token,
+          body: { layers: Array.from(activeLayersRef.current) },
+        });
+      } else {
+        writeLayerCookie(activeLayersRef.current);
+      }
+      setToast("지도 설정을 저장했어요.");
+    } catch {
+      setToast("설정 저장에 실패했어요. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setIsSavingLayerPreference(false);
+    }
+  }, [token]);
 
   useEffect(() => {
     if (!KAKAO_APP_KEY) {
@@ -755,6 +840,15 @@ function ServiceMapView() {
   const toggleLayer = useCallback(
     (layer: LayerKey, available: boolean) => {
       if (!available) return;
+      // 매물/시공사례 중 켜져 있는 마지막 하나를 끄려는 시도는 막는다 —
+      // 지도가 아예 텅 비는 상태를 만들 수 없게 하기 위함(2026-08-27).
+      if (PRIMARY_LAYERS.has(layer) && activeLayersRef.current.has(layer)) {
+        const other: LayerKey = layer === "listings" ? "interiorPortfolio" : "listings";
+        if (!activeLayersRef.current.has(other)) {
+          setToast("매물 또는 시공사례 중 최소 하나는 켜져 있어야 해요.");
+          return;
+        }
+      }
       setActiveLayers((prev) => {
         const next = new Set(prev);
         if (next.has(layer)) {
@@ -769,6 +863,15 @@ function ServiceMapView() {
             if (next.has(opposingLayer)) deactivateLayer(next, opposingLayer);
           });
           next.add(layer);
+          // 반대 그룹을 끄는 과정에서 매물/시공사례가 둘 다 꺼진 채로
+          // 남을 수 있다(예: 매물은 이미 꺼둔 채로 "부동산 업체"만 새로
+          // 켠 경우 — company_real_estate는 프라이머리가 아니라 위
+          // 가드를 안 거치므로). 그럴 땐 지금 켠 레이어가 속한 그룹의
+          // 프라이머리를 자동으로 같이 켜서 "최소 하나는 항상 켜져
+          // 있어야 한다"를 어느 경로로도 어길 수 없게 한다.
+          if (![...PRIMARY_LAYERS].some((primary) => next.has(primary))) {
+            next.add(LAYER_GROUP_ZIPPALGO.has(layer) ? "listings" : "interiorPortfolio");
+          }
         }
         return next;
       });
@@ -1131,6 +1234,24 @@ function ServiceMapView() {
               )}
             </div>
           )}
+
+          {/* 지금 켜진 레이어 조합을 저장 — 로그인 상태면 계정에, 아니면
+              쿠키에 저장해서 다음 방문 때 그대로 복원한다(2026-08-27). */}
+          <div className="border-t border-line px-4 py-3">
+            <button
+              type="button"
+              onClick={handleSaveLayerPreference}
+              disabled={isSavingLayerPreference}
+              className="w-full rounded-lg bg-brand-green px-3 py-2 text-xs font-bold text-white transition hover:bg-brand-green/90 disabled:opacity-60"
+            >
+              {isSavingLayerPreference ? "저장 중..." : "이 레이어 설정 저장하기"}
+            </button>
+            <p className="mt-1.5 text-[10px] leading-relaxed text-muted">
+              {token
+                ? "다음에 접속해도 이 조합으로 먼저 보여드려요."
+                : "로그인하면 계정에 저장돼요. 지금은 이 브라우저에만 저장됩니다."}
+            </p>
+          </div>
         </div>
           )}
         </div>

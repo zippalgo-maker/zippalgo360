@@ -7,7 +7,10 @@ from app.config import get_settings
 from app.database import get_db
 from app.deps import get_current_user
 from app.modules.auth import service, sso
+from app.modules.users import repository as users_repository
 from app.modules.users.schemas import (
+    MapLayerPreferenceIn,
+    MapLayerPreferenceOut,
     SsoCodeOut,
     SsoVerifyIn,
     SsoVerifyOut,
@@ -34,6 +37,38 @@ def login(payload: UserLogin, conn: Connection = Depends(get_db)) -> TokenOut:
 @router.get("/me", response_model=UserOut)
 def me(user: dict = Depends(get_current_user)) -> UserOut:
     return UserOut(**user)
+
+
+@router.get("/me/map-layers", response_model=MapLayerPreferenceOut)
+def get_map_layers(
+    user: dict = Depends(get_current_user),
+    conn: Connection = Depends(get_db),
+) -> MapLayerPreferenceOut:
+    """로그인 사용자가 마지막으로 저장한 /map 레이어 선택을 돌려준다.
+
+    저장한 적이 없으면 빈 목록 — 프론트가 이 경우 자기 기본값(또는 쿠키)을
+    쓴다.
+    """
+    stored = users_repository.get_map_layers(conn, user["id"])
+    layers = [layer for layer in (stored or "").split(",") if layer]
+    return MapLayerPreferenceOut(layers=layers)
+
+
+@router.put("/me/map-layers", response_model=MapLayerPreferenceOut)
+def set_map_layers(
+    payload: MapLayerPreferenceIn,
+    user: dict = Depends(get_current_user),
+    conn: Connection = Depends(get_db),
+) -> MapLayerPreferenceOut:
+    """/map의 "설정 저장하기"가 호출하는 저장 엔드포인트.
+
+    어떤 레이어 키가 유효한지(매물/시공사례 중복선택 금지, 최소 1개 필수
+    등)는 프론트엔드가 이미 검증한 뒤 보낸다고 가정한다 — 이 값은 그저
+    "지도 레이어 이름 목록"일 뿐이라, 앞으로 프론트에 레이어가 추가/변경돼도
+    백엔드를 다시 배포할 필요가 없도록 일부러 느슨하게(그대로 저장) 둔다.
+    """
+    users_repository.set_map_layers(conn, user["id"], ",".join(payload.layers))
+    return MapLayerPreferenceOut(layers=payload.layers)
 
 
 @router.post("/sso/issue-code", response_model=SsoCodeOut)
