@@ -3278,3 +3278,31 @@ sudo systemctl restart zippalgo360-web
   `/zipterior`를 `/map?mode=interior`로 교체하는 작업 진행 예정
   (사용자 승인 대기 중, 로그인/회원사 메뉴 이관 방안도 같이 논의
   필요).
+
+## 2026-08-27 — 집테리어 회원 이관 스크립트 작성 (사용자 "넘어가자" 지시로 SQL 조회 결과 대기 없이 진행)
+
+- 이전 턴에서 요청한 읽기전용 조회 SQL 결과를 사용자가 보내기 전에
+  "넘어가자"고 해서, 집테리어의 정확한 `users` 컬럼명을 모른 채로도
+  안전하게 동작하도록 **스키마 비의존적으로 설계**해서 바로 진행.
+- **[완료]** `apps/api/scripts/zipterior_migration/`:
+  - `01_export_on_zipterior.sql` — 집테리어 서버에서 실행할 읽기전용
+    내보내기. 컬럼명을 몰라도 되게 `SELECT row_to_json(u) FROM users u`
+    로 전체 컬럼을 JSON 한 줄씩 그대로 내보냄(사용자에게 파일로 전달 —
+    집테리어는 이 저장소 밖의 별도 코드베이스라 git pull로 못 받음).
+  - `02_import_to_zippalgo360.py` — 집팔고360 서버에서 실행. JSON의 여러
+    후보 키 이름(email/hashed_password/nickname/kakao_id 등)을 순서대로
+    시도해 필드를 뽑고, kakao_id→이메일 순으로 기존 계정과 매칭해
+    **있으면 무조건 건너뜀**(덮어쓰기 없음), 비밀번호 해시는 bcrypt
+    형식(`$2[aby]$..`)일 때만 복사하고 아니면 NULL. 탈퇴/비활성으로
+    보이는 행(`deleted_at`/`status=deleted` 등 후보 키)은 건너뜀.
+    **기본은 dry-run**(통계만 출력, DB 변경 없음), `--commit`을 붙여야
+    실제 INSERT. `role`은 전부 `customer`로 고정, 업체 데이터는 다루지
+    않음(범위 밖 — 집테리어 자체 관리자가 계속 관리).
+  - `README.md` — 실행 순서(백업 → 집테리어에서 내보내기 → 파일 이동 →
+    dry-run 확인 → `--commit`) 정리.
+- **[완료] 검증**: `pick()`/`is_inactive()`/bcrypt 정규식 로직을 venv에서
+  합성 데이터로 단위 테스트(이메일/카카오ID 우선순위 추출, bcrypt
+  형식 판별, deleted_at/status 기반 비활성 판정 전부 의도대로 동작
+  확인). 실제 DB 연결 테스트는 이 세션에 접근 권한이 없어 못 함 — 서버에서
+  dry-run으로 먼저 확인 필요.
+- **아직 실행 안 됨** — 사용자가 실제 서버에서 순서대로 실행해야 함.
