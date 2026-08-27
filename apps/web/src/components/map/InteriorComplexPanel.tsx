@@ -83,7 +83,7 @@ export default function InteriorComplexPanel({
     .sort((a, b) => b.date.localeCompare(a.date));
 
   return (
-    <div className="absolute right-0 top-0 z-20 flex h-full w-full max-w-md flex-col overflow-hidden border-l border-line bg-white shadow-2xl">
+    <div className="flex h-full w-[28rem] flex-shrink-0 flex-col overflow-hidden border-r border-line bg-white shadow-2xl">
       <div className="flex items-center justify-between border-b border-line px-5 py-4">
         <p className="text-sm font-bold text-ink">단지 정보</p>
         <button

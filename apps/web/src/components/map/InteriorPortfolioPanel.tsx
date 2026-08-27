@@ -35,7 +35,7 @@ export default function InteriorPortfolioPanel({ portfolioId, onClose, areaUnit 
   }, [portfolioId]);
 
   return (
-    <div className="absolute right-0 top-0 z-30 flex h-full w-full max-w-md flex-col overflow-hidden border-l border-line bg-white shadow-2xl">
+    <div className="flex h-full w-[28rem] flex-shrink-0 flex-col overflow-hidden border-r border-line bg-white shadow-2xl">
       <div className="flex items-center justify-between border-b border-line px-5 py-4">
         <p className="text-sm font-bold text-ink">시공사례 상세</p>
         <button

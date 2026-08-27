@@ -174,6 +174,10 @@ function ServiceMapView() {
   const [selectedComplexId, setSelectedComplexId] = useState<number | null>(null);
   const [selectedArea, setSelectedArea] = useState<string | null>(null);
   const [selectedPortfolio, setSelectedPortfolio] = useState<ZipteriorPortfolioSummary | null>(null);
+  // 여러 단지가 뭉쳐진 클러스터 마커를 클릭했을 때 "이 마커에 포함된
+  // 단지 목록" 1단계 화면에 쓸 목록 — 집테리어 모바일의
+  // openClusterComplexSelect와 동일한 기능. null이면 안 뜸.
+  const [clusterSelectItems, setClusterSelectItems] = useState<ZipteriorMapMarker[] | null>(null);
   // idle 이벤트로 뷰포트가 다시 로드될 때 쓰는 렌더 함수는 지도가 처음
   // 준비되거나 activeLayers가 바뀔 때만 새로 붙기 때문에(아래 useEffect의
   // 의존성 배열 참고), 그 클로저 안에서 selectedComplexId/selectedArea를
@@ -325,6 +329,7 @@ function ServiceMapView() {
     });
     setSelectedArea(null);
     setSelectedPortfolio(null);
+    setClusterSelectItems(null);
   }, [collapseInteriorMarker]);
 
   // 부챗살 마커 안의 조각(평형 타입) 클릭, 닫기 버튼, 단지명/시공건수
@@ -358,6 +363,18 @@ function ServiceMapView() {
 
   // 단지 마커를 클릭했을 때: 단지 상세를 받아와 그 마커를 부챗살로
   // 바꾸고 패널을 연다(집테리어의 selectComplex와 동일한 흐름).
+  //
+  // "부챗살이 뜨는 경우도 있고 안 뜨는 경우도 있다"는 리포트의 원인 —
+  // 이 함수를 호출하는 경로가 늘어나면서(검색 결과 선택, 클러스터
+  // 목록에서 선택 등) 클릭 시점에 그 단지가 **화면에 개별 마커로 없는**
+  // 경우(다른 단지와 뭉쳐 클러스터로 표시 중이거나, 아직 그 위치의
+  // 마커를 한 번도 안 불러왔거나)가 흔해졌는데, 예전 코드는 그 경우
+  // 그냥 `entry`가 없으니 조용히 포기하고 끝나서 패널만 열리고 지도
+  // 위 부챗살은 영영 안 나타났다. 이제는 entry가 없으면 그 단지 좌표로
+  // 지도를 이동시켜 클러스터를 풀어준다 — 그러면 idle 이벤트로
+  // redrawInteriorClusters가 다시 돌면서(아래 그 함수 끝의 복원 로직)
+  // 이 단지가 개별 마커로 그려지고, 캐시에 이미 있는 상세 정보로 부챗살
+  // 상태를 자동 복원한다.
   const openInteriorComplex = useCallback(
     async (complexId: number) => {
       setSelectedComplexId((current) => {
@@ -366,6 +383,7 @@ function ServiceMapView() {
       });
       setSelectedArea(null);
       setSelectedPortfolio(null);
+      setClusterSelectItems(null);
 
       let complex = interiorComplexCacheRef.current.get(complexId);
       if (!complex) {
@@ -377,11 +395,23 @@ function ServiceMapView() {
         }
       }
       if (!complex.available) return;
+      // fetch가 걸리는 동안 사용자가 다른 단지를 또 클릭했으면 이 응답은
+      // 버린다(오래된 응답이 방금 클릭한 단지를 덮어쓰지 않도록).
+      if (selectedComplexIdRef.current !== complexId) return;
+
       const entry = interiorMarkerElementsRef.current.get(complexId);
-      if (!entry) return;
-      entry.el.innerHTML = buildFanMarkerHtml(complex, null);
-      entry.overlay.setZIndex?.(10000);
-      bindFanInteractions(entry.el, complex);
+      if (entry) {
+        entry.el.innerHTML = buildFanMarkerHtml(complex, null);
+        entry.overlay.setZIndex?.(10000);
+        bindFanInteractions(entry.el, complex);
+        return;
+      }
+      const kakao = window.kakao;
+      const map = mapRef.current;
+      if (kakao && map) {
+        map.setLevel(Math.min(map.getLevel(), 4));
+        map.setCenter(new kakao.maps.LatLng(complex.latitude, complex.longitude));
+      }
     },
     [collapseInteriorMarker, bindFanInteractions]
   );
@@ -457,9 +487,13 @@ function ServiceMapView() {
         const el = document.createElement("div");
         el.innerHTML = buildCountMarkerHtml(portfolioSum);
         const overlay = new kakao.maps.CustomOverlay({ position, content: el, map, yAnchor: 0.5, xAnchor: 0.5, zIndex: 0 });
+        // 집테리어 모바일과 동일하게, 여러 단지가 뭉친 마커는 확대 대신
+        // "이 마커에 포함된 단지 목록"을 보여주고 사용자가 직접 골라
+        // 단지기본정보로 넘어가게 한다(zoomToBoundsOnClick:false +
+        // clusterclick → openClusterComplexSelect와 동일한 흐름).
         el.addEventListener("click", () => {
-          map.setLevel(Math.max(1, map.getLevel() - 2));
-          map.setCenter(position);
+          closeInteriorPanels();
+          setClusterSelectItems(bucket);
         });
         markersByLayerRef.current.interiorPortfolio.push(overlay);
       });
@@ -480,7 +514,7 @@ function ServiceMapView() {
         bindFanInteractions(entry.el, cached);
       }
     }
-  }, [clearLayerMarkers, renderInteriorStandardMarker, bindFanInteractions]);
+  }, [clearLayerMarkers, renderInteriorStandardMarker, bindFanInteractions, closeInteriorPanels]);
 
   // 단지 정보 패널에서 평형 타입 탭을 눌러 selectedArea가 바뀌면, 지도
   // 위 부챗살 마커의 활성 조각(active 표시)도 같이 갱신한다.
@@ -1071,23 +1105,76 @@ function ServiceMapView() {
         )}
       </div>
 
-      {activeLayers.has("interiorPortfolio") && selectedComplexId != null && (
-        <InteriorComplexPanel
-          complexId={selectedComplexId}
-          selectedArea={selectedArea}
-          onSelectArea={setSelectedArea}
-          onClose={closeInteriorPanels}
-          areaUnit={areaUnit}
-          onOpenPortfolio={setSelectedPortfolio}
-        />
-      )}
-      {selectedPortfolio && (
-        <InteriorPortfolioPanel
-          portfolioId={selectedPortfolio.id}
-          onClose={() => setSelectedPortfolio(null)}
-          areaUnit={areaUnit}
-        />
-      )}
+      {/* 인테리어 시공사례 패널들 — 집테리어(zipterior.kr)와 동일하게
+          화면 왼쪽에서 열리고, 단지기본정보 옆에 포트폴리오 상세가
+          나란히(겹치지 않고) 열린다. 클러스터 선택 목록과 단지기본정보는
+          같은 자리를 공유하는 1단계/2단계 흐름(둘 다 selectedComplexId가
+          null일 때만 클러스터 목록이 보임)이고, 포트폴리오 상세는 그
+          오른쪽에 추가로 붙는 세 번째 칸. */}
+      <div className="absolute left-0 top-0 z-20 flex h-full">
+        {activeLayers.has("interiorPortfolio") && clusterSelectItems && selectedComplexId == null && (
+          <div className="flex h-full w-[28rem] flex-shrink-0 flex-col overflow-hidden border-r border-line bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-line px-5 py-4">
+              <div>
+                <p className="text-xs font-bold text-brand-green">1단계</p>
+                <p className="text-sm font-bold text-ink">아파트 단지를 선택해 주세요</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setClusterSelectItems(null)}
+                aria-label="닫기"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-lg text-muted transition hover:bg-soft hover:text-ink"
+              >
+                ×
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-4">
+              <p className="mb-3 text-xs text-muted">
+                이 마커에 포함된 아파트 단지 {clusterSelectItems.length}곳입니다.
+              </p>
+              <div className="flex flex-col gap-2">
+                {clusterSelectItems.map((marker) => (
+                  <button
+                    key={marker.id}
+                    type="button"
+                    onClick={() => {
+                      setClusterSelectItems(null);
+                      openInteriorComplex(marker.id);
+                    }}
+                    className="flex items-center justify-between gap-3 rounded-xl bg-soft px-4 py-3 text-left transition hover:bg-brand-green/10"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-ink">{marker.name}</span>
+                      <span className="block truncate text-xs text-muted">
+                        {[marker.sido, marker.sigungu].filter(Boolean).join(" ")}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-xs font-bold text-brand-green">{marker.portfolio_count}건</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeLayers.has("interiorPortfolio") && selectedComplexId != null && (
+          <InteriorComplexPanel
+            complexId={selectedComplexId}
+            selectedArea={selectedArea}
+            onSelectArea={setSelectedArea}
+            onClose={closeInteriorPanels}
+            areaUnit={areaUnit}
+            onOpenPortfolio={setSelectedPortfolio}
+          />
+        )}
+        {selectedPortfolio && (
+          <InteriorPortfolioPanel
+            portfolioId={selectedPortfolio.id}
+            onClose={() => setSelectedPortfolio(null)}
+            areaUnit={areaUnit}
+          />
+        )}
+      </div>
 
       {chatOpen && (
         <div className="absolute right-0 top-0 z-30 flex h-full w-full max-w-sm flex-col overflow-hidden border-l border-line bg-white shadow-2xl">
