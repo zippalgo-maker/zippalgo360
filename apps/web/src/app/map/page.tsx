@@ -438,7 +438,11 @@ function ServiceMapView() {
         return;
       }
       const map = mapRef.current;
-      if (map) map.setLevel(Math.min(map.getLevel(), 4));
+      // 화면에 개별 마커가 없다는 건 다른 단지와 뭉쳐 클러스터로 표시
+      // 중이었다는 뜻 — 확실하게 풀어내도록 고정된 줌(3)까지 당긴다
+      // (현재 줌이 이미 더 가까우면 오히려 확대될 수 있어, 그럴 땐 현재
+      // 줌을 유지).
+      if (map) map.setLevel(Math.min(map.getLevel(), 3));
       centerMapOnComplex(complex.latitude, complex.longitude);
     },
     [collapseInteriorMarker, bindFanInteractions, centerMapOnComplex]
@@ -865,10 +869,11 @@ function ServiceMapView() {
       if (!kakao || !map || item.latitude == null || item.longitude == null) return;
       if (item.kind === "complex") {
         if (!activeLayersRef.current.has("interiorPortfolio")) toggleLayer("interiorPortfolio", true);
-        map.setLevel(4);
-        // 지도 중심 이동은 openInteriorComplex 안의 centerMapOnComplex가
-        // 왼쪽 패널 폭을 감안해서 처리한다 — 여기서 먼저 plain setCenter를
-        // 하면 그 뒤에 또 한 번 움직여서 화면이 두 번 튀어 보인다.
+        // openInteriorComplex는 단지 상세를 fetch한 뒤에야 지도를 옮기므로
+        // (네트워크 왕복만큼 늦게 반응) 검색 결과에 이미 있는 좌표로 먼저
+        // 즉시 이동시킨다 — 패널 폭 보정은 centerMapOnComplex가 처리.
+        map.setLevel(3);
+        centerMapOnComplex(item.latitude, item.longitude);
         openInteriorComplex(Number(item.id));
       } else if (item.kind === "company") {
         if (!activeLayersRef.current.has("company_interior")) toggleLayer("company_interior", true);
@@ -879,7 +884,7 @@ function ServiceMapView() {
         map.setCenter(new kakao.maps.LatLng(item.latitude, item.longitude));
       }
     },
-    [toggleLayer, openInteriorComplex]
+    [toggleLayer, openInteriorComplex, centerMapOnComplex]
   );
 
   const isLoading = loadingLayers.size > 0;
@@ -1171,6 +1176,14 @@ function ServiceMapView() {
                     type="button"
                     onClick={() => {
                       setClusterSelectItems(null);
+                      // openInteriorComplex는 단지 상세를 fetch한 뒤에야
+                      // 지도를 옮기므로(네트워크 왕복만큼 늦게 반응) 목록에
+                      // 이미 있는 좌표로 먼저 즉시 이동시켜 "눌렀는데 지도가
+                      // 안 움직인다"는 체감을 없앤다. 클러스터를 확실히
+                      // 풀어내야 하니 줌도 고정된 값(3)으로 당겨준다.
+                      const map = mapRef.current;
+                      if (map) map.setLevel(3);
+                      centerMapOnComplex(marker.latitude, marker.longitude);
                       openInteriorComplex(marker.id);
                     }}
                     className="flex items-center justify-between gap-3 rounded-xl bg-soft px-4 py-3 text-left transition hover:bg-brand-green/10"
