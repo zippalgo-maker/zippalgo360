@@ -3258,3 +3258,17 @@ sudo systemctl restart zippalgo360-web
   `/zipterior`를 `/map?mode=interior`로 교체하는 작업 진행 예정
   (사용자 승인 대기 중, 로그인/회원사 메뉴 이관 방안도 같이 논의
   필요).
+
+### 배포
+- 서버가 배포 직전 `claude/jippalgo360-service-screen-lmv8de`(제3의
+  브랜치)에 가 있던 걸 확인 — 브랜치 통일 공지 이후에도 여전히
+  다른 브랜치로 드리프트될 수 있다는 실제 사례. `git checkout
+  claude/jippalgo360-platform-6bvrfh` → `git pull`(36 커밋 fast-forward,
+  카카오 로그인/관리자 화면/집서비스 라이프스타일 개편 등 다른
+  세션들 작업 전부 포함) → `apps/api`에서 `alembic upgrade head`
+  (0005/0006 마이그레이션) → `zippalgo360-api` 재시작 → `apps/web`
+  `npm run build` → `zippalgo360-web` 재시작.
+- **[완료] 검증**: `systemctl status` 양쪽 다 `active (running)`,
+  `git log -1`로 최신 커밋(`fbef83f`) 배포 확인.
+- **다음 확인 필요(사용자)**: 실제 포트폴리오로 `/map?mode=interior`
+  에서 방별 그룹핑/콘텐츠 블록이 정상 렌더링되는지 브라우저로 확인.
