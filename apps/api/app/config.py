@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     sso_shared_secret: str = "change-this-in-production"
     sso_code_ttl_seconds: int = 30
     kakao_rest_api_key: str = ""
+    kakao_client_secret: str = ""
+    kakao_redirect_uri: str = "http://localhost:3000/login/kakao/callback"
 
     @property
     def cors_origin_list(self) -> list[str]:

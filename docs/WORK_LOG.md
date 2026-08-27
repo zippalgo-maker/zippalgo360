@@ -2032,3 +2032,72 @@ sudo systemctl restart zippalgo360-web
     → 있으면 로그인/없으면 자동가입 → JWT 발급) 라우터 추가.
   - 프론트: `/login`, `/register`에 "카카오로 시작하기" 버튼 + 카카오 인가
     코드를 받는 콜백 페이지 추가.
+
+## 2026-08-27 — 카카오 소셜로그인(일반회원) 구현 완료
+
+- **[완료] 백엔드** (`apps/api`):
+  - `alembic/versions/0005_kakao_login_support.py`: `users.password_hash`
+    NULL 허용(카카오 전용 계정은 비밀번호 없음), `kakao_id`에 부분 유니크
+    인덱스(`WHERE kakao_id IS NOT NULL`) 추가.
+  - `app/config.py`: `kakao_client_secret`(선택), `kakao_redirect_uri`
+    설정 추가. **`kakao_rest_api_key`는 기존에 지오코딩용으로 이미 서버
+    `.env`에 있는 값을 카카오 로그인 client_id로 그대로 재사용**(카카오
+    앱 하나의 REST API 키는 여러 기능에 공용) — 새 키 발급 불필요.
+  - `app/modules/auth/kakao.py` 신설: 인가 코드를 카카오 토큰으로 교환 →
+    `kapi.kakao.com/v2/user/me`로 프로필 조회. 이메일 동의를 안 한
+    계정(카카오는 이메일이 선택 동의 항목)은 `kakao_id@kakao-user.
+    zippalgo360.local` 플레이스홀더 이메일로 대체(users.email이 NOT
+    NULL UNIQUE라 이 값이 없으면 가입 자체가 실패하기 때문 — 이 도메인은
+    실제 발신용이 아니므로 메일 발송에 쓰면 안 됨).
+  - `app/modules/auth/service.py`의 `kakao_login()`: kakao_id로 기존
+    회원 조회 → 없으면 이메일로 재조회(같은 이메일로 이미 이메일/비밀번호
+    가입한 계정이 있으면 새 계정을 만들지 않고 **그 계정에 카카오 로그인을
+    연결**, `users/repository.py`의 `link_kakao_id()`) → 그래도 없으면
+    신규가입(`create_kakao_user()`, role=customer 고정). 기존
+    `login()`(이메일/비밀번호)도 `password_hash IS NULL`인 카카오 전용
+    계정으로 이메일 로그인 시도 시 `bcrypt.checkpw`가 죽지 않도록 방어
+    추가.
+  - `POST /auth/kakao/login`(`KakaoLoginIn{code, redirect_uri}` →
+    `TokenOut`) 라우터 추가. 카카오 키가 아예 없으면 501로 명확히 응답.
+  - 검증: 로컬에 venv 새로 만들어 `requirements.txt` 설치 후
+    `python -c "import app.main"` 통과(라우터 등록까지 실제로 import되는
+    선에서 확인, 실제 카카오 서버와의 왕복은 이 환경에 카카오 앱
+    키/네트워크가 없어 못 함).
+- **[완료] 프론트** (`apps/web`):
+  - `lib/kakao.ts`: `getKakaoAuthorizeUrl()`/`getKakaoRedirectUri()` —
+    redirect_uri를 **런타임에 `window.location.origin` 기준으로 계산**해서
+    로컬/스테이징/프로덕션 도메인이 달라도 별도 환경변수 없이 항상
+    맞게 동작하도록 함(카카오 인가 요청과 토큰 교환 양쪽에 동일한 값을
+    보내야 하는데, 소스를 하나로 통일해 어긋날 여지를 없앰).
+  - `lib/auth-context.tsx`에 `loginWithKakao(code, redirectUri)` 추가.
+  - `components/KakaoLoginButton.tsx`(카카오 브랜드 가이드 준수 —
+    `#FEE500` 배경, 말풍선 아이콘), `lib/ui.ts`에 `kakaoButtonClass` 추가.
+  - `/login`, `/register`(단, `role === "customer"`일 때만 — 카카오
+    가입은 항상 일반회원으로 생성되므로 업체가입 탭에서는 안 보여줌)에
+    버튼 배치.
+  - `app/login/kakao/callback/page.tsx` 신설 — 카카오가 돌려준 `code`(또는
+    사용자가 동의를 취소했을 때의 `error`)를 받아 백엔드 호출 후
+    `/mypage`로 이동, 실패 시 에러 문구 + 로그인으로 돌아가기 링크.
+  - `.env.example`(웹)에 `NEXT_PUBLIC_KAKAO_CLIENT_ID` 추가 — **백엔드
+    `KAKAO_REST_API_KEY`와 반드시 같은 값**이어야 함.
+- **[완료] 검증**: `npm install` 후 `next build` 클린(24개 라우트,
+  `/login/kakao/callback` 정상 포함). `npx eslint 'src/**/*.{ts,tsx}'`
+  전체 실행 결과 17개 중 새로 추가한 콜백 페이지의
+  `react-hooks/set-state-in-effect` 1건만 신규분이고, 이건 같은 파일에
+  이미 있던 `auth-context.tsx`의 동일 규칙 사전 존재 오류와 같은 종류
+  (이펙트 안 setState, 이 저장소 전역에 만연, 빌드 안 막힘, 이전
+  세션에서 이미 비차단 판단됨) — 새로운 종류의 오류 없음.
+- **[남은 작업 — 배포 시 사용자가 직접 해야 함, 이 세션은 서버 접근 불가]**:
+  1. `apps/api`에서 `alembic upgrade head` 실행(0005 마이그레이션 적용).
+  2. 카카오 개발자 콘솔에서 해당 앱의 "카카오 로그인" 제품이 꺼져 있으면
+     활성화, **Redirect URI에 `https://zippalgo360.com/login/kakao/
+     callback`(실제 배포 도메인) 등록**.
+  3. `apps/web` 서버 `.env`에 `NEXT_PUBLIC_KAKAO_CLIENT_ID=<서버 apps/api
+     .env의 KAKAO_REST_API_KEY와 동일한 값>` 추가 후 `next build` 재실행
+     (NEXT_PUBLIC_* 값은 빌드 타임에 번들되므로 재시작만으로는 반영 안 됨).
+  4. `zippalgo360-api`/`zippalgo360-web` 재시작 후 실제 카카오 로그인
+     동의 화면까지 뜨는지 브라우저에서 최종 확인.
+- **다음 단계(집테리어 연동)**: CLAUDE.md에 기록한 순서대로, 이 카카오
+  로그인이 배포 환경에서 실제로 동작 확인된 뒤에 (2) 집테리어와 SSO
+  연동 단대단 검증 → (3) 기존 집테리어 회원 이관 → (4) 집테리어 자체
+  로그인 정리로 진행.
