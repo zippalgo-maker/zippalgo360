@@ -1966,3 +1966,18 @@ sudo systemctl restart zippalgo360-web
     복사하면 됨.
   - 모바일 반응형 스크린샷 검증은 이번에도 하지 않음(PC만 확인) —
     이전 라운드와 동일한 제약.
+- **[진행 중] 서버 재배포** — 사용자가 "배포하자고"라고 요청해서 아래
+  명령어를 전달함(이 세션은 서버 SSH 권한이 없어 직접 실행 불가,
+  사용자가 대신 실행). 프론트엔드 전용 변경(정적 이미지 35장 +
+  `apps/web` 코드)이라 백엔드 마이그레이션/재시작은 불필요, `zippalgo
+  360-web`만 재빌드·재시작하면 됨. 결과 확인 대기 중.
+
+```bash
+cd /srv/zippalgo360
+git fetch origin
+git checkout claude/jippalgo360-service-screen-lmv8de
+git pull origin claude/jippalgo360-service-screen-lmv8de
+cd apps/web
+npm run build
+sudo systemctl restart zippalgo360-web
+```
