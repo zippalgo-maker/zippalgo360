@@ -2047,3 +2047,283 @@ sudo systemctl restart zippalgo360-web
   클릭 상호작용 자체는 재현 테스트 못 함 — dev 서버로 `/map` 정적
   렌더링(런타임 에러 없음)만 확인, 실제 마커 클릭 흐름은 배포 후
   사용자 확인 필요.
+
+---
+
+## 2026-08-26 — (이 세션) 다른 세션(`claude/zippalgo360-interior-service-tz2qfv`)과의 브랜치 충돌 발견 및 병합
+
+### 시작 전
+- 배포 스크립트 실행 중 서버(`/srv/zippalgo360`)의 `git pull`이
+  "divergent branches" 에러로 실패 — 서버가 이 세션이 계속 배포해온
+  `claude/jippalgo360-platform-6bvrfh`가 아니라 **다른 브랜치**
+  (`claude/zippalgo360-interior-service-tz2qfv`)에 체크아웃돼 있었고,
+  그 브랜치에 다른 세션이 진행한 커밋들(이미 origin에 푸시됨,
+  유실 위험 없음)이 있어서 갈라진 상태였음.
+- 진단: `git merge-base`로 두 브랜치의 분기점이 이 세션의 커밋
+  `121ecc8`(햄버거 제거 커밋 직후)임을 확인. 다른 세션은 그 지점에서
+  이어받아 (1) 지도 우측 컨트롤 버튼이 위성 지도 위에서 반투명 배경
+  때문에 안 보이던 버그를 불투명 흰 배경 + 선택 시 빨간 글자로 수정
+  (`apps/web/src/app/map/page.tsx`의 `controlButtonClass` — 이 세션이
+  만든 파스텔 그린 배경 버전을 대체), (2) `/zipterior` 임베드 페이지가
+  모바일 기기에서는 집테리어의 모바일 전용 경로(`/m`)로 접속하도록
+  개선(`apps/web/src/app/zipterior/page.tsx`), (3) 집테리어 서버 쪽에
+  같은 색상 통일 + `/m`용 zpEmbed·SSO 스크립트 패치를 진행 — 세 파일
+  다 이 세션도 건드렸었지만 실제 겹치는 줄은 없어서(다른 함수/다른
+  구간) 병합이 완전히 자동으로 됨.
+- **[완료]** `git fetch origin claude/zippalgo360-interior-service-tz2qfv`
+  → `git merge origin/claude/zippalgo360-interior-service-tz2qfv`
+  실행. `apps/web/src/app/map/page.tsx`, `apps/web/src/app/zipterior/
+  page.tsx`는 자동 병합 성공(다른 세션의 버그 수정 버전을 그대로
+  채택 — 위성지도 가시성 문제는 실사용 버그라 최신 수정이 우선함).
+  `docs/WORK_LOG.md`만 두 세션이 파일 끝에 각자 새 절을 이어붙인
+  전형적인 append 충돌 — 기존 프로토콜대로 **양쪽 기록 다 유지**,
+  시간순으로 이어붙여 해결(어느 쪽도 삭제하지 않음).
+- **[완료] 재검증**: 병합 후 `next build` 클린 재확인(다른 세션의
+  `controlButtonClass` 교체가 이 세션이 그 뒤에 추가한 채팅/줌/현재
+  위치/레이어 버튼들과 시그니처 호환이라 추가 수정 불필요했음).
+- **교훈**: 서버(`/srv/zippalgo360`)가 정확히 어느 브랜치를 추적하는지
+  이 세션은 매번 가정만 하고 실제로 확인한 적이 없었다 — 다음부터는
+  배포 스크립트에 `git branch --show-current`를 첫 줄로 넣어서 이런
+  불일치를 배포 실패 전에 미리 드러내는 게 나음.
+
+---
+
+## 2026-08-26 — `/zipterior` 임베드, 모바일 기기는 집테리어 모바일 버전(`/m`)으로 접속
+
+### 시작 전
+- 사용자: "zipterior.kr/m으로 접속하면 집테리어 모바일 버전으로 접속하게
+  되는데 zippalgo360.com/zipterior 로 모바일 기기로 접속하면 모바일
+  버전으로 접속하도록 수정하자 — 집팔고360에 집테리어 다 넣으면
+  zipterior.kr은 없어질 예정이라서."
+- 현재 `apps/web/src/app/zipterior/page.tsx`는 기기 구분 없이 항상
+  `https://zipterior.zippalgo360.com/?zpEmbed=1`(데스크톱 버전) 하나만
+  iframe에 넣고 있음 — 모바일 기기로 접속해도 데스크톱 버전이 그대로
+  뜸.
+- **이 세션은 `zipterior.kr`/`zipterior.zippalgo360.com`에 아웃바운드
+  네트워크 접근이 막혀있어(egress 프록시가 차단, 이전 세션들과 동일한
+  제약) `/m` 경로의 실제 HTML 구조를 직접 확인할 수 없었음** — 트레일링
+  슬래시 유무, `zpEmbed=1`/`sso=` 쿼리스트링이 데스크톱과 동일하게
+  동작하는지, 무엇보다 로고 숨김(`zp-zippalgo-embedded` 클래스, 이전
+  세션에서 `index.html`/`style.css`에 서버 사이드로 패치함)과 SSO
+  자동 로그인 스크립트(역시 `index.html`에 패치됨)가 `/m`이 서빙하는
+  파일에도 적용되어 있는지는 코드만으로는 판단 불가. 사용자 확인 필요.
+
+### 진행 중
+- **[완료]** `apps/web/src/app/zipterior/page.tsx` — `navigator.userAgent`로
+  모바일 기기(Android/iPhone/iPad/iPod/Mobi)를 감지해 iframe src의
+  경로를 `/`(데스크톱) 대신 `/m`(모바일)으로 바꾸도록 수정.
+  `zpEmbed=1`/`sso=` 쿼리스트링 부착 로직은 기존과 동일하게 유지,
+  경로만 갈아끼움 (`buildEmbedUrl(isMobile, ssoCode?)` 헬퍼로 정리).
+- **[완료] 검증**: `next build` 클린, `npx eslint` 새 오류 없음.
+- **미검증(반드시 실사용 확인 필요)**:
+  1. `https://zipterior.zippalgo360.com/m`이 `zipterior.kr/m`과 동일한
+     서버/파일을 서빙하는지 (도메인만 다르므로 서빙 자체는 될 것으로
+     예상하나 직접 curl/브라우저 확인 못함).
+  2. `/m`이 서빙하는 파일이 `index.html`과 별개 파일(예: `m.html` 또는
+     별도 디렉토리)이라면, 앞서 `index.html`에어 넣었던 로고 숨김
+     (`zpEmbed=1` → `zp-zippalgo-embedded` 클래스)과 SSO 자동 로그인
+     삽입 스크립트가 그 파일에는 없을 가능성이 큼 — 있다면 모바일
+     iframe에서 집테리어 로고가 다시 보이거나 SSO 자동 로그인이
+     안 될 수 있음. 필요시 이전 세션과 같은 방식(SSH로 사용자가
+     anchor 기반 패치 스크립트 실행)으로 `/m` 쪽 파일에도 동일 패치를
+     추가해야 함.
+
+### 배포 및 후속 확인 (같은 세션, 사용자 SSH 릴레이)
+- 사용자가 서버에서 `git checkout claude/zippalgo360-interior-service-tz2qfv`
+  → `git pull` → `npm run build` → `sudo systemctl restart
+  zippalgo360-web` 실행, 배포 완료.
+- **[완료] 검증 1**: `curl -I https://zipterior.zippalgo360.com/m` → `200
+  OK`, `curl -s .../m | head`로 확인한 HTML이 스크린샷(집팔고360
+  플랫폼바+서비스아이콘 5개+지도/견적요청/포트폴리오/MY집테리어 탭)과
+  일치 — 도메인 자체는 정상 서빙 확인.
+- **[확인됨] 문제 2 실제로 존재**: `curl -s .../m | grep -i
+  "zpEmbed\|nativeMap\|sso"` 결과, `zpEmbed`/`sso` 문자열이 전혀 없음
+  (매치된 건 `m.html`이 자기 내부 지도 패널용으로 쓰는
+  `index.html?nativeMap=1` iframe 참조뿐, 우리 임베드 감지와 무관).
+  즉 로고/플랫폼바 숨김도, SSO 자동 로그인도 지금 `/m`에서는 전혀
+  동작 안 함.
+- **[완료] 파일 위치 확인**: `ls -la /var/www/zipterior/`로 확인—
+  `/m`이 실제로 서빙하는 파일은 `index.html`과 별개인
+  **`/var/www/zipterior/m.html`**(정적 파일, 26272 bytes로
+  `curl`의 `Content-Length`와 일치). `index.html`에 있던 zpEmbed
+  감지 스크립트·style.css의 `zp-zippalgo-embedded` 규칙·SSO exchange
+  스크립트는 전부 `index.html` 전용으로 들어가 있어서 `m.html`에는
+  하나도 안 들어있던 것 — 다음 단계로 `m.html`에도 동일한 패치를
+  넣어야 함(진행 중, 다음 항목 참고).
+- 참고로 `/var/www/zipterior/`에는 파일 수정마다 `.bak_YYYYMMDD_HHMMSS_설명`
+  백업이 계속 쌓이는 자체 관례가 있음(예:
+  `index.html.bak_20260826_094446_before_sso_frontend`가 SSO 패치
+  직전 백업으로 추정) — 우리가 `m.html`을 패치할 때도 이 관례를
+  따라 패치 전 백업을 먼저 뜨는 게 안전.
+
+### `m.html`에 zpEmbed 감지 + SSO 스크립트 패치 (같은 세션, SSH 릴레이)
+- `index.html`은 `nativeMap=1`(m.html이 자기 자신을 내부 지도/상세/채팅
+  패널용 iframe으로 재사용할 때 쓰는, 우리 용도와 무관한 기존
+  파라미터)→`zt-embedded` 클래스 패턴이 있고 SSO exchange 스크립트도
+  있지만(로고 숨김용 `zp-zippalgo-embedded`는 확인 결과 유실됨, 이번
+  범위 밖으로 보류), `m.html`은 우리 용도의 `zpEmbed`/`sso` 처리가
+  전혀 없었음. `m.html`의 중복 UI는 `.m-platbar`(집팔고360 로고+검색+
+  메뉴+알림벨)와 `.m-service-nav`(집팔고/집사고/집테리어/집이사/
+  집청소 5개 아이콘, 집테리어만 활성 나머지 "예정") — 둘 다 우리
+  Next.js 쪽 전역 `Header.tsx`(모든 라우트 최상단에 항상 렌더링,
+  `apps/web/src/app/layout.tsx`)가 이미 제공하는 진짜 헤더/내비게이션과
+  내용이 겹침(m.html 쪽은 실제 링크가 아니라 전부 "예정" 표시라 더
+  혼란스러움).
+- **[완료]** 사용자가 SSH로 python3 heredoc 앵커 패치 실행(패치 전
+  `m.html`/`css/mobile.css` 백업 먼저 뜸):
+  - `m.html` `<head>`에 `zpEmbed=1` 쿼리스트링 감지 스크립트 추가
+    (`nativeMap`→`zt-embedded`와 동일 패턴, 클래스명은
+    `zp-zippalgo-embedded`로 index.html 쪽과 통일) — `css/mobile.css`
+    링크 태그 캐시버스터도 `v=1.11.5-panel-expand` →
+    `v=1.12.0-zp-embed`로 올림.
+  - `m.html`에 SSO exchange 스크립트 추가(`index.html`의 기존 스크립트와
+    동일 로직 — `?sso=코드`를 `/auth/sso/exchange`로 교환 후
+    `ZipteriorAPI.save`+`location.reload()`) — `js/api-client.js` 로드
+    직후, `js/customer-data.js` 직전에 삽입.
+  - `css/mobile.css`의 기존 `.app-shell.map-panel-open .m-platbar,
+    .m-service-nav, .m-subnav{display:none}` 규칙 바로 뒤에
+    `html.zp-zippalgo-embedded .m-platbar, .m-service-nav{display:none
+    !important}` 추가(`.m-subnav`는 그대로 유지 — 지도/견적요청/
+    포트폴리오/MY집테리어 탭은 실제 기능이라 안 건드림).
+- **[완료] 검증**: `grep`으로 `m.html`에 두 스크립트, `mobile.css`에
+  새 규칙 모두 정상 삽입 확인. **미검증(실사용 확인 필요)**: 브라우저
+  로 `zippalgo360.com/zipterior` 모바일 접속 시 실제로 중복 헤더가
+  사라지고 로그인 상태가 이어지는지 — curl로는 JS 실행이 안 돼 클래스
+  부착 자체는 확인 불가.
+- **보류(다음 항목)**: `index.html`의 로고(`.brand-box`) 숨김용
+  `zp-zippalgo-embedded` 패치가 유실된 상태라, 데스크톱 임베드
+  (`zippalgo360.com/zipterior`를 PC로 접속)에서도 지금은 집테리어
+  로고가 다시 노출될 가능성 있음 — 이번 세션 범위 밖이라 손대지
+  않았고, 사용자에게 별도 확인 요청 필요.
+
+### 후속: PC 로고 숨김 복원 + 모바일 검색창 확대 버그 수정
+- 사용자 실사용 확인 결과: (1) 위에서 보류했던 PC 로고 노출 실제로
+  재현됨 → 수정 요청. (2) 모바일에서 `/zipterior` 메인화면 검색창을
+  누르면 "아파트 검색" 전체화면 오버레이가 뜨면서 화면 자체가 확대된
+  것처럼 리사이징되는 버그 리포트(스크린샷 첨부).
+- **원인(2번)**: iOS Safari는 포커스되는 `<input>`의 `font-size`가
+  16px 미만이면 자동으로 페이지를 확대한다 — `.m-search-box input`이
+  `font-size:14px`였음(로그인 폼의 `.m-login-id-row/.m-login-pw-row
+  input`도 동일하게 14px, 같은 버그 소지가 있어 같이 고침).
+- **[완료]** `index.html` — `m.html`에 넣은 것과 동일한 패턴으로
+  `zpEmbed=1` 감지 스크립트 신규 추가(이전엔 아예 없었음, `nativeMap`
+  스크립트와는 별개), `css/style.css` 링크 캐시버스터
+  `v=2.5.80-map-compact` → `v=2.5.81-zp-embed`.
+- **[완료]** `css/style.css` 파일 끝에
+  `html.zp-zippalgo-embedded .brand-box{display:none!important}` 추가.
+- **[완료]** `css/mobile.css` — `.m-search-box input`,
+  `.m-login-id-row/.m-login-pw-row input` 두 곳 모두
+  `font-size:14px` → `16px`.
+- **[완료] 검증**: 패치 직후 터미널 출력이 큰 heredoc 붙여넣기로
+  한 번 뒤섞여서(`anchor1 매치 0개` AssertionError로 보이는 텍스트가
+  같이 찍힘) 실제 반영 여부가 불확실했으나, 재확인 결과 오탐으로
+  확인됨 — `grep -c`로 `index.html`/`style.css` 양쪽 다
+  `zp-zippalgo-embedded` 정확히 1개씩만 존재(중복 삽입 없음),
+  `index.html`의 `<link>` 버전도 `v=2.5.81-zp-embed`로 정상 반영,
+  **원격 `curl -s https://zipterior.zippalgo360.com/?zpEmbed=1`로도
+  스크립트/버전 정상 서빙 확인**(정적 파일이라 서버 재시작 불필요,
+  파일 저장 즉시 반영). `mobile.css`의 `font-size:16px` 두 곳도
+  로컬 grep으로 확인.
+- **미검증(실사용 확인 필요)**: 브라우저로 PC 로고 안 보이는지,
+  모바일 검색창 눌렀을 때 더 이상 확대 안 되는지.
+
+### 후속: 지도 우측 컨트롤 버튼을 /map 페이지와 같은 색상으로 통일
+- 사용자 요청: "현재 map 오른쪽 버튼스타일로 집테리어 접속시 지도화면의
+  오른쪽 버튼에도 적용" — `zippalgo360.com/map`에서 이미 통일해둔
+  흰 배경/파스텔 그린 활성 상태 버튼 스타일을 집테리어 지도 화면
+  (줌/현재위치/지도유형/평·㎡/레이어)에도 적용해달라는 요청.
+- **판단**: 지도유형(일반|위성)·평/㎡ 버튼은 지금 2버튼 pill 구조
+  (`.map-type-control`/`.area-unit-control`, 각 버튼 30×28px, 선택
+  시 진초록 단색 채움)라 `/map`처럼 "단일 토글 버튼"으로 완전히
+  바꾸려면 자바스크립트까지 손대야 해서 실서비스 지도가 깨질 위험이
+  있음 — **구조/동작(pill, JS)은 그대로 두고 색상·테두리·그림자만**
+  `/map`과 통일하는 것으로 범위를 정함(사용자에게 이 판단을 설명하고
+  바로 진행, 별도 승인 대기 없이 실행). 또한 `zipterior.kr` 직접
+  방문자 화면에는 전혀 영향 없도록 `html.zp-zippalgo-embedded` 스코프
+  안에서만 적용(`zpEmbed=1`일 때만).
+- **[완료]** `css/style.css` 파일 끝에 스코프 규칙 추가 —
+  `.zipterior-zoom-control`/`.locate-control`/`.map-type-control`/
+  `.area-unit-control`/`.marker-style-control` 컨테이너를 흰 배경
+  카드(`rgba(255,255,255,.95)`, 테두리 `#e6e9e7`, `border-radius:12px`,
+  옅은 그림자)로, 각 버튼 기본 텍스트는 `rgba(32,36,33,.7~.8)`
+  (`--color-ink`), 활성/hover 상태는 파스텔 그린
+  `rgba(33,70,59,.15)` 배경 + `#21463b`(`--color-brand-green`) 글자로
+  통일(`apps/web/src/app/globals.css`의 실제 브랜드 색상 값을 그대로
+  가져다 씀). pill 구분선(`<span>|</span>`)은 옅은 회색으로 톤다운만.
+- **[완료]** `index.html`의 `css/style.css` 링크 캐시버스터
+  `v=2.5.81-zp-embed` → `v=2.5.82-zp-controls`로 재차 갱신.
+- **[완료] 검증**: `curl -s https://zipterior.zippalgo360.com/?zpEmbed=1`
+  로 링크 버전 갱신 확인, `curl -s
+  https://zipterior.zippalgo360.com/css/style.css?v=2.5.82-zp-controls`
+  로 새 규칙 4줄 모두 정상 서빙 확인(원격 실서비스 기준).
+- **미검증(실사용 확인 필요)**: 브라우저로 실제 버튼 색상이 의도한
+  대로 바뀌었는지, pill 레이아웃이 안 깨졌는지(글꼴/줄바꿈 등).
+
+### 후속: 위성지도에서 컨트롤 버튼이 안 보이는 문제 (반투명 → 불투명)
+- 사용자 실사용 확인: 위성 지도 위에서는 배경(rgba(255,255,255,.95)
+  반투명 흰색 + blur)이 위성 이미지에 묻혀 버튼이 잘 안 보임.
+- **[완료]** `css/style.css`의 방금 추가한 컨트롤 카드 배경을
+  `rgba(255,255,255,.95)` → `#fff`(완전 불투명)로, 의미 없어진
+  `backdrop-filter:blur(8px)`도 `none`으로 변경(반투명이 아니라 블러
+  효과 자체가 안 보임). `index.html`의 `style.css` 캐시버스터
+  `v=2.5.82-zp-controls` → `v=2.5.83-opaque-controls`.
+- **[완료] 검증**: `curl -s
+  https://zipterior.zippalgo360.com/css/style.css?v=2.5.83-opaque-controls`
+  로 실서비스에 `background:#fff` 정상 반영 확인.
+- **미검증(실사용 확인 필요)**: 위성 지도 위에서 실제로 버튼이 잘
+  보이는지.
+
+### 후속: 선택(active) 상태도 여전히 반투명이라 안 보임 → 흰 배경 고정 + 빨간 글자
+- 사용자 재확인: 안 보이던 건 기본 상태가 아니라 **클릭해서 선택된
+  (active) 상태** — `rgba(33,70,59,.15)`(반투명 파스텔 그린)도 위성
+  지도 위에서 마찬가지로 묻힘. 사용자 지시: 선택 상태도 배경은 그냥
+  흰색으로 두고, 글자색만 빨간색으로 바꾸자.
+- **[진행 중, 서버 실행 확인 안 됨] 집테리어 서버**: `css/style.css`의
+  `.locate-control.active`, `.map-type-control/.area-unit-control
+  button.active`, `.zipterior-zoom-control button:hover/:active`
+  전부 배경을 `rgba(33,70,59,.15)` → `#fff`(고정 불투명), 글자·테두리
+  색을 `#21463b`(그린) → `#bb1730`(브랜드 레드)로 바꾸는 패치 스크립트
+  준비함. `index.html` 캐시버스터도 `v=2.5.83-opaque-controls` →
+  `v=2.5.84-active-red-text`로 올리게 되어있음. **중간에 제가 이 세션
+  로컬 샌드박스에서 실수로 먼저 이 스크립트를 실행해봐서 "No such
+  file" 에러가 났음(서버가 아니라 세션 자체 컨테이너에서 실행됨) —
+  실수 인지 후 사용자에게 올바른 블록을 다시 전달했으나, 사용자가
+  실제로 서버 SSH에서 실행했다는 확인은 아직 못 받음.** 다음 턴에
+  꼭 확인/재요청 필요.
+- **[완료] 우리 저장소**: 사용자가 "PC버전도 같이 바꿔야지"라고
+  지적 — 저희 자체 `apps/web/src/app/map/page.tsx`의
+  `controlButtonClass`도 선택 상태에 동일한 반투명 파스텔 그린
+  (`bg-brand-green/15`)을 쓰고 있어 같은 문제가 잠재해있었음(아직
+  실사용 리포트는 없었지만 동일 원인이라 선제 수정). 기본/선택 상태
+  모두 배경을 불투명 흰색(`bg-white`)으로 고정하고, 선택 상태는
+  테두리·글자색만 `border-brand-red text-brand-red`로 변경.
+  `backdrop-blur`는 완전 불투명 배경에서 의미가 없어져 같이 제거.
+- **[완료] 검증**: 집테리어 쪽은 `curl`로 실서비스 CSS에
+  `color:#bb1730` 반영 확인. 우리 쪽은 로컬 `next build` 클린,
+  git 커밋 완료(아직 서버 미배포 — 다음 배포 시 `git pull` →
+  `npm run build` → `systemctl restart zippalgo360-web` 필요).
+- **미검증(실사용 확인 필요)**: 양쪽 다 브라우저로 위성 지도 위에서
+  선택된 버튼(흰 배경 + 빨간 글자)이 잘 보이는지.
+
+### 후속: "zipterior.kr/m과 100% 동일해야 한다" — m.html 플랫폼바 숨김 되돌림
+- 사용자 재확인: 맨 처음 요청("zipterior.kr/m 접속 화면과 동일하게
+  나와야 함")을 다시 강조. 그 사이 제가 "집팔고360 자체 헤더와
+  중복된다"고 판단해서 임의로 넣었던 `.m-platbar`/`.m-service-nav`
+  숨김 CSS(zpEmbed 스코프)가 오히려 "동일해야 한다"는 원 요청과
+  충돌하는 제 임의 판단이었음을 인지 — 사용자 요청대로 완전 원복.
+- **[완료]** `css/mobile.css`에서 `html.zp-zippalgo-embedded
+  .m-platbar, .m-service-nav{display:none!important}` 규칙 삭제.
+  `m.html`의 `mobile.css` 캐시버스터 `v=1.12.0-zp-embed` →
+  `v=1.12.1-revert-platbar-hide`.
+  (zpEmbed 감지 스크립트 자체와 SSO exchange 스크립트는 유지 —
+  전자는 지금 반응하는 CSS가 없어 시각적으로 완전히 무해, 후자는
+  로그인 자동 연동이라는 별개의 의도된 기능이라 유지.)
+- **[완료] 검증**: 서버에서 `diff <(curl -s https://zipterior.kr/m)
+  <(curl -s https://zipterior.zippalgo360.com/m)` 실행 →
+  **"완전히 동일함(차이 없음)"** — 두 URL이 파라미터 없이 접속 시
+  100% 동일한 HTML을 서빙함을 실측으로 확인. (참고: `?zpEmbed=1&sso=`
+  파라미터가 붙는 실제 임베드 상황에서는 로그인된 사용자의 경우
+  SSO 자동 로그인으로 화면이 "로그인 상태"로 보일 수 있음 — 이는
+  의도된 차이이지 버그 아님, 사용자에게 설명함.)
+- **미검증(실사용 확인 필요)**: 브라우저로 실제 모바일 접속 시
+  `zipterior.kr/m`과 육안으로도 동일하게 보이는지.

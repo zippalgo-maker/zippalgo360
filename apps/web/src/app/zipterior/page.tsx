@@ -9,19 +9,31 @@ import { useAuth } from "@/lib/auth-context";
 // eTLD+1이 같아 iframe 안에서도 same-site로 취급되므로, zipterior.kr을
 // 직접 넣을 때 발생하는 제3자 쿠키 문제(로그인 세션 유지 실패)를 피할 수 있다.
 const ZIPTERIOR_URL = "https://zipterior.zippalgo360.com";
+// 모바일 기기는 zipterior.kr/m과 동일한 모바일 전용 경로(/m)로 보낸다 —
+// zipterior.kr이 없어지고 집팔고360으로 완전히 통합될 예정이라, 여기서도
+// 데스크톱/모바일 버전을 기기별로 나눠 서빙해야 한다.
+const MOBILE_USER_AGENT_RE = /Android|iPhone|iPad|iPod|Mobi/i;
+
 // 집테리어 서버가 이 파라미터로 "집팔고360 안에 임베드된 화면"임을 인식해
 // 자기 로고(.brand-box)를 숨긴다(zipterior.kr/zipterior.zippalgo360.com에
 // 직접 접속하면 이 파라미터가 없어 로고가 그대로 보임) — 집테리어 저장소
 // index.html의 zpEmbed 감지 스크립트와 짝을 이루는 값.
-const ZIPTERIOR_EMBED_BASE_URL = `${ZIPTERIOR_URL}/?zpEmbed=1`;
+function buildEmbedUrl(isMobile: boolean, ssoCode?: string) {
+  const path = isMobile ? "/m" : "/";
+  const params = new URLSearchParams({ zpEmbed: "1" });
+  if (ssoCode) params.set("sso", ssoCode);
+  return `${ZIPTERIOR_URL}${path}?${params.toString()}`;
+}
 
 export default function ZipteriorEmbedPage() {
   const { token, isLoading } = useAuth();
-  const [iframeSrc, setIframeSrc] = useState(ZIPTERIOR_EMBED_BASE_URL);
+  const [iframeSrc, setIframeSrc] = useState(buildEmbedUrl(false));
 
   useEffect(() => {
+    const isMobile = MOBILE_USER_AGENT_RE.test(navigator.userAgent);
+
     if (isLoading || !token) {
-      setIframeSrc(ZIPTERIOR_EMBED_BASE_URL);
+      setIframeSrc(buildEmbedUrl(isMobile));
       return;
     }
 
@@ -32,10 +44,10 @@ export default function ZipteriorEmbedPage() {
     let cancelled = false;
     apiFetch<{ code: string }>("/auth/sso/issue-code", { method: "POST", token })
       .then(({ code }) => {
-        if (!cancelled) setIframeSrc(`${ZIPTERIOR_EMBED_BASE_URL}&sso=${encodeURIComponent(code)}`);
+        if (!cancelled) setIframeSrc(buildEmbedUrl(isMobile, code));
       })
       .catch(() => {
-        if (!cancelled) setIframeSrc(ZIPTERIOR_EMBED_BASE_URL);
+        if (!cancelled) setIframeSrc(buildEmbedUrl(isMobile));
       });
 
     return () => {
