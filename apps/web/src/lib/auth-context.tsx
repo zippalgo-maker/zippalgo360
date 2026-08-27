@@ -11,6 +11,7 @@ interface AuthContextValue {
   token: string | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<User>;
+  loginWithKakao: (code: string, redirectUri: string) => Promise<User>;
   register: (input: {
     email: string;
     password: string;
@@ -61,6 +62,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return applyToken(result);
   }
 
+  async function loginWithKakao(code: string, redirectUri: string) {
+    const result = await apiFetch<TokenResponse>("/auth/kakao/login", {
+      method: "POST",
+      body: { code, redirect_uri: redirectUri },
+    });
+    return applyToken(result);
+  }
+
   async function register(input: {
     email: string;
     password: string;
@@ -82,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, loginWithKakao, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

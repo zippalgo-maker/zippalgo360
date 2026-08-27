@@ -35,6 +35,11 @@ export interface Company {
   service_regions: string[];
 }
 
+export interface CompanyAdmin extends Company {
+  owner_email: string;
+  owner_name: string;
+}
+
 export interface ApartmentComplex {
   id: number;
   name: string;

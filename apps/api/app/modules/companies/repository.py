@@ -123,6 +123,65 @@ def list_companies(conn: Connection, *, company_type: str | None = None) -> list
     return [{**dict(r), "service_regions": get_service_regions(conn, r["id"])} for r in rows]
 
 
+def list_companies_admin(conn: Connection, *, is_verified: bool | None = None) -> list[dict]:
+    query = """
+        SELECT c.id, c.owner_user_id, c.company_type, c.business_name,
+               c.business_registration_number, c.representative_name,
+               c.address, c.phone, c.latitude, c.longitude, c.is_verified, c.is_active, c.created_at,
+               u.email AS owner_email, u.name AS owner_name
+        FROM companies c
+        JOIN users u ON u.id = c.owner_user_id
+    """
+    params: dict = {}
+    if is_verified is not None:
+        query += " WHERE c.is_verified = :is_verified"
+        params["is_verified"] = is_verified
+    query += " ORDER BY c.created_at DESC"
+
+    rows = conn.execute(text(query), params).mappings().all()
+    return [{**dict(r), "service_regions": get_service_regions(conn, r["id"])} for r in rows]
+
+
+def set_company_verified(conn: Connection, company_id: int, is_verified: bool) -> dict | None:
+    row = conn.execute(
+        text(
+            """
+            UPDATE companies
+            SET is_verified = :is_verified, updated_at = now()
+            WHERE id = :id
+            RETURNING id, owner_user_id, company_type, business_name,
+                      business_registration_number, representative_name,
+                      address, phone, latitude, longitude, is_verified, is_active, created_at
+            """
+        ),
+        {"id": company_id, "is_verified": is_verified},
+    ).mappings().first()
+    conn.commit()
+    if row is None:
+        return None
+    return {**dict(row), "service_regions": get_service_regions(conn, row["id"])}
+
+
+def set_company_active(conn: Connection, company_id: int, is_active: bool) -> dict | None:
+    row = conn.execute(
+        text(
+            """
+            UPDATE companies
+            SET is_active = :is_active, updated_at = now()
+            WHERE id = :id
+            RETURNING id, owner_user_id, company_type, business_name,
+                      business_registration_number, representative_name,
+                      address, phone, latitude, longitude, is_verified, is_active, created_at
+            """
+        ),
+        {"id": company_id, "is_active": is_active},
+    ).mappings().first()
+    conn.commit()
+    if row is None:
+        return None
+    return {**dict(row), "service_regions": get_service_regions(conn, row["id"])}
+
+
 def list_map_markers(
     conn: Connection,
     *,

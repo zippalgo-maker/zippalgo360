@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { apiFetch, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useRequireRole } from "@/lib/use-require-role";
 import { cardClass } from "@/lib/ui";
+import type { Company } from "@/lib/types";
 
 const CUSTOMER_LINKS = [
   { href: "/zippalgo/mine", title: "내 매물 관리", desc: "등록한 매물과 진행 상태를 확인하세요" },
@@ -18,8 +21,25 @@ const COMPANY_LINKS = [
 ];
 
 export default function MyPage() {
-  const { logout } = useAuth();
+  const { logout, token } = useAuth();
   const { user } = useRequireRole("customer", "company", "admin");
+  const [company, setCompany] = useState<Company | null>(null);
+  const [companyChecked, setCompanyChecked] = useState(false);
+
+  useEffect(() => {
+    if (!token || user?.role !== "company") {
+      setCompanyChecked(true);
+      return;
+    }
+    apiFetch<Company>("/companies/me", { token })
+      .then(setCompany)
+      .catch((err) => {
+        if (!(err instanceof ApiError && err.status === 404)) {
+          console.error(err);
+        }
+      })
+      .finally(() => setCompanyChecked(true));
+  }, [token, user?.role]);
 
   if (!user) return null;
 
@@ -42,6 +62,32 @@ export default function MyPage() {
           로그아웃
         </button>
       </div>
+
+      {user.role === "company" && companyChecked && (
+        <div className={`${cardClass} mt-6`}>
+          {company === null ? (
+            <>
+              <p className="font-semibold text-ink">업체 정보 등록이 필요해요</p>
+              <p className="mt-1 text-sm text-muted">
+                업체 정보를 등록해야 집팔고 매물 열람과 집사고 의뢰 배정을 받을 수 있어요.
+              </p>
+              <Link href="/onboarding/company" className="mt-3 inline-block text-sm font-semibold text-brand-red">
+                업체 등록하러 가기 →
+              </Link>
+            </>
+          ) : !company.is_active ? (
+            <p className="text-sm font-semibold text-brand-red">
+              업체 이용이 정지되었습니다. 문의가 필요하면 고객센터에 연락해주세요.
+            </p>
+          ) : !company.is_verified ? (
+            <p className="text-sm font-semibold text-muted">
+              업체 가입 심사 중이에요. 승인되면 매물 열람·의뢰 배정을 이용할 수 있어요.
+            </p>
+          ) : (
+            <p className="text-sm font-semibold text-brand-green">승인된 업체입니다.</p>
+          )}
+        </div>
+      )}
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2">
         {links.map((link) => (

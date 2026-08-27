@@ -38,6 +38,11 @@ class CompanyOut(BaseModel):
     service_regions: list[str] = []
 
 
+class CompanyAdminOut(CompanyOut):
+    owner_email: str
+    owner_name: str
+
+
 class CompanyMapMarker(BaseModel):
     id: int
     company_type: CompanyType
