@@ -124,6 +124,12 @@ function interiorClusterCellDegrees(leafletZoom: number): number {
   return 20 / Math.pow(1.8, leafletZoom);
 }
 
+// 인테리어 시공사례 단지기본정보/포트폴리오 패널의 폭(InteriorComplexPanel/
+// InteriorPortfolioPanel의 w-[28rem]과 반드시 동일해야 함) — 지도 위
+// 절대 위치 오버레이라 지도 div 자체는 안 줄어드므로, 마커를 그냥
+// setCenter만 하면 패널에 가려지거나 패널 바로 옆 애매한 자리에 온다.
+const LEFT_PANEL_WIDTH_PX = 448;
+
 const KAKAO_APP_KEY = process.env.NEXT_PUBLIC_KAKAO_MAP_JS_KEY ?? "";
 // 집테리어 자체 지도(js/app.js)의 시작 위치/축척과 동일하게 맞춘다
 // (성수JC 부근, 카카오 레벨 7 = 집테리어의 leaflet 스타일 줌 11).
@@ -314,6 +320,30 @@ function ServiceMapView() {
     []
   );
 
+  // 단지 마커를 클릭했을 때 지도를 그 좌표로 이동시키되, 왼쪽 단지기본
+  // 정보 패널(LEFT_PANEL_WIDTH_PX)에 가려지지 않도록 패널 폭의 절반만큼
+  // 오른쪽으로 밀어서 "패널을 뺀 나머지 화면 영역"의 정중앙에 마커가
+  // 오게 한다. 방법: 일단 target을 정중앙(true center)에 놓은 뒤,
+  // container 기준으로 (정중앙 - 패널폭/2) 지점에 있던 좌표를 다시 구해
+  // 그걸 새 중심으로 삼는다 — 그러면 target은 새 중심보다 패널폭/2만큼
+  // 오른쪽(=원하는 자리)에 남는다. 원본 카카오맵 SDK API(Projection의
+  // containerPointFromCoords/coordsFromContainerPoint)가 없는 극단적인
+  // 경우엔 그냥 조용히 단순 setCenter로 폴백한다.
+  const centerMapOnComplex = useCallback((lat: number, lng: number) => {
+    const kakao = window.kakao;
+    const map = mapRef.current;
+    if (!kakao || !map) return;
+    map.setCenter(new kakao.maps.LatLng(lat, lng));
+    const container = mapContainerRef.current;
+    const projection = map.getProjection?.();
+    if (!container || typeof projection?.coordsFromContainerPoint !== "function") return;
+    const offsetPx = LEFT_PANEL_WIDTH_PX / 2;
+    const shiftedCenter = projection.coordsFromContainerPoint(
+      new kakao.maps.Point(container.clientWidth / 2 - offsetPx, container.clientHeight / 2)
+    );
+    map.setCenter(shiftedCenter);
+  }, []);
+
   // 부챗살 마커를 원래의 "시공 N" 원형 배지로 되돌린다(단지 선택 해제 시).
   const collapseInteriorMarker = useCallback((complexId: number) => {
     const entry = interiorMarkerElementsRef.current.get(complexId);
@@ -404,16 +434,14 @@ function ServiceMapView() {
         entry.el.innerHTML = buildFanMarkerHtml(complex, null);
         entry.overlay.setZIndex?.(10000);
         bindFanInteractions(entry.el, complex);
+        centerMapOnComplex(complex.latitude, complex.longitude);
         return;
       }
-      const kakao = window.kakao;
       const map = mapRef.current;
-      if (kakao && map) {
-        map.setLevel(Math.min(map.getLevel(), 4));
-        map.setCenter(new kakao.maps.LatLng(complex.latitude, complex.longitude));
-      }
+      if (map) map.setLevel(Math.min(map.getLevel(), 4));
+      centerMapOnComplex(complex.latitude, complex.longitude);
     },
-    [collapseInteriorMarker, bindFanInteractions]
+    [collapseInteriorMarker, bindFanInteractions, centerMapOnComplex]
   );
 
   // 지금까지 누적된 원본 단지 마커 하나를 "표준 배지" 상태로 그린다
@@ -838,7 +866,9 @@ function ServiceMapView() {
       if (item.kind === "complex") {
         if (!activeLayersRef.current.has("interiorPortfolio")) toggleLayer("interiorPortfolio", true);
         map.setLevel(4);
-        map.setCenter(new kakao.maps.LatLng(item.latitude, item.longitude));
+        // 지도 중심 이동은 openInteriorComplex 안의 centerMapOnComplex가
+        // 왼쪽 패널 폭을 감안해서 처리한다 — 여기서 먼저 plain setCenter를
+        // 하면 그 뒤에 또 한 번 움직여서 화면이 두 번 튀어 보인다.
         openInteriorComplex(Number(item.id));
       } else if (item.kind === "company") {
         if (!activeLayersRef.current.has("company_interior")) toggleLayer("company_interior", true);
