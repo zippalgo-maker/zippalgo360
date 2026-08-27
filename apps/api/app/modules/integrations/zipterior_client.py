@@ -12,10 +12,12 @@ from app.modules.integrations.schemas import (
     ZipteriorComplexPortfolioListOut,
     ZipteriorMapMarker,
     ZipteriorMapMarkerListOut,
+    ZipteriorContentBlock,
     ZipteriorPortfolioCard,
     ZipteriorPortfolioDetailOut,
     ZipteriorPortfolioImage,
     ZipteriorPortfolioListOut,
+    ZipteriorPortfolioSpace,
     ZipteriorPortfolioSummary,
     ZipteriorSearchItem,
     ZipteriorSearchOut,
@@ -439,10 +441,42 @@ def get_portfolio_detail(portfolio_id: int) -> ZipteriorPortfolioDetailOut:
         company = item.get("company") or {}
         raw_images = item.get("images") or []
         images = [
-            ZipteriorPortfolioImage(src=url, caption=image.get("description") or None)
+            ZipteriorPortfolioImage(
+                src=url,
+                caption=image.get("description") or None,
+                space_id=str(image["portfolio_space_id"]) if image.get("portfolio_space_id") is not None else None,
+                room_label=image.get("room_label") or None,
+            )
             for image in raw_images
             if (url := _absolute_media_url(image.get("large_path") or image.get("medium_path") or image.get("thumbnail_path")))
         ]
+        # 집테리어 app.js가 방(공간)별로 사진을 묶어 이름·설명과 함께 보여주는
+        # 표시 방식(renderRoomGallery 계열)과 동일하게, spaces를 그대로 통과시켜
+        # 프론트가 같은 그룹핑을 재현할 수 있게 한다.
+        spaces = [
+            ZipteriorPortfolioSpace(
+                id=str(space["id"]),
+                name=space.get("space_name") or "기타",
+                description=space.get("description") or None,
+            )
+            for space in (item.get("spaces") or [])
+        ]
+        # 오늘의집에서 원본 그대로 가져온 일부 포트폴리오는 spaces 대신
+        # content_blocks(문서 순서 그대로의 텍스트+사진)를 쓴다 — 있으면
+        # document_order로 정렬해 그대로 통과.
+        content_blocks = sorted(
+            (
+                ZipteriorContentBlock(
+                    block_type=str(block.get("block_type") or "text"),
+                    document_order=int(block.get("document_order") or 0),
+                    image_url=_absolute_media_url(block.get("image_url") or (block.get("raw_node") or {}).get("imageUrl")),
+                    text_content=block.get("text_content"),
+                    raw_node=block.get("raw_node"),
+                )
+                for block in (item.get("content_blocks") or [])
+            ),
+            key=lambda block: block.document_order,
+        )
         representative = _absolute_media_url(
             item.get("representative_large_path")
             or item.get("representative_medium_path")
@@ -468,6 +502,8 @@ def get_portfolio_detail(portfolio_id: int) -> ZipteriorPortfolioDetailOut:
             intro=item.get("summary") or item.get("description") or "",
             hero_image=hero_image,
             images=images,
+            spaces=spaces,
+            content_blocks=content_blocks,
             available=True,
         )
     except (httpx.HTTPError, ValueError, KeyError, TypeError):

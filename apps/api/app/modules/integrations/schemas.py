@@ -157,6 +157,34 @@ class ZipteriorComplexPortfolioListOut(BaseModel):
 class ZipteriorPortfolioImage(BaseModel):
     src: str
     caption: str | None = None
+    space_id: str | None = None
+    """이미지가 속한 공간(방)의 id — `spaces` 목록의 id와 매칭. 매칭되는
+    공간이 없으면 None이고, 그 경우 room_label로 대체 그룹핑한다."""
+    room_label: str | None = None
+    """space_id가 없을 때 쓰는 대체 방 이름(집테리어 app.js의 room_label과
+    동일한 fallback 그룹핑 키)."""
+
+
+class ZipteriorPortfolioSpace(BaseModel):
+    """포트폴리오 사진을 방(공간)별로 묶어서 보여주기 위한 그룹 — 집테리어
+    포트폴리오 상세의 기본 표시 방식(예: 거실/침실/주방)."""
+
+    id: str
+    name: str
+    description: str | None = None
+
+
+class ZipteriorContentBlock(BaseModel):
+    """집테리어가 오늘의집에서 원본 그대로 가져온 일부 포트폴리오에만 있는,
+    작성자가 정한 순서대로 텍스트·사진·구분선 등이 섞인 문서형 콘텐츠 블록.
+    렌더링 규칙은 집테리어 app.js의 renderContentBlock()과 동일하게
+    프론트에서 처리하므로, 여기서는 원본 구조를 그대로 통과시킨다."""
+
+    block_type: str
+    document_order: int
+    image_url: str | None = None
+    text_content: str | None = None
+    raw_node: dict | None = None
 
 
 class ZipteriorPortfolioDetailOut(BaseModel):
@@ -177,6 +205,8 @@ class ZipteriorPortfolioDetailOut(BaseModel):
     intro: str
     hero_image: str | None = None
     images: list[ZipteriorPortfolioImage]
+    spaces: list[ZipteriorPortfolioSpace] = []
+    content_blocks: list[ZipteriorContentBlock] = []
     available: bool
     """집테리어 API에 접속할 수 없거나 포트폴리오를 못 찾으면 False."""
 
