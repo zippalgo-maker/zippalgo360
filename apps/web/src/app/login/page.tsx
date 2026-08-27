@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { KakaoLoginButton } from "@/components/KakaoLoginButton";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { cardClass, errorTextClass, inputClass, labelClass, primaryButtonClass } from "@/lib/ui";
@@ -72,6 +73,14 @@ export default function LoginPage() {
           {isSubmitting ? "로그인 중..." : "로그인"}
         </button>
       </form>
+
+      <div className="my-4 flex items-center gap-3 text-xs text-muted">
+        <span className="h-px flex-1 bg-line" />
+        또는
+        <span className="h-px flex-1 bg-line" />
+      </div>
+
+      <KakaoLoginButton />
 
       <p className="mt-6 text-center text-sm text-muted">
         아직 계정이 없으신가요?{" "}

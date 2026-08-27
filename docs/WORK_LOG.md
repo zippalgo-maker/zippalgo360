@@ -2876,3 +2876,140 @@ sudo systemctl restart zippalgo360-web
   또 다른 진단 결과를 보내왔는데(`origin/claude/jippalgo360-service
   -screen-lmv8de`가 `9abf8c7`보다 한 커밋(`6231697`) 더 앞서 있음)
   이것도 fetch해서 같이 병합해야 함 — 아직 안 함, 이어서 진행.
+
+## 2026-08-27 — 회원(가입/로그인) 기능 개발 착수: 집테리어와의 관계 정리 + 카카오 로그인 구현 시작
+
+- 사용자 요청: "집팔고360의 회원관련(회원가입, 로그인 등) 개발진행할거야"로 시작.
+  대화 중 핵심 논의: 집테리어(별도 스택, 별도 서버)에 이미 회원(일반/업체)+
+  관리자+카카오 간편로그인이 완성돼 있는데, 이걸 집팔고360으로 그대로
+  포팅하는 게 나은지 질문받음.
+- **[결정]** CLAUDE.md에 "회원/SSO/등급·결제 아키텍처" 섹션으로 기록 완료.
+  요지:
+  - 집테리어 코드를 그대로 포팅하지 않는다(스택이 완전히 다름: 집테리어는
+    바닐라 JS+FastAPI raw SQL, 집팔고360은 Next.js). 집테리어는 **설계
+    레퍼런스**로만 참고하고 집팔고360 스택으로 새로 구현.
+  - 집팔고360이 통합회원 신원(가입/로그인)과 등급·결제 정보의 소유자.
+    하위 서비스(집팔고/집사고/집테리어)는 이미 있는 SSO(`/auth/sso/
+    issue-code` → `/auth/sso/verify`)로 신원을 받는다.
+  - 관리자도 같은 원칙: 회원/결제 관리는 집팔고360 통합 관리자, 서비스별
+    세부 운영(집테리어 포트폴리오 검수 등)은 각 서비스 자체 관리자 유지 —
+    **집테리어 관리자 자체는 다시 만들 필요 없음, 그대로 계속 사용**.
+  - 등급/결제 필드는 SSO verify 응답에 실어서 하위 서비스가 그 시점에
+    판단하게 하고(매 요청마다 라이브 API 호출 금지 — SPOF 방지), 세션은
+    짧은 TTL 재검증 + 결제 관련 민감 액션만 그 순간 라이브 재확인.
+  - **집테리어 기존 회원 정리 순서**(사고 방지용, 반드시 순서 준수):
+    (1) 집팔고360 회원가입/로그인/카카오로그인/업체가입 구현 → (2) 집테리어와
+    SSO 연동 단대단 검증 → (3) 기존 집테리어 가입자를 집팔고360 통합회원으로
+    이관/매핑 → (4) 그 다음에야 집테리어 자체 로그인 진입점 정리. 이관 전에
+    집테리어 자체 로그인을 없애면 기존 회원이 로그인 불가 상태가 됨.
+- **[조사 완료] 기존 코드 현황**:
+  - 백엔드(`apps/api/app/modules/{auth,users,companies,payments}`)에 이미
+    이메일/비밀번호 회원가입·로그인(JWT, bcrypt), `/auth/me`, SSO
+    issue-code/verify, 업체(공인중개사) 온보딩(`/companies` POST)까지
+    구현되어 있음. `users` 테이블에 `kakao_id` 컬럼은 이미 있으나(초기
+    스키마), 실제 카카오 OAuth 플로우(콜백 라우터, 토큰 교환, 프로필 조회)는
+    아직 없음 — `config.py`의 `kakao_rest_api_key`는 지금 집테리어 검색
+    프록시/지오코딩(`companies/geocoding.py`)에서만 쓰이고 있었음.
+  - 프론트(`apps/web/src/app/{login,register}`, `lib/auth-context.tsx`)도
+    이메일 가입/로그인 폼과 토큰 유지까지는 있으나 카카오 로그인 버튼/콜백
+    페이지는 없음.
+  - `payments` 모듈은 매물 열람 건별 결제(PG 미연동, 모의 결제)이지 회원
+    등급/구독 개념이 아님 — 등급·결제 필드는 아직 실제 요구사항이 확정되지
+    않은 미래 기능이라 지금 스키마에 미리 만들지 않기로 함(과설계 방지).
+- **[진행 중] 이번 작업 범위**: 카카오 소셜로그인(일반회원)을 집팔고360에
+  신규 구현 시작. 계획:
+  - DB: `password_hash` NULL 허용(카카오 전용 계정은 비밀번호 없음),
+    `kakao_id`에 부분 유니크 인덱스 추가하는 마이그레이션 신설.
+  - 백엔드: `/auth/kakao/login`(인가 코드 → 카카오 토큰 교환 → 프로필 조회
+    → 있으면 로그인/없으면 자동가입 → JWT 발급) 라우터 추가.
+  - 프론트: `/login`, `/register`에 "카카오로 시작하기" 버튼 + 카카오 인가
+    코드를 받는 콜백 페이지 추가.
+
+## 2026-08-27 — 카카오 소셜로그인(일반회원) 구현 완료
+
+- **[완료] 백엔드** (`apps/api`):
+  - `alembic/versions/0005_kakao_login_support.py`: `users.password_hash`
+    NULL 허용(카카오 전용 계정은 비밀번호 없음), `kakao_id`에 부분 유니크
+    인덱스(`WHERE kakao_id IS NOT NULL`) 추가.
+  - `app/config.py`: `kakao_client_secret`(선택), `kakao_redirect_uri`
+    설정 추가. **`kakao_rest_api_key`는 기존에 지오코딩용으로 이미 서버
+    `.env`에 있는 값을 카카오 로그인 client_id로 그대로 재사용**(카카오
+    앱 하나의 REST API 키는 여러 기능에 공용) — 새 키 발급 불필요.
+  - `app/modules/auth/kakao.py` 신설: 인가 코드를 카카오 토큰으로 교환 →
+    `kapi.kakao.com/v2/user/me`로 프로필 조회. 이메일 동의를 안 한
+    계정(카카오는 이메일이 선택 동의 항목)은 `kakao_id@kakao-user.
+    zippalgo360.local` 플레이스홀더 이메일로 대체(users.email이 NOT
+    NULL UNIQUE라 이 값이 없으면 가입 자체가 실패하기 때문 — 이 도메인은
+    실제 발신용이 아니므로 메일 발송에 쓰면 안 됨).
+  - `app/modules/auth/service.py`의 `kakao_login()`: kakao_id로 기존
+    회원 조회 → 없으면 이메일로 재조회(같은 이메일로 이미 이메일/비밀번호
+    가입한 계정이 있으면 새 계정을 만들지 않고 **그 계정에 카카오 로그인을
+    연결**, `users/repository.py`의 `link_kakao_id()`) → 그래도 없으면
+    신규가입(`create_kakao_user()`, role=customer 고정). 기존
+    `login()`(이메일/비밀번호)도 `password_hash IS NULL`인 카카오 전용
+    계정으로 이메일 로그인 시도 시 `bcrypt.checkpw`가 죽지 않도록 방어
+    추가.
+  - `POST /auth/kakao/login`(`KakaoLoginIn{code, redirect_uri}` →
+    `TokenOut`) 라우터 추가. 카카오 키가 아예 없으면 501로 명확히 응답.
+  - 검증: 로컬에 venv 새로 만들어 `requirements.txt` 설치 후
+    `python -c "import app.main"` 통과(라우터 등록까지 실제로 import되는
+    선에서 확인, 실제 카카오 서버와의 왕복은 이 환경에 카카오 앱
+    키/네트워크가 없어 못 함).
+- **[완료] 프론트** (`apps/web`):
+  - `lib/kakao.ts`: `getKakaoAuthorizeUrl()`/`getKakaoRedirectUri()` —
+    redirect_uri를 **런타임에 `window.location.origin` 기준으로 계산**해서
+    로컬/스테이징/프로덕션 도메인이 달라도 별도 환경변수 없이 항상
+    맞게 동작하도록 함(카카오 인가 요청과 토큰 교환 양쪽에 동일한 값을
+    보내야 하는데, 소스를 하나로 통일해 어긋날 여지를 없앰).
+  - `lib/auth-context.tsx`에 `loginWithKakao(code, redirectUri)` 추가.
+  - `components/KakaoLoginButton.tsx`(카카오 브랜드 가이드 준수 —
+    `#FEE500` 배경, 말풍선 아이콘), `lib/ui.ts`에 `kakaoButtonClass` 추가.
+  - `/login`, `/register`(단, `role === "customer"`일 때만 — 카카오
+    가입은 항상 일반회원으로 생성되므로 업체가입 탭에서는 안 보여줌)에
+    버튼 배치.
+  - `app/login/kakao/callback/page.tsx` 신설 — 카카오가 돌려준 `code`(또는
+    사용자가 동의를 취소했을 때의 `error`)를 받아 백엔드 호출 후
+    `/mypage`로 이동, 실패 시 에러 문구 + 로그인으로 돌아가기 링크.
+  - `.env.example`(웹)에 `NEXT_PUBLIC_KAKAO_CLIENT_ID` 추가 — **백엔드
+    `KAKAO_REST_API_KEY`와 반드시 같은 값**이어야 함.
+- **[완료] 검증**: `npm install` 후 `next build` 클린(24개 라우트,
+  `/login/kakao/callback` 정상 포함). `npx eslint 'src/**/*.{ts,tsx}'`
+  전체 실행 결과 17개 중 새로 추가한 콜백 페이지의
+  `react-hooks/set-state-in-effect` 1건만 신규분이고, 이건 같은 파일에
+  이미 있던 `auth-context.tsx`의 동일 규칙 사전 존재 오류와 같은 종류
+  (이펙트 안 setState, 이 저장소 전역에 만연, 빌드 안 막힘, 이전
+  세션에서 이미 비차단 판단됨) — 새로운 종류의 오류 없음.
+- **[남은 작업 — 배포 시 사용자가 직접 해야 함, 이 세션은 서버 접근 불가]**:
+  1. `apps/api`에서 `alembic upgrade head` 실행(0005 마이그레이션 적용).
+  2. 카카오 개발자 콘솔에서 해당 앱의 "카카오 로그인" 제품이 꺼져 있으면
+     활성화, **Redirect URI에 `https://zippalgo360.com/login/kakao/
+     callback`(실제 배포 도메인) 등록**.
+  3. `apps/web` 서버 `.env`에 `NEXT_PUBLIC_KAKAO_CLIENT_ID=<서버 apps/api
+     .env의 KAKAO_REST_API_KEY와 동일한 값>` 추가 후 `next build` 재실행
+     (NEXT_PUBLIC_* 값은 빌드 타임에 번들되므로 재시작만으로는 반영 안 됨).
+  4. `zippalgo360-api`/`zippalgo360-web` 재시작 후 실제 카카오 로그인
+     동의 화면까지 뜨는지 브라우저에서 최종 확인.
+- **다음 단계(집테리어 연동)**: CLAUDE.md에 기록한 순서대로, 이 카카오
+  로그인이 배포 환경에서 실제로 동작 확인된 뒤에 (2) 집테리어와 SSO
+  연동 단대단 검증 → (3) 기존 집테리어 회원 이관 → (4) 집테리어 자체
+  로그인 정리로 진행.
+
+## 2026-08-27 — 브랜치 통일 공지에 따라 회원기능 작업을 claude/jippalgo360-platform-6bvrfh로 병합
+
+- 사용자가 전체 세션에 "이제부터 이 저장소는 claude/jippalgo360-platform
+  -6bvrfh 브랜치 하나만 쓴다"고 공지(오늘 다른 세션이 서버를 자기
+  브랜치로 체크아웃+배포하면서 `/map` 작업을 몇 시간 전 상태로 되돌린
+  사고가 있었던 데 따른 조치, CLAUDE.md "브랜치 정책" 섹션 참고).
+- 이 세션은 `claude/jippalgo-360-member-features-hf7hxt`(카카오
+  로그인 커밋 2개, `b96aa9d`/`c668fe6`)에서 작업 중이었음 — 이미 원격에
+  푸시 완료된 상태에서 `claude/jippalgo360-platform-6bvrfh`로 체크아웃
+  후 병합.
+- **[완료] 병합**: `docs/WORK_LOG.md`에서 두 브랜치가 각자 파일 끝에
+  로그를 이어붙이며 생긴 충돌(내용 충돌 아님, 같은 지점에 서로 다른
+  날짜의 로그를 추가) 1건 발견 — 양쪽 로그 전부 보존하는 방향으로
+  수동 해결(순서: platform 브랜치의 기존 로그 → 이 세션의 회원기능
+  로그). `CLAUDE.md`, 백엔드/프론트 코드 파일은 겹치는 부분이 없어
+  자동 병합됨.
+- 이 브랜치(`claude/jippalgo-360-member-features-hf7hxt`)는 앞으로
+  안 쓰고, 이후 모든 커밋은 `claude/jippalgo360-platform-6bvrfh`에
+  바로 푸시.

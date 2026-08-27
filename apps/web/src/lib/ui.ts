@@ -12,3 +12,6 @@ export const secondaryButtonClass =
 export const cardClass = "rounded-2xl border border-line bg-white p-6 shadow-brand";
 
 export const errorTextClass = "text-sm text-brand-red";
+
+export const kakaoButtonClass =
+  "flex w-full items-center justify-center gap-2 rounded-full bg-[#FEE500] px-6 py-3 text-sm font-semibold text-[#191600] transition hover:bg-[#FDD800]";
