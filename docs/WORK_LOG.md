@@ -3181,3 +3181,80 @@ sudo systemctl restart zippalgo360-web
   예외적으로 코드 변경이 없는 `zipsago`(문서의 `ZIPBUY` 대신) 표기만
   지금 확정.
 - 코드 변경 없음(문서 기록만).
+
+---
+
+## 2026-08-27 — `/map` 인테리어 포트폴리오 패널: content_blocks/공간별 그룹핑 반영
+
+### 시작 전
+- 사용자 요청 2가지: (1) 집팔고360에서 집테리어 접속 화면이 집팔고360
+  지도 화면과 "최대한 가깝게"가 아니라 **100% 동일**해야 함(디자인
+  포함). (2) `/map`에서 포트폴리오 클릭 시 지금은 이미지만 나오는데,
+  집테리어 실제 포트폴리오 상세처럼 텍스트+배열 순서가 적용된 내용이
+  나오도록 수정.
+- (1)에 대해 사용자와 논의한 결론: 레거시 zipterior 정적 사이트를
+  CSS/JS로 계속 흉내내는 지금 방식으로는 "100% 동일"을 보장할 수
+  없음 — 유일하게 보장되는 방법은 PC `/zipterior`를 저희 자체
+  `/map?mode=interior` 페이지로 완전히 교체하는 것(로그인/회원사
+  메뉴는 그 화면에서 빠짐, 사용자 확인 필요 — 아직 실행 안 함).
+  사용자가 순서를 정리: **먼저 `/map`의 인테리어 모드를 zipterior와
+  기능적으로 동등하게 맞춘 뒤에** 교체를 진행하기로 함 — 이번 세션은
+  그 첫 단계(포트폴리오 상세 콘텐츠)만 진행.
+
+### 진행 중 — 원인 조사
+- zipterior 서버(`/var/www/zipterior/js/app.js`)의
+  `openPortfolioDetail()`을 읽어서 포트폴리오 상세가 실제로 어떤
+  구조인지 확인:
+  - **드문 경우**: `apiDetail.content_blocks`가 있으면(오늘의집에서
+    원본 그대로 가져온 포트폴리오) `document_order`로 정렬한 뒤
+    `block_type`(image/heading/callout/divider/link/기본 텍스트)별로
+    `renderContentBlock()`이 문서 그대로 렌더링. 리치텍스트 필드는
+    `{entity:{bold/italic/underline/strikethrough}, content:[...]}`
+    형태의 span 배열(`cbRichHtml()`).
+  - **일반적인 경우**: `apiDetail.spaces`(방/공간 목록: id·이름·설명)
+    + `apiDetail.images`의 `portfolio_space_id`로 사진을 방별로
+    그룹핑, 매칭 안 되면 `room_label`로 대체 그룹핑 — 방 이름·설명과
+    함께 섹션별로 보여줌.
+  - 우리 백엔드(`apps/api/.../zipterior_client.py`의
+    `get_portfolio_detail()`)는 이 구조를 전부 버리고 `images`만
+    평평하게(caption만 유지) 가져오고 있었음 — "이미지만 나온다"의
+    정확한 원인.
+
+### 진행 중 — 구현
+- **[완료] 백엔드** (`apps/api/app/modules/integrations/`):
+  - `schemas.py` — `ZipteriorPortfolioImage`에 `space_id`/`room_label`
+    추가, 신규 `ZipteriorPortfolioSpace`(id/name/description),
+    `ZipteriorContentBlock`(block_type/document_order/image_url/
+    text_content/raw_node — raw_node는 리치텍스트 구조 그대로 통과),
+    `ZipteriorPortfolioDetailOut`에 `spaces`/`content_blocks` 추가
+    (기본값 `[]`라 기존 실패 폴백 분기는 안 건드려도 됨).
+  - `zipterior_client.py`의 `get_portfolio_detail()` — zipterior
+    원본 API 응답의 `spaces`/`content_blocks`/이미지의
+    `portfolio_space_id`/`room_label`을 그대로 프록시하도록 수정.
+- **[완료] 프론트엔드** (`apps/web/src/`):
+  - `lib/types.ts` — 위 스키마와 대응하는 TS 타입 추가.
+  - `lib/content-blocks.tsx`(신규) — `richTextToPlain()`(리치텍스트
+    span 배열에서 순수 텍스트만 추출, `<br>`은 `\n`으로 보존 — 굵게/
+    기울임 서식은 이번 범위에서 의도적으로 생략, 필요하면 후속 작업),
+    `groupImagesBySpace()`(zipterior와 동일한 방/공간 그룹핑 로직),
+    `ContentBlockView`(block_type별 렌더링 — link 블록은 관리자 설정
+    의존이라 항상 생략, 나머지는 zipterior와 동일).
+  - `components/map/InteriorPortfolioPanel.tsx` — 렌더링을
+    3단계 우선순위로 교체: ① `content_blocks` 있으면 문서 순서
+    그대로, ② 없으면 `spaces`/`room_label`로 방별 그룹핑(이름+설명+
+    사진), ③ 그룹핑 정보가 아예 없으면 기존 평면 그리드로 폴백
+    (안전장치).
+- **[완료] 검증**: `next build` 클린, 백엔드 전체 `ast.parse` 통과.
+  **다른 세션의 대규모 변경(카카오 로그인, 관리자 회원/업체 화면,
+  지도 레이어 저장 등)과 충돌 없이 병합됨** — `git merge`가 자동으로
+  합쳤고 병합 후에도 빌드 정상.
+- **미검증(중요)**: 이 세션은 zipterior API에 네트워크 접근이 없어서
+  **실제 `content_blocks`/`spaces`가 있는 진짜 포트폴리오로 렌더링
+  결과를 확인 못함** — 코드는 app.js 로직을 그대로 재현했지만, 실제
+  데이터의 필드명이 문서와 미묘하게 다를 가능성 있음. 배포 후
+  실제 포트폴리오 몇 개(방별 그룹핑 있는 것, 가능하면 content_blocks
+  있는 것도)를 브라우저에서 열어 확인 필요.
+- **다음 단계(보류)**: 이게 잘 동작하는 것 확인되면, PC
+  `/zipterior`를 `/map?mode=interior`로 교체하는 작업 진행 예정
+  (사용자 승인 대기 중, 로그인/회원사 메뉴 이관 방안도 같이 논의
+  필요).
