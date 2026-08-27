@@ -3165,3 +3165,19 @@ sudo systemctl restart zippalgo360-web
   cd apps/api && source venv/bin/activate && alembic upgrade head && sudo systemctl restart zippalgo360-api
   cd ../web && npm run build && sudo systemctl restart zippalgo360-web
   ```
+
+## 2026-08-27 — 목표 아키텍처 문서 반영 시점 결정: 로컬 서버 이전 후로 미룸
+
+- 지난 턴에서 정리한 5가지 차이점(role/user_type, kakao_id/oauth_accounts,
+  owner_user_id 1:1/company_memberships 다대다, ZIPBUY/zipsago, 모놀리스/
+  포트분리)에 대해 옵션 두 가지(지금 유지 vs 지금부터 목표 구조로 개발)의
+  장단점을 설명 — 로컬 서버가 지금 세팅 중이라는 사용자 발언이 핵심 변수:
+  서버 인프라 이전과 DB 리팩터링을 동시에 하면 문제 원인 구분이 어려워지고,
+  방금 만든 카카오로그인/업체승인 기능을 또 뜯어고쳐야 하는 낭비가 생김.
+- **[결정] 사용자가 "1번(지금 스키마 유지, 로컬 서버 안정화 후 정리)"으로
+  확정.** CLAUDE.md에 "목표 DB/서버 아키텍처 문서와 지금 스키마의 관계"
+  섹션으로 기록 완료 — 다음 세션이 이 참고문서 3건을 보고 바로 스키마를
+  뜯어고치려 하면 로컬 서버 이전이 끝났는지부터 먼저 확인하도록 명시해둠.
+  예외적으로 코드 변경이 없는 `zipsago`(문서의 `ZIPBUY` 대신) 표기만
+  지금 확정.
+- 코드 변경 없음(문서 기록만).
