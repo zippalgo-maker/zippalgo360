@@ -103,6 +103,21 @@ def get_user_by_id(conn: Connection, user_id: int) -> dict | None:
     return dict(row) if row else None
 
 
+def get_map_layers(conn: Connection, user_id: int) -> str | None:
+    return conn.execute(
+        text("SELECT map_layers FROM users WHERE id = :id"),
+        {"id": user_id},
+    ).scalar_one_or_none()
+
+
+def set_map_layers(conn: Connection, user_id: int, map_layers: str) -> None:
+    conn.execute(
+        text("UPDATE users SET map_layers = :map_layers WHERE id = :id"),
+        {"map_layers": map_layers, "id": user_id},
+    )
+    conn.commit()
+
+
 def list_users(conn: Connection, *, role: str | None = None) -> list[dict]:
     query = """
         SELECT id, email, name, phone, role, is_active, created_at
