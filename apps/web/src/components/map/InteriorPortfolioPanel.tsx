@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { ContentBlockView, groupImagesBySpace } from "@/lib/content-blocks";
 import { formatAreaLabel, type AreaUnit } from "@/lib/interior-marker";
 import type { ZipteriorPortfolioDetailOut } from "@/lib/types";
 
@@ -113,19 +114,70 @@ export default function InteriorPortfolioPanel({ portfolioId, onClose, areaUnit 
             )}
           </div>
 
-          {portfolio.images.length > 0 && (
+          {portfolio.content_blocks.length > 0 ? (
+            // 오늘의집 원본 순서 데이터가 있는 포트폴리오 — 집테리어와 동일하게
+            // 텍스트·사진·구분선을 작성자가 정한 순서 그대로 보여준다.
             <div className="border-t border-line px-5 py-4">
-              <p className="mb-3 text-xs font-semibold text-muted">시공 사진 {portfolio.images.length}장</p>
-              <div className="grid grid-cols-2 gap-2.5">
-                {portfolio.images.map((image, index) => (
-                  <figure key={index} className="overflow-hidden rounded-xl">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={image.src} alt={image.caption ?? portfolio.title} className="h-32 w-full object-cover" />
-                    {image.caption && <figcaption className="mt-1 text-[10px] text-muted">{image.caption}</figcaption>}
-                  </figure>
-                ))}
+              <div className="flex flex-col gap-4">
+                {(() => {
+                  let imageIndex = 0;
+                  return portfolio.content_blocks.map((block, index) => {
+                    const isImage = block.block_type?.toLowerCase() === "image";
+                    const node = <ContentBlockView key={index} block={block} imageIndex={imageIndex} />;
+                    if (isImage) imageIndex += 1;
+                    return node;
+                  });
+                })()}
               </div>
             </div>
+          ) : (
+            (() => {
+              const rooms = groupImagesBySpace(portfolio.images, portfolio.spaces);
+              if (rooms.length > 0) {
+                // 방(공간)별로 이름·설명과 함께 묶어서 보여준다 — 집테리어
+                // 포트폴리오 상세의 기본 표시 방식과 동일.
+                return (
+                  <div className="border-t border-line px-5 py-4">
+                    <div className="flex flex-col gap-5">
+                      {rooms.map((room) => (
+                        <section key={room.key}>
+                          <h3 className="text-sm font-bold text-ink">{room.name}</h3>
+                          {room.description && (
+                            <p className="mt-1.5 whitespace-pre-line text-xs leading-relaxed text-muted">{room.description}</p>
+                          )}
+                          <div className="mt-3 grid grid-cols-2 gap-2.5">
+                            {room.images.map((image, index) => (
+                              <figure key={index} className="overflow-hidden rounded-xl">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={image.src} alt={image.caption ?? room.name} className="h-32 w-full object-cover" />
+                                {image.caption && <figcaption className="mt-1 whitespace-pre-line text-[10px] text-muted">{image.caption}</figcaption>}
+                              </figure>
+                            ))}
+                          </div>
+                        </section>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+              if (portfolio.images.length === 0) return null;
+              // 방/공간 정보가 전혀 없는 포트폴리오를 위한 안전장치 — 기존
+              // 평면 그리드로 폴백.
+              return (
+                <div className="border-t border-line px-5 py-4">
+                  <p className="mb-3 text-xs font-semibold text-muted">시공 사진 {portfolio.images.length}장</p>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {portfolio.images.map((image, index) => (
+                      <figure key={index} className="overflow-hidden rounded-xl">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={image.src} alt={image.caption ?? portfolio.title} className="h-32 w-full object-cover" />
+                        {image.caption && <figcaption className="mt-1 text-[10px] text-muted">{image.caption}</figcaption>}
+                      </figure>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()
           )}
         </div>
       )}
