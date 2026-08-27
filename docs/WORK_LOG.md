@@ -2203,3 +2203,26 @@ sudo systemctl restart zippalgo360-web
   `npm run build` → `systemctl restart zippalgo360-web` 필요).
 - **미검증(실사용 확인 필요)**: 양쪽 다 브라우저로 위성 지도 위에서
   선택된 버튼(흰 배경 + 빨간 글자)이 잘 보이는지.
+
+### 후속: "zipterior.kr/m과 100% 동일해야 한다" — m.html 플랫폼바 숨김 되돌림
+- 사용자 재확인: 맨 처음 요청("zipterior.kr/m 접속 화면과 동일하게
+  나와야 함")을 다시 강조. 그 사이 제가 "집팔고360 자체 헤더와
+  중복된다"고 판단해서 임의로 넣었던 `.m-platbar`/`.m-service-nav`
+  숨김 CSS(zpEmbed 스코프)가 오히려 "동일해야 한다"는 원 요청과
+  충돌하는 제 임의 판단이었음을 인지 — 사용자 요청대로 완전 원복.
+- **[완료]** `css/mobile.css`에서 `html.zp-zippalgo-embedded
+  .m-platbar, .m-service-nav{display:none!important}` 규칙 삭제.
+  `m.html`의 `mobile.css` 캐시버스터 `v=1.12.0-zp-embed` →
+  `v=1.12.1-revert-platbar-hide`.
+  (zpEmbed 감지 스크립트 자체와 SSO exchange 스크립트는 유지 —
+  전자는 지금 반응하는 CSS가 없어 시각적으로 완전히 무해, 후자는
+  로그인 자동 연동이라는 별개의 의도된 기능이라 유지.)
+- **[완료] 검증**: 서버에서 `diff <(curl -s https://zipterior.kr/m)
+  <(curl -s https://zipterior.zippalgo360.com/m)` 실행 →
+  **"완전히 동일함(차이 없음)"** — 두 URL이 파라미터 없이 접속 시
+  100% 동일한 HTML을 서빙함을 실측으로 확인. (참고: `?zpEmbed=1&sso=`
+  파라미터가 붙는 실제 임베드 상황에서는 로그인된 사용자의 경우
+  SSO 자동 로그인으로 화면이 "로그인 상태"로 보일 수 있음 — 이는
+  의도된 차이이지 버그 아님, 사용자에게 설명함.)
+- **미검증(실사용 확인 필요)**: 브라우저로 실제 모바일 접속 시
+  `zipterior.kr/m`과 육안으로도 동일하게 보이는지.
