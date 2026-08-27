@@ -2345,3 +2345,24 @@ sudo systemctl restart zippalgo360-web
   의도된 차이이지 버그 아님, 사용자에게 설명함.)
 - **미검증(실사용 확인 필요)**: 브라우저로 실제 모바일 접속 시
   `zipterior.kr/m`과 육안으로도 동일하게 보이는지.
+
+### 후속: `/map` 버튼 색상 수정 서버 배포 + 동시 작업 중인 다른 세션 커밋 병합 확인
+- 사용자가 `git checkout` → `git pull` → `npm run build` →
+  `systemctl restart zippalgo360-web`로 배포 실행, 빌드 성공.
+- **[확인] 다른 동시 세션의 커밋이 이 브랜치에 같이 들어와 있음**:
+  `git pull` 결과가 `docs/WORK_LOG.md`만 9줄 바뀐 것처럼 보였지만,
+  이 세션 쪽에서 다시 `git fetch`+로그 확인해보니 실제로는 origin의
+  `claude/zippalgo360-interior-service-tz2qfv`에 이 세션이 모르는
+  커밋 3개(`b7af698`/`4387fd1`/`4d07aa5`)가 추가로 올라와 있었음.
+  `b7af698`("인테리어 시공사례 패널 왼쪽+2단 레이아웃, 클러스터 선택
+  목록" 등)은 **동시에 같은 저장소에서 작업 중인 다른 Claude
+  세션**(브랜치 `claude/jippalgo360-platform-6bvrfh`)의 작업으로,
+  `apps/web/src/app/map/page.tsx`를 이 세션과 겹치게 수정했지만
+  git이 충돌 없이 자동 병합함(다른 부분을 건드림).
+- **[완료] 검증**: 로컬에서 `git pull`로 같은 상태 동기화 후
+  `controlButtonClass`가 이번 세션이 만든 흰 배경+빨간 글자 스타일
+  그대로 남아있는지 grep으로 확인(다른 세션 커밋에 덮어써지지 않음),
+  `next build` 클린 재확인.
+- **참고**: 두 세션이 같은 파일을 동시에 건드리고 있어서 앞으로도
+  이런 병합이 반복될 수 있음 — 다음 세션은 배포 전 항상 origin의
+  최신 커밋 로그를 한 번 더 확인하는 게 안전.
