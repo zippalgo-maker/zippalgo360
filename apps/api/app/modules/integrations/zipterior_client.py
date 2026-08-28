@@ -565,6 +565,7 @@ def get_portfolio_detail(portfolio_id: int) -> ZipteriorPortfolioDetailOut:
             images=images,
             spaces=spaces,
             content_blocks=content_blocks,
+            detail_url=f"{settings.zipterior_api_base_url}/?portfolio={item['id']}",
             available=True,
         )
     except (httpx.HTTPError, ValueError, KeyError, TypeError):

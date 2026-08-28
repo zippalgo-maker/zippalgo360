@@ -201,20 +201,28 @@ export default function InteriorPortfolioPanel({ portfolioId, onClose, areaUnit 
           {displaySettings?.notice_enabled && (
             <div className="border-t border-line px-5 py-4 text-center">
               {displaySettings.notice_image_path && (
+                // 원본 이미지가 더 넓은 화면(예: 24인치 데스크톱) 기준으로
+                // 만들어져 있어, 우리 패널(28rem=448px)에 꽉 채우면 실제
+                // 소스 해상도보다 더 크게 늘어나 흐릿해 보인다. max-w-xs로
+                // 표시 폭을 줄여서(늘리지 않고 축소만 되도록) 같은 픽셀을
+                // 더 좁은 영역에 그리게 해 체감 선명도를 높인다 — 원본
+                // 파일 자체의 해상도를 올리는 근본 해결은 아니라서, 그래도
+                // 흐리면 집테리어 관리자 화면에서 더 고해상도 이미지로
+                // 교체하는 게 정석.
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={displaySettings.notice_image_path} alt="" className="mx-auto mb-3 w-full rounded-xl" />
+                <img src={displaySettings.notice_image_path} alt="" className="mx-auto mb-3 w-full max-w-xs rounded-xl" />
               )}
               {displaySettings.notice_text && (
                 <p className="mb-3 whitespace-pre-line text-xs leading-relaxed text-ink/80">{displaySettings.notice_text}</p>
               )}
-              {portfolio.company_phone && (
-                <a
-                  href={`tel:${portfolio.company_phone}`}
-                  className="flex w-full items-center justify-center rounded-full bg-brand-green px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90"
-                >
-                  {displaySettings.notice_button_label || "이 포트폴리오의 집 인테리어 견적 문의하기"}
-                </a>
-              )}
+              <a
+                href={portfolio.company_phone ? `tel:${portfolio.company_phone}` : portfolio.detail_url}
+                target={portfolio.company_phone ? undefined : "_blank"}
+                rel={portfolio.company_phone ? undefined : "noreferrer"}
+                className="flex w-full items-center justify-center rounded-full bg-brand-green px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+              >
+                {displaySettings.notice_button_label || "이 포트폴리오의 집 인테리어 견적 문의하기"}
+              </a>
             </div>
           )}
         </div>

@@ -15,6 +15,7 @@ import type {
   ZipteriorComplexDetailOut,
   ZipteriorMapMarker,
   ZipteriorMapMarkerListOut,
+  ZipteriorPortfolioCard,
   ZipteriorPortfolioSummary,
   ZipteriorSearchItem,
   ZipteriorSearchOut,
@@ -268,6 +269,13 @@ function ServiceMapView() {
   const [chatOpen, setChatOpen] = useState(false);
   const [unreadChatCount] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
+
+  // NearbyPortfolioWidget을 레이어 버튼과 똑같은 "버튼→드롭다운"
+  // 패턴으로 바꿨다 — 기본은 닫혀 있고, 우측 상단 컨트롤 스택의
+  // "인테리어" 버튼을 누르면 그 버튼 바로 아래에 패널이 펼쳐지며
+  // 버튼 자체도 다른 켜진 컨트롤처럼 빨간색으로 강조된다(2026-08-28
+  // 사용자 요청 — 레이어 패널과 동일한 UX로 통일).
+  const [portfolioPanelOpen, setPortfolioPanelOpen] = useState(false);
 
   useEffect(() => {
     if (!toast) return;
@@ -532,6 +540,38 @@ function ServiceMapView() {
       centerMapOnComplex(complex.latitude, complex.longitude);
     },
     [collapseInteriorMarker, bindFanInteractions, centerMapOnComplex]
+  );
+
+  // "우리집과 가까운/최근 등록" 위젯에서 포트폴리오 카드를 클릭했을 때 —
+  // 마커를 직접 클릭한 것과 동일하게 그 포트폴리오가 속한 단지를 열고
+  // (부챗살 마커 표시 + 지도 이동 + 단지정보 패널), 그 포트폴리오의
+  // 평형으로 selectedArea까지 맞춘 뒤에야 포트폴리오 상세를 연다.
+  // 이렇게 안 하면 이전에 열려있던 다른 단지의 패널과 방금 연 포트폴리오가
+  // 서로 안 맞는 채로 같이 떠 있는 문제가 생긴다(실사용 리포트).
+  const openPortfolioFromFeed = useCallback(
+    async (card: ZipteriorPortfolioCard) => {
+      if (card.complex_id != null) {
+        await openInteriorComplex(card.complex_id);
+        const complex = interiorComplexCacheRef.current.get(card.complex_id);
+        const match = complex?.apartment_types.find((type) => type.id === card.apartment_type_id);
+        setSelectedArea(match ? `${match.area}|${match.type}` : null);
+      }
+      setSelectedPortfolio({
+        id: card.id,
+        company_id: card.company.id,
+        company_name: card.company.name,
+        complex_name: card.complex_name ?? "",
+        title: card.title,
+        scope: "",
+        budget: "",
+        duration: "",
+        date: card.published_at,
+        area: card.pyeong_label ?? "",
+        type: card.apartment_type_name ?? "",
+        image: card.thumbnail_url,
+      });
+    },
+    [openInteriorComplex]
   );
 
   // 지금까지 누적된 원본 단지 마커 하나를 "표준 배지" 상태로 그린다
@@ -1132,7 +1172,10 @@ function ServiceMapView() {
         <div className="relative">
           <button
             type="button"
-            onClick={() => setLayerPanelOpen((open) => !open)}
+            onClick={() => {
+              setLayerPanelOpen((open) => !open);
+              setPortfolioPanelOpen(false);
+            }}
             aria-label="지도 레이어 선택"
             aria-expanded={layerPanelOpen}
             className={`relative ${controlButtonClass(layerPanelOpen)}`}
@@ -1150,7 +1193,7 @@ function ServiceMapView() {
           </button>
 
           {layerPanelOpen && (
-        <div className="absolute right-0 top-12 w-64 overflow-hidden rounded-2xl border border-line bg-white shadow-lg">
+        <div className="absolute right-full top-0 mr-2 w-64 overflow-hidden rounded-2xl border border-line bg-white shadow-lg">
           <div className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
             <p className="text-sm font-bold text-ink">지도 레이어</p>
             <button
@@ -1262,6 +1305,27 @@ function ServiceMapView() {
             불러오는 중...
           </div>
         )}
+
+        {activeLayers.has("interiorPortfolio") && (
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setPortfolioPanelOpen((open) => !open);
+                setLayerPanelOpen(false);
+              }}
+              aria-label="시공사례 위젯 열기"
+              aria-expanded={portfolioPanelOpen}
+              className={`${controlButtonClass(portfolioPanelOpen)} flex-col gap-0.5 text-[11px] font-extrabold leading-none`}
+            >
+              <span>인테</span>
+              <span>리어</span>
+            </button>
+            {portfolioPanelOpen && (
+              <NearbyPortfolioWidget onOpenPortfolio={openPortfolioFromFeed} onClose={() => setPortfolioPanelOpen(false)} />
+            )}
+          </div>
+        )}
       </div>
 
       {/* 인테리어 시공사례 패널들 — 집테리어(zipterior.kr)와 동일하게
@@ -1342,14 +1406,6 @@ function ServiceMapView() {
           />
         )}
       </div>
-
-      {/* 위 왼쪽 패널 스택(absolute left-0, flex)의 flex 아이템으로 잘못
-          들어가 있으면 열린 패널 개수에 따라 위치가 널뛰는 버그가 있었음
-          (2026-08-28 실제로 발생) — 반드시 이 바깥, 뷰포트 전체 기준
-          absolute로 둬야 줌/현재위치 컨트롤과 같은 우측 하단에 고정됨. */}
-      {activeLayers.has("interiorPortfolio") && (
-        <NearbyPortfolioWidget onOpenPortfolio={setSelectedPortfolio} />
-      )}
 
       {chatOpen && (
         <div className="absolute right-0 top-0 z-30 flex h-full w-full max-w-sm flex-col overflow-hidden border-l border-line bg-white shadow-2xl">

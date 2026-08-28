@@ -1,7 +1,40 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 import { SERVICES } from "@/lib/services";
 
+// /map, /zipterior는 헤더 높이를 뺀 나머지 뷰포트를 지도가 정확히 꽉
+// 채우도록 만든 전체화면 앱 화면이라(h-[calc(100vh-4rem)]), 그 아래에
+// 푸터까지 붙으면 문서 전체 높이가 뷰포트를 넘겨 스크롤이 생기고
+// 지도가 화면에 딱 안 맞아 보인다 — 이 두 라우트에서는 푸터를 아예
+// 렌더링하지 않는다.
+const FULLSCREEN_ROUTE_PREFIXES = ["/map", "/zipterior"];
+
 export default function Footer() {
+  const pathname = usePathname();
+  const isFullscreenRoute = FULLSCREEN_ROUTE_PREFIXES.some((prefix) => pathname?.startsWith(prefix));
+
+  // 푸터를 없애도 헤더의 border-b(1px)가 h-16(4rem) 계산 밖에 있어서
+  // 문서 전체 높이가 뷰포트보다 딱 1px 넘쳐, 브라우저가 아주 얇은
+  // 스크롤바를 계속 그리는 문제가 있었다(사용자가 실제 화면에서 확인).
+  // calc() 픽셀을 억지로 맞추는 대신, 이 두 라우트에 있는 동안은
+  // body 자체의 스크롤을 막아 어떤 서브픽셀 오차가 있어도 스크롤바가
+  // 아예 안 뜨게 한다.
+  useEffect(() => {
+    if (!isFullscreenRoute) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isFullscreenRoute]);
+
+  if (isFullscreenRoute) {
+    return null;
+  }
+
   return (
     <footer className="border-t border-line bg-soft">
       <div className="mx-auto max-w-[1600px] px-5 py-12 sm:px-10">
