@@ -1341,10 +1341,15 @@ function ServiceMapView() {
             areaUnit={areaUnit}
           />
         )}
-        {activeLayers.has("interiorPortfolio") && (
-          <NearbyPortfolioWidget onOpenPortfolio={setSelectedPortfolio} />
-        )}
       </div>
+
+      {/* 위 왼쪽 패널 스택(absolute left-0, flex)의 flex 아이템으로 잘못
+          들어가 있으면 열린 패널 개수에 따라 위치가 널뛰는 버그가 있었음
+          (2026-08-28 실제로 발생) — 반드시 이 바깥, 뷰포트 전체 기준
+          absolute로 둬야 줌/현재위치 컨트롤과 같은 우측 하단에 고정됨. */}
+      {activeLayers.has("interiorPortfolio") && (
+        <NearbyPortfolioWidget onOpenPortfolio={setSelectedPortfolio} />
+      )}
 
       {chatOpen && (
         <div className="absolute right-0 top-0 z-30 flex h-full w-full max-w-sm flex-col overflow-hidden border-l border-line bg-white shadow-2xl">

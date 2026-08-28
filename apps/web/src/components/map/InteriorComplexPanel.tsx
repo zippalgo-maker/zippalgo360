@@ -56,10 +56,10 @@ export default function InteriorComplexPanel({
         if (cancelled) return;
         setComplex(complexDetail);
         setPortfolios(portfolioList.items);
-        if (complexDetail.apartment_types.length && !selectedArea) {
-          const first = complexDetail.apartment_types[0];
-          onSelectArea(`${first.area}|${first.type}`);
-        }
+        // 평형 타입 자동 선택 안 함 — 마커를 클릭해 단지를 열면 항상
+        // "전체"가 기본(selectedArea=null)이고, 부챗살에서 특정 평형
+        // 조각을 클릭했을 때만 bindFanInteractions가 그 평형으로
+        // selectedArea를 지정한다.
       })
       .catch(() => {
         if (!cancelled) setComplex(null);
