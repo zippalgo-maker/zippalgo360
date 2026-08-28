@@ -3456,3 +3456,61 @@ sudo systemctl restart zippalgo360-web
 - **남은 미검증(브라우저)**: 위젯 위치, 평형 기본값(전체), 부챗살
   평형 필터, 안내 메시지 4가지 전부 사용자가 직접 화면으로 확인
   필요.
+
+---
+
+## 2026-08-28 — 영업팀 업체 통화기록 기능 (별도 저장소 `zipterior-backend`)
+
+### 배경
+- 사용자가 "집테리어 관리자에 영업관리 메뉴" 요청 — 영업팀이 등록된
+  집테리어 업체에 전화해서 집팔고360/집테리어를 설명(TM)하고,
+  통화했다는 근거·누가 했는지·내용을 기록하는 심플한 기능.
+- 처음엔 집팔고360 admin(Core)에 범용 CRM으로 설계하려 했으나, 사용자가
+  "집테리어 업체만 대상이니 심플하게 집테리어 관리자 자체에 넣으면
+  된다"고 정정 — 33장에서 정리한 "Core vs 서비스별" 원칙과도 일치
+  (신규 업체 유치 영업이 아니라 이미 등록된 특정 서비스 업체 대상
+  통화기록이라 그 서비스 소관).
+
+### 중요 발견 — 저장소 구조
+- **집테리어 관리자 화면(admin-dashboard.html 등)은 어떤 git 저장소에도
+  없다.** GitHub에서 확인 가능한 저장소는 `zippalgo-maker/zippalgo360`
+  (이 저장소)과 `zippalgo-maker/zipterior-backend`(API만) 둘뿐.
+  `zipterior-backend`의 `SERVER_CONTEXT.md`에 명시: 운영 프론트는
+  `/var/www/zipterior`에 **정적 파일로 서버에 직접 올라가 있고 git
+  관리 대상이 아님**(`/srv/zipterior/frontend`는 존재하지만 "실제 운영
+  프론트가 아니다"라고 문서에 경고돼 있음). 즉 화면(HTML/JS) 쪽은 이
+  세션도, 어떤 세션도 git으로는 못 봄 — 서버 파일을 직접 받아야 함.
+- 이번 세션에서 `zipterior-backend`를 처음으로 이 세션에 붙여
+  clone(`/home/user/zipterior-backend`)했다. **다음 세션이 집테리어
+  백엔드 코드를 다시 찾을 때 이 저장소명을 바로 알 수 있도록 기록.**
+
+### 진행 — 백엔드만 구현 (프론트는 못 함, 아래 참고)
+- **[완료]** `zipterior-backend` 저장소, `main` 브랜치에 직접 커밋·푸시
+  (커밋 `003fe37`). 이 저장소는 아직 별도 브랜치 정책/CLAUDE.md가 없어
+  기존 관행(단일 커밋 히스토리)대로 main에 바로 푸시함.
+  - 신규 Alembic 마이그레이션 `a25000000010_add_company_sales_contacts`
+    (down_revision=`a25000000009`, 단일 head 확인 완료) — 신규 테이블
+    `company_sales_contacts`(company_id, admin_user_id, content,
+    contacted_at, created_at). 기존 companies/users 스키마 무변경.
+  - 신규 라우터 `app/modules/admin/sales_contact_router.py`:
+    `GET/POST /api/v1/admin/companies/{company_id}/sales-contacts`
+    (기존 `CurrentAdmin` 인증 재사용, 생성 시 기존 `AuditService`로
+    감사로그 남김).
+  - 기존 `GET /api/v1/admin/companies`(overview_repository.list_companies)
+    에 `sales_contact_count`/`last_sales_contact_at` 컬럼 추가 —
+    업체 리스트에서 바로 통화 여부 확인 가능하게.
+  - **[완료] 검증**: 변경/신규 파일 전부 `ast.parse` 통과. 마이그레이션
+    체인 단일 head(`a25000000010`) 확인. 이 세션엔 fastapi 등 의존성이
+    설치돼 있지 않아 실제 앱 기동/alembic 실행 검증은 못 함.
+
+### 미완료 — 사용자 확인/작업 필요
+- **화면(관리자 메뉴 UI)은 아직 전혀 안 만듦.** 위 이유로 현재
+  admin-dashboard.html 등 실제 화면 코드를 볼 방법이 없어서, "영업관리"
+  메뉴 탭/리스트/입력폼 UI는 다음 중 하나가 있어야 진행 가능:
+  1. 사용자가 서버의 `/var/www/zipterior` 관리자 화면 관련 파일(예:
+     `admin-dashboard.html`, 관련 js)을 이 세션에 전달, 또는
+  2. 그 파일들을 git 저장소로 새로 옮기는 작업을 먼저 진행
+- **서버 배포 안 됨**: `zipterior-backend`에 새 커밋이 푸시됐지만,
+  실제 운영 서버(`/srv/zipterior/backend`)에 `git pull` +
+  `alembic upgrade head` + 서비스 재시작을 사용자가 해줘야 새 API가
+  살아난다. 이 세션은 서버 SSH 접근 불가.
