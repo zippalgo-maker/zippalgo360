@@ -3913,3 +3913,52 @@ sudo systemctl restart zippalgo360-web
     하면 안 됨.
   - db_backups/ 내용 확인 전까지 이 저장소에서 `git add -A`류의
     전체 스테이징을 하지 말 것 — 개인정보 유출 위험.
+
+### 후속: 위 심각한 문제들 전부 해결, 배포 완료
+
+- **[완료] db_backups/ 안전 확인**: CSV 2개 헤더 확인 결과 업체명/주소/
+  좌표/노출여부 등 이미 공개된 사업자 정보뿐, 개인정보 아님. 그래도
+  소스코드가 아니라 `.gitignore`에 `db_backups/` 추가해서 커밋 대상에서
+  제외.
+- **[완료] 시크릿 스캔**: 대량 미커밋 diff 전체에 password/secret/token/
+  api_key 패턴 grep — 전부 필드명·컬럼명·`settings.xxx`(환경변수 참조)
+  뿐, 하드코딩된 실제 시크릿 값 없음 확인. `sso_bridge.py`는 CLAUDE.md의
+  SSO 연동(`SSO_SHARED_SECRET`)을 실제로 구현 중이던 작업물로 확인됨
+  (`settings.sso_shared_secret`을 정상적으로 env에서 읽음).
+- **[완료] 서버의 대량 미커밋 작업 커밋**: 45개 파일(채팅, auth refresh
+  token 로테이션, 리뷰, 견적 공정 마일스톤, 알림 설정, SSO 브릿지,
+  관리자 활동로그/서버상태/정지 워커 등) 커밋 `b9b4554`.
+- **[완료] 마이그레이션 리비전 충돌 해결**: 이 세션의 로컬 클론에서
+  `a25000000010_add_company_sales_contacts.py`를
+  `a25000000011_add_company_sales_contacts.py`로 재발급, down_revision을
+  서버의 `a25000000010`(리뷰/마일스톤/알림설정)으로 체이닝. 커밋
+  `2e45c7b`, GitHub에 먼저 푸시.
+- **[완료] 서버-GitHub 병합**: 서버에서 `git fetch`+`git merge`(rebase
+  아님) — `app/main.py`는 서버 쪽이 전체 리포맷된 상태라 파일 전체가
+  충돌 처리됨, HEAD(서버) 버전을 기준으로 제 라우터 import/include 2줄만
+  정확한 위치에 재삽입해서 수동 해결. `overview_repository.py`/
+  `overview_schemas.py`는 자동 병합 성공. 병합 커밋 `492055c`.
+- **[완료] GitHub push**: 서버에 git 인증정보가 한 번도 설정된 적 없어서
+  최초 시도 시 막힘 — 사용자가 갖고 있던 Personal Access Token을
+  `https://<token>@github.com/...` 형태로 URL에 직접 넣어 해결(유저네임
+  불필요). `2e45c7b..492055c` 정상 push 완료 — **이제 서버와 GitHub
+  완전히 동기화됨.**
+- **[완료] 마이그레이션 적용**: `alembic upgrade head` →
+  `alembic current` = `a25000000011 (head)` 확인.
+- **[완료] 서비스 재시작 및 검증**: `systemctl restart zipterior-api` →
+  `active (running)`, `Application startup complete` 로그 확인.
+  `GET /openapi.json`에서 `/api/v1/admin/companies/{company_id}/
+  sales-contacts` 경로 등록 확인.
+- **[완료] 프론트엔드**: 이전 항목에서 이미 완료·검증됨(사이드바 "영업관리"
+  버튼, section-view, 모달 — grep으로 삽입 개수 확인 완료).
+
+**최종 상태: 영업관리(업체 통화기록) 기능 배포 완료.** 브라우저에서
+실사용(로그인 → 영업관리 메뉴 → 업체 목록 → 통화기록 추가/조회)만
+사용자가 확인하면 됨 — 아직 미검증.
+
+**부수적으로 얻은 것**: `zipterior-backend`가 그동안 서버에만 있고 한
+번도 GitHub에 없던 대량의 작업물(SSO 브릿지 포함)을 이번에 전부
+커밋·푸시함 — 이전까지 이 저장소는 "initial commit" 하나뿐이었다는 걸
+고려하면, 이번이 사실상 이 저장소의 첫 실질적인 동기화였음. 앞으로
+세션들은 GitHub 쪽만 보고 판단해도 서버 상태와 어긋나지 않을 가능성이
+높아짐(단, 이번처럼 또 미커밋 상태로 작업이 쌓이지 않는다는 전제 하에).
