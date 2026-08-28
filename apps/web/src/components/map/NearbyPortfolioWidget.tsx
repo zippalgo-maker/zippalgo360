@@ -124,7 +124,7 @@ export default function NearbyPortfolioWidget({ onOpenPortfolio, onClose }: Near
   const pages = items ? chunk(items, PAGE_SIZE) : [];
 
   return (
-    <div className="absolute right-0 top-12 z-20 w-80 overflow-hidden rounded-2xl border border-line bg-white shadow-lg">
+    <div className="absolute right-full top-0 z-20 mr-2 w-80 overflow-hidden rounded-2xl border border-line bg-white shadow-lg">
       <div className="flex items-center justify-between border-b border-line px-3 py-2">
         <div className="flex gap-1">
           <button
@@ -217,7 +217,7 @@ export default function NearbyPortfolioWidget({ onOpenPortfolio, onClose }: Near
                   <span
                     key={pageIndex}
                     className={`rounded-full transition-all ${
-                      pageIndex === page ? "h-2.5 w-2.5 bg-ink/70" : "h-2 w-2 bg-line"
+                      pageIndex === page ? "h-2 w-2 bg-ink/70" : "h-1.5 w-1.5 bg-line"
                     }`}
                   />
                 ))}

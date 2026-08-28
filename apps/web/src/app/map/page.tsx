@@ -1193,7 +1193,7 @@ function ServiceMapView() {
           </button>
 
           {layerPanelOpen && (
-        <div className="absolute right-0 top-12 w-64 overflow-hidden rounded-2xl border border-line bg-white shadow-lg">
+        <div className="absolute right-full top-0 mr-2 w-64 overflow-hidden rounded-2xl border border-line bg-white shadow-lg">
           <div className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
             <p className="text-sm font-bold text-ink">지도 레이어</p>
             <button
