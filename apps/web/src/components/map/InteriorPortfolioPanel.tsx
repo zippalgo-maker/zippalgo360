@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { ContentBlockView, groupImagesBySpace } from "@/lib/content-blocks";
 import { formatAreaLabel, type AreaUnit } from "@/lib/interior-marker";
-import type { ZipteriorPortfolioDetailOut } from "@/lib/types";
+import type { ZipteriorPortfolioDetailOut, ZipteriorPortfolioDisplaySettingsOut } from "@/lib/types";
 
 interface InteriorPortfolioPanelProps {
   portfolioId: number;
@@ -14,6 +15,24 @@ interface InteriorPortfolioPanelProps {
 export default function InteriorPortfolioPanel({ portfolioId, onClose, areaUnit }: InteriorPortfolioPanelProps) {
   const [portfolio, setPortfolio] = useState<ZipteriorPortfolioDetailOut | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [displaySettings, setDisplaySettings] = useState<ZipteriorPortfolioDisplaySettingsOut | null>(null);
+
+  // 관리자가 설정하는 전역 안내문구/이미지/견적문의 CTA — 특정 포트폴리오에
+  // 딸린 값이 아니라 집테리어 전체 공통 설정이라 portfolioId와 무관하게
+  // 한 번만 불러온다. 실패해도 조용히 무시(안내 블록을 그냥 안 보여줌).
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch<ZipteriorPortfolioDisplaySettingsOut>("/integrations/zipterior/portfolio-display-settings")
+      .then((settings) => {
+        if (!cancelled) setDisplaySettings(settings);
+      })
+      .catch(() => {
+        if (!cancelled) setDisplaySettings(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -113,18 +132,97 @@ export default function InteriorPortfolioPanel({ portfolioId, onClose, areaUnit 
             )}
           </div>
 
-          {portfolio.images.length > 0 && (
+          {portfolio.content_blocks.length > 0 ? (
+            // 오늘의집 원본 순서 데이터가 있는 포트폴리오 — 집테리어와 동일하게
+            // 텍스트·사진·구분선을 작성자가 정한 순서 그대로 보여준다.
             <div className="border-t border-line px-5 py-4">
-              <p className="mb-3 text-xs font-semibold text-muted">시공 사진 {portfolio.images.length}장</p>
-              <div className="grid grid-cols-2 gap-2.5">
-                {portfolio.images.map((image, index) => (
-                  <figure key={index} className="overflow-hidden rounded-xl">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={image.src} alt={image.caption ?? portfolio.title} className="h-32 w-full object-cover" />
-                    {image.caption && <figcaption className="mt-1 text-[10px] text-muted">{image.caption}</figcaption>}
-                  </figure>
-                ))}
+              <div className="flex flex-col gap-4">
+                {(() => {
+                  let imageIndex = 0;
+                  return portfolio.content_blocks.map((block, index) => {
+                    const isImage = block.block_type?.toLowerCase() === "image";
+                    const node = <ContentBlockView key={index} block={block} imageIndex={imageIndex} />;
+                    if (isImage) imageIndex += 1;
+                    return node;
+                  });
+                })()}
               </div>
+            </div>
+          ) : (
+            (() => {
+              const rooms = groupImagesBySpace(portfolio.images, portfolio.spaces);
+              if (rooms.length > 0) {
+                // 방(공간)별로 이름·설명과 함께 묶어서 보여준다 — 집테리어
+                // 포트폴리오 상세의 기본 표시 방식과 동일.
+                return (
+                  <div className="border-t border-line px-5 py-4">
+                    <div className="flex flex-col gap-5">
+                      {rooms.map((room) => (
+                        <section key={room.key}>
+                          <h3 className="text-sm font-bold text-ink">{room.name}</h3>
+                          {room.description && (
+                            <p className="mt-1.5 whitespace-pre-line text-xs leading-relaxed text-muted">{room.description}</p>
+                          )}
+                          <div className="mt-3 grid grid-cols-2 gap-2.5">
+                            {room.images.map((image, index) => (
+                              <figure key={index} className="overflow-hidden rounded-xl">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={image.src} alt={image.caption ?? room.name} className="h-32 w-full object-cover" />
+                                {image.caption && <figcaption className="mt-1 whitespace-pre-line text-[10px] text-muted">{image.caption}</figcaption>}
+                              </figure>
+                            ))}
+                          </div>
+                        </section>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+              if (portfolio.images.length === 0) return null;
+              // 방/공간 정보가 전혀 없는 포트폴리오를 위한 안전장치 — 기존
+              // 평면 그리드로 폴백.
+              return (
+                <div className="border-t border-line px-5 py-4">
+                  <p className="mb-3 text-xs font-semibold text-muted">시공 사진 {portfolio.images.length}장</p>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {portfolio.images.map((image, index) => (
+                      <figure key={index} className="overflow-hidden rounded-xl">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={image.src} alt={image.caption ?? portfolio.title} className="h-32 w-full object-cover" />
+                        {image.caption && <figcaption className="mt-1 text-[10px] text-muted">{image.caption}</figcaption>}
+                      </figure>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()
+          )}
+
+          {displaySettings?.notice_enabled && (
+            <div className="border-t border-line px-5 py-4 text-center">
+              {displaySettings.notice_image_path && (
+                // 원본 이미지가 더 넓은 화면(예: 24인치 데스크톱) 기준으로
+                // 만들어져 있어, 우리 패널(28rem=448px)에 꽉 채우면 실제
+                // 소스 해상도보다 더 크게 늘어나 흐릿해 보인다. max-w-xs로
+                // 표시 폭을 줄여서(늘리지 않고 축소만 되도록) 같은 픽셀을
+                // 더 좁은 영역에 그리게 해 체감 선명도를 높인다 — 원본
+                // 파일 자체의 해상도를 올리는 근본 해결은 아니라서, 그래도
+                // 흐리면 집테리어 관리자 화면에서 더 고해상도 이미지로
+                // 교체하는 게 정석.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={displaySettings.notice_image_path} alt="" className="mx-auto mb-3 w-full max-w-xs rounded-xl" />
+              )}
+              {displaySettings.notice_text && (
+                <p className="mb-3 whitespace-pre-line text-xs leading-relaxed text-ink/80">{displaySettings.notice_text}</p>
+              )}
+              <a
+                href={portfolio.company_phone ? `tel:${portfolio.company_phone}` : portfolio.detail_url}
+                target={portfolio.company_phone ? undefined : "_blank"}
+                rel={portfolio.company_phone ? undefined : "noreferrer"}
+                className="flex w-full items-center justify-center rounded-full bg-brand-green px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+              >
+                {displaySettings.notice_button_label || "이 포트폴리오의 집 인테리어 견적 문의하기"}
+              </a>
             </div>
           )}
         </div>

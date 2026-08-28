@@ -12,10 +12,13 @@ from app.modules.integrations.schemas import (
     ZipteriorComplexPortfolioListOut,
     ZipteriorMapMarker,
     ZipteriorMapMarkerListOut,
+    ZipteriorContentBlock,
     ZipteriorPortfolioCard,
     ZipteriorPortfolioDetailOut,
+    ZipteriorPortfolioDisplaySettingsOut,
     ZipteriorPortfolioImage,
     ZipteriorPortfolioListOut,
+    ZipteriorPortfolioSpace,
     ZipteriorPortfolioSummary,
     ZipteriorSearchItem,
     ZipteriorSearchOut,
@@ -69,6 +72,7 @@ def _to_card(item: dict) -> ZipteriorPortfolioCard:
         like_count=item.get("like_count", 0),
         published_at=item["published_at"],
         detail_url=detail_url,
+        distance_km=item.get("distance_km"),
     )
 
 
@@ -83,6 +87,44 @@ def get_portfolios_for_complex_type(
     params: dict = {"complex_id": complex_id, "limit": limit, "sort": "popular"}
     if apartment_type_id is not None:
         params["apartment_type_id"] = apartment_type_id
+
+    try:
+        response = httpx.get(
+            f"{settings.zipterior_api_base_url}/api/v1/portfolios",
+            params=params,
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        data = response.json()
+    except (httpx.HTTPError, ValueError, KeyError):
+        return ZipteriorPortfolioListOut(items=[], total=0, available=False)
+
+    try:
+        items = [_to_card(item) for item in data["items"]]
+    except (KeyError, TypeError):
+        return ZipteriorPortfolioListOut(items=[], total=0, available=False)
+
+    return ZipteriorPortfolioListOut(items=items, total=data.get("total", len(items)), available=True)
+
+
+def get_portfolio_feed(
+    *,
+    sort: str,
+    near_lat: float | None = None,
+    near_lng: float | None = None,
+    limit: int = 4,
+    offset: int = 0,
+) -> ZipteriorPortfolioListOut:
+    """단지에 묶이지 않은 전체 포트폴리오 피드 — "우리집과 가까운 시공사례"
+    (`sort=nearest`, 하버사인 거리순, 집테리어가 이미 서버에서 distance_km을
+    계산해 내려줌)와 "최근 등록 시공사례"(`sort=latest`) 두 탭용. 집테리어
+    자체 지도 화면(PC `.local-stats`/모바일 지도 탭)의 위젯과 동일한
+    `/api/v1/portfolios?sort=...` 엔드포인트를 그대로 재사용한다.
+    """
+    params: dict = {"sort": sort, "limit": limit, "offset": offset}
+    if sort == "nearest" and near_lat is not None and near_lng is not None:
+        params["near_lat"] = near_lat
+        params["near_lng"] = near_lng
 
     try:
         response = httpx.get(
@@ -427,6 +469,27 @@ def get_complex_portfolios(*, complex_id: int, limit: int = 100, offset: int = 0
     return ZipteriorComplexPortfolioListOut(items=items, total=data.get("total", len(items)), available=True)
 
 
+def get_portfolio_display_settings() -> ZipteriorPortfolioDisplaySettingsOut:
+    """포트폴리오 상세 맨 아래 안내문구/이미지/견적문의 CTA 관리자 설정.
+    실패해도(네트워크 장애 등) 안전한 기본값(미노출)으로 폴백한다 —
+    집테리어 app.js의 폴백 정책과 동일."""
+    try:
+        response = httpx.get(
+            f"{settings.zipterior_api_base_url}/api/v1/public/portfolio-display-settings",
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        data = response.json()
+        return ZipteriorPortfolioDisplaySettingsOut(
+            notice_enabled=bool(data.get("notice_enabled")),
+            notice_image_path=_absolute_media_url(data.get("notice_image_path")),
+            notice_text=data.get("notice_text"),
+            notice_button_label=data.get("notice_button_label"),
+        )
+    except (httpx.HTTPError, ValueError):
+        return ZipteriorPortfolioDisplaySettingsOut(notice_enabled=False)
+
+
 def get_portfolio_detail(portfolio_id: int) -> ZipteriorPortfolioDetailOut:
     """포트폴리오 카드 클릭 시 뜨는 상세(히어로 이미지 + 사진 목록 + 업체정보)."""
     try:
@@ -439,10 +502,42 @@ def get_portfolio_detail(portfolio_id: int) -> ZipteriorPortfolioDetailOut:
         company = item.get("company") or {}
         raw_images = item.get("images") or []
         images = [
-            ZipteriorPortfolioImage(src=url, caption=image.get("description") or None)
+            ZipteriorPortfolioImage(
+                src=url,
+                caption=image.get("description") or None,
+                space_id=str(image["portfolio_space_id"]) if image.get("portfolio_space_id") is not None else None,
+                room_label=image.get("room_label") or None,
+            )
             for image in raw_images
             if (url := _absolute_media_url(image.get("large_path") or image.get("medium_path") or image.get("thumbnail_path")))
         ]
+        # 집테리어 app.js가 방(공간)별로 사진을 묶어 이름·설명과 함께 보여주는
+        # 표시 방식(renderRoomGallery 계열)과 동일하게, spaces를 그대로 통과시켜
+        # 프론트가 같은 그룹핑을 재현할 수 있게 한다.
+        spaces = [
+            ZipteriorPortfolioSpace(
+                id=str(space["id"]),
+                name=space.get("space_name") or "기타",
+                description=space.get("description") or None,
+            )
+            for space in (item.get("spaces") or [])
+        ]
+        # 오늘의집에서 원본 그대로 가져온 일부 포트폴리오는 spaces 대신
+        # content_blocks(문서 순서 그대로의 텍스트+사진)를 쓴다 — 있으면
+        # document_order로 정렬해 그대로 통과.
+        content_blocks = sorted(
+            (
+                ZipteriorContentBlock(
+                    block_type=str(block.get("block_type") or "text"),
+                    document_order=int(block.get("document_order") or 0),
+                    image_url=_absolute_media_url(block.get("image_url") or (block.get("raw_node") or {}).get("imageUrl")),
+                    text_content=block.get("text_content"),
+                    raw_node=block.get("raw_node"),
+                )
+                for block in (item.get("content_blocks") or [])
+            ),
+            key=lambda block: block.document_order,
+        )
         representative = _absolute_media_url(
             item.get("representative_large_path")
             or item.get("representative_medium_path")
@@ -468,6 +563,9 @@ def get_portfolio_detail(portfolio_id: int) -> ZipteriorPortfolioDetailOut:
             intro=item.get("summary") or item.get("description") or "",
             hero_image=hero_image,
             images=images,
+            spaces=spaces,
+            content_blocks=content_blocks,
+            detail_url=f"{settings.zipterior_api_base_url}/?portfolio={item['id']}",
             available=True,
         )
     except (httpx.HTTPError, ValueError, KeyError, TypeError):

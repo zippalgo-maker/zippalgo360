@@ -3,7 +3,7 @@ from sqlalchemy import Connection
 
 from app.modules.companies import repository
 from app.modules.companies.geocoding import geocode_address
-from app.modules.companies.schemas import CompanyCreate, CompanyMapMarker, CompanyOut
+from app.modules.companies.schemas import CompanyAdminOut, CompanyCreate, CompanyMapMarker, CompanyOut
 
 
 def register_company(conn: Connection, owner_user_id: int, payload: CompanyCreate) -> CompanyOut:
@@ -31,6 +31,24 @@ def register_company(conn: Connection, owner_user_id: int, payload: CompanyCreat
 
 def list_companies(conn: Connection, company_type: str | None = None) -> list[CompanyOut]:
     return [CompanyOut(**c) for c in repository.list_companies(conn, company_type=company_type)]
+
+
+def list_companies_admin(conn: Connection, *, is_verified: bool | None) -> list[CompanyAdminOut]:
+    return [CompanyAdminOut(**c) for c in repository.list_companies_admin(conn, is_verified=is_verified)]
+
+
+def verify_company(conn: Connection, company_id: int) -> CompanyOut:
+    company = repository.set_company_verified(conn, company_id, True)
+    if company is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="업체를 찾을 수 없습니다.")
+    return CompanyOut(**company)
+
+
+def set_company_active(conn: Connection, company_id: int, is_active: bool) -> CompanyOut:
+    company = repository.set_company_active(conn, company_id, is_active)
+    if company is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="업체를 찾을 수 없습니다.")
+    return CompanyOut(**company)
 
 
 def list_map_markers(

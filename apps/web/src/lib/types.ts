@@ -35,6 +35,11 @@ export interface Company {
   service_regions: string[];
 }
 
+export interface CompanyAdmin extends Company {
+  owner_email: string;
+  owner_name: string;
+}
+
 export interface ApartmentComplex {
   id: number;
   name: string;
@@ -217,6 +222,7 @@ export interface ZipteriorPortfolioCard {
   like_count: number;
   published_at: string;
   detail_url: string;
+  distance_km: number | null;
 }
 
 export interface ZipteriorPortfolioListOut {
@@ -332,6 +338,25 @@ export interface ZipteriorComplexPortfolioListOut {
 export interface ZipteriorPortfolioImage {
   src: string;
   caption: string | null;
+  space_id: string | null;
+  room_label: string | null;
+}
+
+export interface ZipteriorPortfolioSpace {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
+/** 집테리어 app.js의 renderContentBlock()과 짝을 이루는 원본 문서 블록 —
+ * 렌더링 규칙은 apps/web/src/lib/content-blocks.tsx의 renderContentBlock에서
+ * 동일하게 재현한다. */
+export interface ZipteriorContentBlock {
+  block_type: string;
+  document_order: number;
+  image_url: string | null;
+  text_content: string | null;
+  raw_node: Record<string, unknown> | null;
 }
 
 export interface ZipteriorSearchItem {
@@ -347,6 +372,13 @@ export interface ZipteriorSearchItem {
 export interface ZipteriorSearchOut {
   items: ZipteriorSearchItem[];
   available: boolean;
+}
+
+export interface ZipteriorPortfolioDisplaySettingsOut {
+  notice_enabled: boolean;
+  notice_image_path: string | null;
+  notice_text: string | null;
+  notice_button_label: string | null;
 }
 
 export interface ZipteriorPortfolioDetailOut {
@@ -367,5 +399,8 @@ export interface ZipteriorPortfolioDetailOut {
   intro: string;
   hero_image: string | null;
   images: ZipteriorPortfolioImage[];
+  spaces: ZipteriorPortfolioSpace[];
+  content_blocks: ZipteriorContentBlock[];
+  detail_url: string;
   available: boolean;
 }

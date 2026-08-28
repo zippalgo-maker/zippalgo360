@@ -2940,3 +2940,729 @@ sudo systemctl restart zippalgo360-web
   서브픽셀 반올림으로 추정, 실사용에 지장 없는 수준)로 사실상 스크롤
   없음 확인. 홈(`/`)에는 여전히 푸터가 정상 렌더링되는 것도 확인
   (다른 페이지 회귀 없음). `npx eslint` 새 오류 없음.
+
+---
+
+## 2026-08-27 — 회원(가입/로그인) 기능 개발 착수: 집테리어와의 관계 정리 + 카카오 로그인 구현 시작
+
+- 사용자 요청: "집팔고360의 회원관련(회원가입, 로그인 등) 개발진행할거야"로 시작.
+  대화 중 핵심 논의: 집테리어(별도 스택, 별도 서버)에 이미 회원(일반/업체)+
+  관리자+카카오 간편로그인이 완성돼 있는데, 이걸 집팔고360으로 그대로
+  포팅하는 게 나은지 질문받음.
+- **[결정]** CLAUDE.md에 "회원/SSO/등급·결제 아키텍처" 섹션으로 기록 완료.
+  요지:
+  - 집테리어 코드를 그대로 포팅하지 않는다(스택이 완전히 다름: 집테리어는
+    바닐라 JS+FastAPI raw SQL, 집팔고360은 Next.js). 집테리어는 **설계
+    레퍼런스**로만 참고하고 집팔고360 스택으로 새로 구현.
+  - 집팔고360이 통합회원 신원(가입/로그인)과 등급·결제 정보의 소유자.
+    하위 서비스(집팔고/집사고/집테리어)는 이미 있는 SSO(`/auth/sso/
+    issue-code` → `/auth/sso/verify`)로 신원을 받는다.
+  - 관리자도 같은 원칙: 회원/결제 관리는 집팔고360 통합 관리자, 서비스별
+    세부 운영(집테리어 포트폴리오 검수 등)은 각 서비스 자체 관리자 유지 —
+    **집테리어 관리자 자체는 다시 만들 필요 없음, 그대로 계속 사용**.
+  - 등급/결제 필드는 SSO verify 응답에 실어서 하위 서비스가 그 시점에
+    판단하게 하고(매 요청마다 라이브 API 호출 금지 — SPOF 방지), 세션은
+    짧은 TTL 재검증 + 결제 관련 민감 액션만 그 순간 라이브 재확인.
+  - **집테리어 기존 회원 정리 순서**(사고 방지용, 반드시 순서 준수):
+    (1) 집팔고360 회원가입/로그인/카카오로그인/업체가입 구현 → (2) 집테리어와
+    SSO 연동 단대단 검증 → (3) 기존 집테리어 가입자를 집팔고360 통합회원으로
+    이관/매핑 → (4) 그 다음에야 집테리어 자체 로그인 진입점 정리. 이관 전에
+    집테리어 자체 로그인을 없애면 기존 회원이 로그인 불가 상태가 됨.
+- **[조사 완료] 기존 코드 현황**:
+  - 백엔드(`apps/api/app/modules/{auth,users,companies,payments}`)에 이미
+    이메일/비밀번호 회원가입·로그인(JWT, bcrypt), `/auth/me`, SSO
+    issue-code/verify, 업체(공인중개사) 온보딩(`/companies` POST)까지
+    구현되어 있음. `users` 테이블에 `kakao_id` 컬럼은 이미 있으나(초기
+    스키마), 실제 카카오 OAuth 플로우(콜백 라우터, 토큰 교환, 프로필 조회)는
+    아직 없음 — `config.py`의 `kakao_rest_api_key`는 지금 집테리어 검색
+    프록시/지오코딩(`companies/geocoding.py`)에서만 쓰이고 있었음.
+  - 프론트(`apps/web/src/app/{login,register}`, `lib/auth-context.tsx`)도
+    이메일 가입/로그인 폼과 토큰 유지까지는 있으나 카카오 로그인 버튼/콜백
+    페이지는 없음.
+  - `payments` 모듈은 매물 열람 건별 결제(PG 미연동, 모의 결제)이지 회원
+    등급/구독 개념이 아님 — 등급·결제 필드는 아직 실제 요구사항이 확정되지
+    않은 미래 기능이라 지금 스키마에 미리 만들지 않기로 함(과설계 방지).
+- **[진행 중] 이번 작업 범위**: 카카오 소셜로그인(일반회원)을 집팔고360에
+  신규 구현 시작. 계획:
+  - DB: `password_hash` NULL 허용(카카오 전용 계정은 비밀번호 없음),
+    `kakao_id`에 부분 유니크 인덱스 추가하는 마이그레이션 신설.
+  - 백엔드: `/auth/kakao/login`(인가 코드 → 카카오 토큰 교환 → 프로필 조회
+    → 있으면 로그인/없으면 자동가입 → JWT 발급) 라우터 추가.
+  - 프론트: `/login`, `/register`에 "카카오로 시작하기" 버튼 + 카카오 인가
+    코드를 받는 콜백 페이지 추가.
+
+## 2026-08-27 — 카카오 소셜로그인(일반회원) 구현 완료
+
+- **[완료] 백엔드** (`apps/api`):
+  - `alembic/versions/0005_kakao_login_support.py`: `users.password_hash`
+    NULL 허용(카카오 전용 계정은 비밀번호 없음), `kakao_id`에 부분 유니크
+    인덱스(`WHERE kakao_id IS NOT NULL`) 추가.
+  - `app/config.py`: `kakao_client_secret`(선택), `kakao_redirect_uri`
+    설정 추가. **`kakao_rest_api_key`는 기존에 지오코딩용으로 이미 서버
+    `.env`에 있는 값을 카카오 로그인 client_id로 그대로 재사용**(카카오
+    앱 하나의 REST API 키는 여러 기능에 공용) — 새 키 발급 불필요.
+  - `app/modules/auth/kakao.py` 신설: 인가 코드를 카카오 토큰으로 교환 →
+    `kapi.kakao.com/v2/user/me`로 프로필 조회. 이메일 동의를 안 한
+    계정(카카오는 이메일이 선택 동의 항목)은 `kakao_id@kakao-user.
+    zippalgo360.local` 플레이스홀더 이메일로 대체(users.email이 NOT
+    NULL UNIQUE라 이 값이 없으면 가입 자체가 실패하기 때문 — 이 도메인은
+    실제 발신용이 아니므로 메일 발송에 쓰면 안 됨).
+  - `app/modules/auth/service.py`의 `kakao_login()`: kakao_id로 기존
+    회원 조회 → 없으면 이메일로 재조회(같은 이메일로 이미 이메일/비밀번호
+    가입한 계정이 있으면 새 계정을 만들지 않고 **그 계정에 카카오 로그인을
+    연결**, `users/repository.py`의 `link_kakao_id()`) → 그래도 없으면
+    신규가입(`create_kakao_user()`, role=customer 고정). 기존
+    `login()`(이메일/비밀번호)도 `password_hash IS NULL`인 카카오 전용
+    계정으로 이메일 로그인 시도 시 `bcrypt.checkpw`가 죽지 않도록 방어
+    추가.
+  - `POST /auth/kakao/login`(`KakaoLoginIn{code, redirect_uri}` →
+    `TokenOut`) 라우터 추가. 카카오 키가 아예 없으면 501로 명확히 응답.
+  - 검증: 로컬에 venv 새로 만들어 `requirements.txt` 설치 후
+    `python -c "import app.main"` 통과(라우터 등록까지 실제로 import되는
+    선에서 확인, 실제 카카오 서버와의 왕복은 이 환경에 카카오 앱
+    키/네트워크가 없어 못 함).
+- **[완료] 프론트** (`apps/web`):
+  - `lib/kakao.ts`: `getKakaoAuthorizeUrl()`/`getKakaoRedirectUri()` —
+    redirect_uri를 **런타임에 `window.location.origin` 기준으로 계산**해서
+    로컬/스테이징/프로덕션 도메인이 달라도 별도 환경변수 없이 항상
+    맞게 동작하도록 함(카카오 인가 요청과 토큰 교환 양쪽에 동일한 값을
+    보내야 하는데, 소스를 하나로 통일해 어긋날 여지를 없앰).
+  - `lib/auth-context.tsx`에 `loginWithKakao(code, redirectUri)` 추가.
+  - `components/KakaoLoginButton.tsx`(카카오 브랜드 가이드 준수 —
+    `#FEE500` 배경, 말풍선 아이콘), `lib/ui.ts`에 `kakaoButtonClass` 추가.
+  - `/login`, `/register`(단, `role === "customer"`일 때만 — 카카오
+    가입은 항상 일반회원으로 생성되므로 업체가입 탭에서는 안 보여줌)에
+    버튼 배치.
+  - `app/login/kakao/callback/page.tsx` 신설 — 카카오가 돌려준 `code`(또는
+    사용자가 동의를 취소했을 때의 `error`)를 받아 백엔드 호출 후
+    `/mypage`로 이동, 실패 시 에러 문구 + 로그인으로 돌아가기 링크.
+  - `.env.example`(웹)에 `NEXT_PUBLIC_KAKAO_CLIENT_ID` 추가 — **백엔드
+    `KAKAO_REST_API_KEY`와 반드시 같은 값**이어야 함.
+- **[완료] 검증**: `npm install` 후 `next build` 클린(24개 라우트,
+  `/login/kakao/callback` 정상 포함). `npx eslint 'src/**/*.{ts,tsx}'`
+  전체 실행 결과 17개 중 새로 추가한 콜백 페이지의
+  `react-hooks/set-state-in-effect` 1건만 신규분이고, 이건 같은 파일에
+  이미 있던 `auth-context.tsx`의 동일 규칙 사전 존재 오류와 같은 종류
+  (이펙트 안 setState, 이 저장소 전역에 만연, 빌드 안 막힘, 이전
+  세션에서 이미 비차단 판단됨) — 새로운 종류의 오류 없음.
+- **[남은 작업 — 배포 시 사용자가 직접 해야 함, 이 세션은 서버 접근 불가]**:
+  1. `apps/api`에서 `alembic upgrade head` 실행(0005 마이그레이션 적용).
+  2. 카카오 개발자 콘솔에서 해당 앱의 "카카오 로그인" 제품이 꺼져 있으면
+     활성화, **Redirect URI에 `https://zippalgo360.com/login/kakao/
+     callback`(실제 배포 도메인) 등록**.
+  3. `apps/web` 서버 `.env`에 `NEXT_PUBLIC_KAKAO_CLIENT_ID=<서버 apps/api
+     .env의 KAKAO_REST_API_KEY와 동일한 값>` 추가 후 `next build` 재실행
+     (NEXT_PUBLIC_* 값은 빌드 타임에 번들되므로 재시작만으로는 반영 안 됨).
+  4. `zippalgo360-api`/`zippalgo360-web` 재시작 후 실제 카카오 로그인
+     동의 화면까지 뜨는지 브라우저에서 최종 확인.
+- **다음 단계(집테리어 연동)**: CLAUDE.md에 기록한 순서대로, 이 카카오
+  로그인이 배포 환경에서 실제로 동작 확인된 뒤에 (2) 집테리어와 SSO
+  연동 단대단 검증 → (3) 기존 집테리어 회원 이관 → (4) 집테리어 자체
+  로그인 정리로 진행.
+
+## 2026-08-27 — 브랜치 통일 공지에 따라 회원기능 작업을 claude/jippalgo360-platform-6bvrfh로 병합
+
+- 사용자가 전체 세션에 "이제부터 이 저장소는 claude/jippalgo360-platform
+  -6bvrfh 브랜치 하나만 쓴다"고 공지(오늘 다른 세션이 서버를 자기
+  브랜치로 체크아웃+배포하면서 `/map` 작업을 몇 시간 전 상태로 되돌린
+  사고가 있었던 데 따른 조치, CLAUDE.md "브랜치 정책" 섹션 참고).
+- 이 세션은 `claude/jippalgo-360-member-features-hf7hxt`(카카오
+  로그인 커밋 2개, `b96aa9d`/`c668fe6`)에서 작업 중이었음 — 이미 원격에
+  푸시 완료된 상태에서 `claude/jippalgo360-platform-6bvrfh`로 체크아웃
+  후 병합.
+- **[완료] 병합**: `docs/WORK_LOG.md`에서 두 브랜치가 각자 파일 끝에
+  로그를 이어붙이며 생긴 충돌(내용 충돌 아님, 같은 지점에 서로 다른
+  날짜의 로그를 추가) 1건 발견 — 양쪽 로그 전부 보존하는 방향으로
+  수동 해결(순서: platform 브랜치의 기존 로그 → 이 세션의 회원기능
+  로그). `CLAUDE.md`, 백엔드/프론트 코드 파일은 겹치는 부분이 없어
+  자동 병합됨.
+- 이 브랜치(`claude/jippalgo-360-member-features-hf7hxt`)는 앞으로
+  안 쓰고, 이후 모든 커밋은 `claude/jippalgo360-platform-6bvrfh`에
+  바로 푸시.
+
+## 2026-08-27 — 업체 승인 관리 API + 통합회원(집팔고360) 관리자 화면 구현
+
+- 코드에 이미 남아 있던 메모("이 코드베이스엔 아직 업체를 승인
+  (is_verified=true로 전환)하는 관리자 기능이 없어서" —
+  `apps/api/app/modules/companies/repository.py`의 `list_map_markers`
+  독스트링)를 그대로 채우는 작업. 회원가입/카카오로그인에 이어 CLAUDE.md
+  "회원/SSO/등급·결제 아키텍처" 원칙대로 **회원·업체 관리를 집팔고360
+  통합 관리자로** 만듦.
+- **[완료] 백엔드**:
+  - `companies`: `GET /companies/me`(본인 업체 조회), `GET /companies/
+    admin`(관리자용 전체 목록, `owner_email`/`owner_name` 조인 포함,
+    `is_verified` 필터), `POST /companies/{id}/verify`·`/suspend`·
+    `/reactivate`(전부 `require_role("admin")`) 추가.
+  - `users`: 라우터가 아예 없었어서 `app/modules/users/router.py` 신설
+    — `GET /users`(role 필터), `POST /users/{id}/activate`·
+    `/deactivate`, `POST /users/{id}/role`(역할 변경). `service.py`에
+    자기 자신을 비활성화/역할변경하지 못하게 막는 방어 추가(관리자가
+    실수로 자기 권한을 잠그는 사고 방지). `main.py`에 라우터 등록.
+  - 검증: venv에서 `import app.main` 통과, 등록된 전체 라우트 목록을
+    직접 찍어서 `/companies/me`, `/companies/admin`,
+    `/companies/{id}/verify` 등 경로 충돌 없이 올바르게 등록됐는지 확인.
+- **[완료] 프론트**:
+  - `/admin`(신설) — 회원관리/업체승인/단지마스터데이터/매도증빙검토
+    4개 관리자 화면으로 가는 인덱스 페이지(그동안 admin 하위 페이지가
+    서로 링크 없이 URL로만 접근 가능했던 것을 이번에 처음으로 하나로
+    묶음).
+  - `/admin/companies`(신설) — 업체별 대표자/소유자(이메일)/사업자
+    등록번호 표시, 승인 배지(심사중/승인됨/정지됨), 승인·정지·정지해제
+    버튼.
+  - `/admin/members`(신설) — 역할별 필터(전체/일반회원/업체/관리자),
+    회원 목록 테이블(이름/이메일/역할 드롭다운/활성상태 배지/가입일/
+    활성-비활성 토글). 본인 계정은 역할변경·비활성화 버튼을 비활성화
+    처리(백엔드 방어와 동일한 취지를 프론트에도 반영).
+  - `mypage`에 업체(company) 역할 사용자를 위한 상태 배너 추가
+    (`GET /companies/me` 호출) — 아직 업체 미등록이면 온보딩 유도,
+    심사중/정지됨/승인됨 상태를 그 자리에서 바로 보여줌(기존엔 업체
+    등록 후 자기 상태를 확인할 방법이 마이페이지에 전혀 없었음).
+  - 검증: `next build` 클린(29개 라우트, 신규 4개 포함).
+    `npx eslint 'src/**/*.{ts,tsx}'` 전체 20건 중 신규 3건(admin/
+    companies, admin/members, mypage)은 전부 기존 sale-proofs 페이지와
+    동일한 `useEffect(() => { refresh(); }, [token])` 패턴에서 나오는
+    `react-hooks/set-state-in-effect` — 이 저장소에 이미 확립된 비차단
+    사전 존재 오류와 완전히 같은 종류, 새로운 종류 없음.
+- **참고**: 등급/결제(tier/payment) 필드는 이번에도 실제 결제·구독
+  상품이 없어 스키마에 넣지 않음(과설계 방지, CLAUDE.md에 이미 기록된
+  방침 그대로 유지) — 실제 결제 기능이 생기면 그때 SSO verify 응답에
+  얹는다.
+
+## 2026-08-27 — 사용자가 로컬 서버 이전 + 목표 DB/서버 아키텍처 참고자료 3건 전달
+
+- 사용자가 업로드한 3개 문서를 저장소에 보관(세션 첨부파일은 컨테이너에만
+  존재하고 저장소엔 안 남아서, 다음 세션이 참고할 수 있게 커밋):
+  - `docs/zippalgo360-db-architecture-guide.md` — 목표 DB 스키마 설계서
+    (Core users/companies/orders/payments/oauth_accounts 등 + 서비스별
+    schema 분리안)
+  - `docs/zippalgo360-server-architecture-guide.md` — 클라우드→로컬 서버
+    이전 아키텍처 지침(하드웨어, 서비스별 포트 분리, Nginx, 백업/UPS 등)
+  - `docs/zippalgo360-local-server-migration-guide.md` — 위 두 문서의
+    운영 체크리스트 요약판(원본은 .docx, 텍스트만 추출해 마크다운으로
+    보관)
+- **아직 코드 변경 없음** — 사용자가 "참고하고 다시 이야기 하자"고 해서
+  읽기만 하고 반영은 보류, 다음 턴에 방향 논의 예정.
+- **[참고: 다음에 논의할 때 짚어야 할 것]** 이 문서들이 그리는 목표
+  스키마와 지금 실제 코드(`apps/api`)의 스키마 사이에 몇 가지 차이가
+  있음 — 그대로 맞출지, 지금 스키마를 유지하고 미래 목표로만 남길지
+  결정 필요:
+  1. `users.role`(customer/company/admin, 현재 코드) vs 문서의
+     `users.user_type`(general/company/admin) — 이름·값 다름.
+  2. 카카오 로그인을 이번 세션에서 `users.kakao_id` 컬럼으로 구현했는데,
+     문서는 provider별 다중 소셜로그인(kakao/naver/google/apple)을 위한
+     별도 `oauth_accounts` 테이블을 제안 — 지금 구조는 카카오 전용,
+     구조적으로 미래 목표와 다름.
+  3. 지금 `companies.owner_user_id`는 1:1(업체당 대표 유저 1명)인데,
+     문서의 `company_memberships`(company_id, user_id, role: owner/
+     manager/staff)는 업체당 여러 직원 계정을 지원하는 다대다 구조.
+  4. 문서가 쓰는 서비스 코드 `ZIPBUY`(집사고)가 CLAUDE.md에 이미 확정된
+     로마자 표기 규칙(집사고=**zipsago**)과 다름 — 그대로 채택하면
+     기존 네이밍 규칙과 충돌.
+  5. 서버 아키텍처 문서는 Core/집팔고/집사고/집테리어/집서비스를 **포트가
+     분리된 개별 systemd 서비스**로 그리는데, 지금 `apps/api`는 이
+     모듈들을 전부 한 FastAPI 프로세스에 모듈로 얹은 모놀리스 — 로컬
+     서버 이전 시점에 분리할지, 지금처럼 모놀리스 유지하며 논리적
+     경계만 지킬지는 별개 결정.
+  - 결제/포인트/쿠폰/주문(Core orders/payments/points/coupons) 스키마는
+    지금 코드에 전혀 없음 — 이건 문서도 "결제 기능이 실제로 생기면"
+    이라는 전제라 지금 급하게 만들 필요는 없어 보임(기존에 이미 CLAUDE.md
+    에 남긴 "과설계 방지" 방침과 일치).
+
+---
+
+## 2026-08-27 — /map 레이어 설정 저장 기능 추가 (+ 다른 세션과의 브랜치 병합)
+
+### 시작 전
+- 사용자 요청: /map의 레이어 선택("매물"/"인테리어 시공사례"/업체 레이어
+  등)에 "설정 저장하기"를 추가 — 비로그인은 쿠키, 로그인 사용자는 계정에
+  저장해서 다음 방문 때 그대로 복원. 매물/시공사례 중복선택 금지는 그대로
+  유지, 생활서비스(이사/청소/부동산/인테리어 업체) 레이어는 자유롭게 추가
+  가능. **추가로: 매물/시공사례 중 최소 하나는 항상 켜져 있어야 함**(새
+  요구사항).
+
+### 진행 중
+- **[완료] 백엔드**: `users.map_layers`(nullable, 콤마구분 문자열) 컬럼
+  추가하는 마이그레이션, `GET/PUT /auth/me/map-layers` 엔드포인트.
+  백엔드는 레이어 키의 의미를 모르고 그냥 문자열 목록으로 저장/반환만
+  하도록 일부러 느슨하게 설계(프론트 레이어가 늘어나도 백엔드 재배포
+  불필요).
+- **[완료] 프론트엔드**(`apps/web/src/app/map/page.tsx`): "이 레이어 설정
+  저장하기" 버튼(레이어 패널 하단). 초기값 우선순위: 쿠키(비로그인 저장분)
+  → URL `?mode=` → 기본값(매물); 로그인 확인되면 서버 저장값으로 한 번
+  더 덮어씀. "최소 하나는 항상 켜져 있어야 함" 규칙은 두 경로 모두에서
+  강제: (1) 매물/시공사례 자체를 직접 끄려는 시도 차단(토스트 안내),
+  (2) 부동산업체 등 비-프라이머리 레이어를 켜다가 반대 그룹(상호배타)이
+  꺼지면서 매물/시공사례가 둘 다 꺼지는 간접 경로도 자동으로 감지해
+  같은 그룹의 프라이머리를 자동으로 같이 켜서 복구.
+- **[완료] 검증**: 마이그레이션 클린 적용, curl로 저장/조회 왕복 확인,
+  Playwright로 (비로그인) 차단+자동복구+쿠키 저장/재방문 복원, (로그인)
+  서버 저장값이 기본값을 덮어쓰는 것까지 전부 확인.
+
+### 진행 중 — 다른 세션과의 브랜치 병합 (충돌 해결)
+- push 시도 중 origin이 한참 앞서 있는 것 확인 — 다른 세션이 카카오
+  간편로그인, 집팔고360 통합회원 관리자 화면(업체 승인/회원 관리) 등을
+  이미 push해놓은 상태였음.
+- **충돌 1**: alembic 마이그레이션 리비전 번호 충돌 — 이 세션이 만든
+  `0005_add_user_map_layer_preference.py`와 다른 세션의
+  `0005_kakao_login_support.py`가 똑같이 `revision = "0005"`를 씀.
+  → 이 세션 것을 `0006`으로 리넘버링(`down_revision = "0005"`), 파일명도
+  `0006_add_user_map_layer_preference.py`로 변경. `alembic heads`로 단일
+  head(`0006`) 확인, 새 DB에 `0001→0006` 전체 체인 클린 적용 재확인.
+- **충돌 2**: `apps/api/app/modules/auth/router.py` — import 블록만 충돌
+  (양쪽 다 새 스키마를 추가한 것뿐이라 단순 병합: `KakaoLoginIn`과
+  `MapLayerPreferenceIn/Out` 둘 다 유지).
+- **충돌 3**: `apps/api/app/modules/users/repository.py` — 함수 추가만
+  충돌(`get_map_layers`/`set_map_layers` vs `list_users`/
+  `set_user_active`/`set_user_role`), 전부 유지.
+- 나머지 대부분의 변경(카카오 로그인 프론트/백엔드, 관리자 회원·업체
+  화면, `/zipservice/*` 확장 등)은 git이 자동 병합함 — 이 세션이 건드린
+  파일과 겹치지 않았음.
+- **[완료] 병합 후 검증**: 백엔드 import 정상, 마이그레이션 체인 클린,
+  `POST /auth/register` + `PUT/GET /auth/me/map-layers` curl 왕복 확인,
+  `next build` 클린(다른 세션이 추가한 `/admin`, `/login/kakao/callback`,
+  `/zipservice/*` 라우트까지 전부 포함해서 정상 생성 확인).
+- 병합 커밋(`369eb79`) push 완료.
+
+### 완료 후
+- 로컬 검증 전부 완료, GitHub push 완료. **서버 재배포 필요**:
+  ```bash
+  cd /srv/zippalgo360
+  git pull origin claude/jippalgo360-platform-6bvrfh
+  cd apps/api && source venv/bin/activate && alembic upgrade head && sudo systemctl restart zippalgo360-api
+  cd ../web && npm run build && sudo systemctl restart zippalgo360-web
+  ```
+
+## 2026-08-27 — 목표 아키텍처 문서 반영 시점 결정: 로컬 서버 이전 후로 미룸
+
+- 지난 턴에서 정리한 5가지 차이점(role/user_type, kakao_id/oauth_accounts,
+  owner_user_id 1:1/company_memberships 다대다, ZIPBUY/zipsago, 모놀리스/
+  포트분리)에 대해 옵션 두 가지(지금 유지 vs 지금부터 목표 구조로 개발)의
+  장단점을 설명 — 로컬 서버가 지금 세팅 중이라는 사용자 발언이 핵심 변수:
+  서버 인프라 이전과 DB 리팩터링을 동시에 하면 문제 원인 구분이 어려워지고,
+  방금 만든 카카오로그인/업체승인 기능을 또 뜯어고쳐야 하는 낭비가 생김.
+- **[결정] 사용자가 "1번(지금 스키마 유지, 로컬 서버 안정화 후 정리)"으로
+  확정.** CLAUDE.md에 "목표 DB/서버 아키텍처 문서와 지금 스키마의 관계"
+  섹션으로 기록 완료 — 다음 세션이 이 참고문서 3건을 보고 바로 스키마를
+  뜯어고치려 하면 로컬 서버 이전이 끝났는지부터 먼저 확인하도록 명시해둠.
+  예외적으로 코드 변경이 없는 `zipsago`(문서의 `ZIPBUY` 대신) 표기만
+  지금 확정.
+- 코드 변경 없음(문서 기록만).
+
+## 2026-08-27 — 3단계 착수: 기존 집테리어 가입자를 집팔고360 회원으로 이관
+
+- 사용자 지시 "시작"으로 CLAUDE.md 4단계 계획의 3번(기존 집테리어 가입자
+  이관/매핑) 착수.
+- **[범위 확정]** 신원(이메일/비밀번호해시/카카오ID/이름/전화번호)만
+  이관하고 업체(회사) 데이터는 이번 범위에서 제외 — 집테리어 자체
+  관리자가 계속 관리하는 도메인이라 자동 이관 시 정합성 문제가 커짐.
+  이관된 계정은 전부 `role='customer'`로 생성(집테리어에서 업체였던
+  사람도 집팔고360 업체기능은 기존 `/onboarding/company`로 별도 신청).
+  매칭 기준은 kakao_id 우선, 없으면 이메일 — 이미 집팔고360에 있는
+  계정은 절대 덮어쓰지 않고 건너뜀. 집테리어 DB는 읽기만 함.
+- **[진행 중]** 집테리어의 실제 `users` 테이블 구조(컬럼명/타입,
+  이메일·카카오ID·비밀번호 null 비율, 비밀번호 해시 형식, 활성상태
+  컬럼 존재 여부, 이메일 중복 여부)를 이 세션이 직접 볼 수 없어서(별도
+  서버/코드베이스, SSH 직접 접속 불가) **읽기 전용** 조회 SQL
+  (`zipterior_users_inspect.sql`, 사용자에게 파일로 전달)을 먼저
+  실행해달라고 요청 — 결과 받아서 정확한 이관 스크립트(export on
+  zipterior + idempotent import on zippalgo360) 설계 예정. 아직 실제
+  이관 코드/실행 없음.
+
+---
+
+## 2026-08-27 — `/map` 인테리어 포트폴리오 패널: content_blocks/공간별 그룹핑 반영
+
+### 시작 전
+- 사용자 요청 2가지: (1) 집팔고360에서 집테리어 접속 화면이 집팔고360
+  지도 화면과 "최대한 가깝게"가 아니라 **100% 동일**해야 함(디자인
+  포함). (2) `/map`에서 포트폴리오 클릭 시 지금은 이미지만 나오는데,
+  집테리어 실제 포트폴리오 상세처럼 텍스트+배열 순서가 적용된 내용이
+  나오도록 수정.
+- (1)에 대해 사용자와 논의한 결론: 레거시 zipterior 정적 사이트를
+  CSS/JS로 계속 흉내내는 지금 방식으로는 "100% 동일"을 보장할 수
+  없음 — 유일하게 보장되는 방법은 PC `/zipterior`를 저희 자체
+  `/map?mode=interior` 페이지로 완전히 교체하는 것(로그인/회원사
+  메뉴는 그 화면에서 빠짐, 사용자 확인 필요 — 아직 실행 안 함).
+  사용자가 순서를 정리: **먼저 `/map`의 인테리어 모드를 zipterior와
+  기능적으로 동등하게 맞춘 뒤에** 교체를 진행하기로 함 — 이번 세션은
+  그 첫 단계(포트폴리오 상세 콘텐츠)만 진행.
+
+### 진행 중 — 원인 조사
+- zipterior 서버(`/var/www/zipterior/js/app.js`)의
+  `openPortfolioDetail()`을 읽어서 포트폴리오 상세가 실제로 어떤
+  구조인지 확인:
+  - **드문 경우**: `apiDetail.content_blocks`가 있으면(오늘의집에서
+    원본 그대로 가져온 포트폴리오) `document_order`로 정렬한 뒤
+    `block_type`(image/heading/callout/divider/link/기본 텍스트)별로
+    `renderContentBlock()`이 문서 그대로 렌더링. 리치텍스트 필드는
+    `{entity:{bold/italic/underline/strikethrough}, content:[...]}`
+    형태의 span 배열(`cbRichHtml()`).
+  - **일반적인 경우**: `apiDetail.spaces`(방/공간 목록: id·이름·설명)
+    + `apiDetail.images`의 `portfolio_space_id`로 사진을 방별로
+    그룹핑, 매칭 안 되면 `room_label`로 대체 그룹핑 — 방 이름·설명과
+    함께 섹션별로 보여줌.
+  - 우리 백엔드(`apps/api/.../zipterior_client.py`의
+    `get_portfolio_detail()`)는 이 구조를 전부 버리고 `images`만
+    평평하게(caption만 유지) 가져오고 있었음 — "이미지만 나온다"의
+    정확한 원인.
+
+### 진행 중 — 구현
+- **[완료] 백엔드** (`apps/api/app/modules/integrations/`):
+  - `schemas.py` — `ZipteriorPortfolioImage`에 `space_id`/`room_label`
+    추가, 신규 `ZipteriorPortfolioSpace`(id/name/description),
+    `ZipteriorContentBlock`(block_type/document_order/image_url/
+    text_content/raw_node — raw_node는 리치텍스트 구조 그대로 통과),
+    `ZipteriorPortfolioDetailOut`에 `spaces`/`content_blocks` 추가
+    (기본값 `[]`라 기존 실패 폴백 분기는 안 건드려도 됨).
+  - `zipterior_client.py`의 `get_portfolio_detail()` — zipterior
+    원본 API 응답의 `spaces`/`content_blocks`/이미지의
+    `portfolio_space_id`/`room_label`을 그대로 프록시하도록 수정.
+- **[완료] 프론트엔드** (`apps/web/src/`):
+  - `lib/types.ts` — 위 스키마와 대응하는 TS 타입 추가.
+  - `lib/content-blocks.tsx`(신규) — `richTextToPlain()`(리치텍스트
+    span 배열에서 순수 텍스트만 추출, `<br>`은 `\n`으로 보존 — 굵게/
+    기울임 서식은 이번 범위에서 의도적으로 생략, 필요하면 후속 작업),
+    `groupImagesBySpace()`(zipterior와 동일한 방/공간 그룹핑 로직),
+    `ContentBlockView`(block_type별 렌더링 — link 블록은 관리자 설정
+    의존이라 항상 생략, 나머지는 zipterior와 동일).
+  - `components/map/InteriorPortfolioPanel.tsx` — 렌더링을
+    3단계 우선순위로 교체: ① `content_blocks` 있으면 문서 순서
+    그대로, ② 없으면 `spaces`/`room_label`로 방별 그룹핑(이름+설명+
+    사진), ③ 그룹핑 정보가 아예 없으면 기존 평면 그리드로 폴백
+    (안전장치).
+- **[완료] 검증**: `next build` 클린, 백엔드 전체 `ast.parse` 통과.
+  **다른 세션의 대규모 변경(카카오 로그인, 관리자 회원/업체 화면,
+  지도 레이어 저장 등)과 충돌 없이 병합됨** — `git merge`가 자동으로
+  합쳤고 병합 후에도 빌드 정상.
+- **미검증(중요)**: 이 세션은 zipterior API에 네트워크 접근이 없어서
+  **실제 `content_blocks`/`spaces`가 있는 진짜 포트폴리오로 렌더링
+  결과를 확인 못함** — 코드는 app.js 로직을 그대로 재현했지만, 실제
+  데이터의 필드명이 문서와 미묘하게 다를 가능성 있음. 배포 후
+  실제 포트폴리오 몇 개(방별 그룹핑 있는 것, 가능하면 content_blocks
+  있는 것도)를 브라우저에서 열어 확인 필요.
+- **다음 단계(보류)**: 이게 잘 동작하는 것 확인되면, PC
+  `/zipterior`를 `/map?mode=interior`로 교체하는 작업 진행 예정
+  (사용자 승인 대기 중, 로그인/회원사 메뉴 이관 방안도 같이 논의
+  필요).
+
+### 배포
+- 서버가 배포 직전 `claude/jippalgo360-service-screen-lmv8de`(제3의
+  브랜치)에 가 있던 걸 확인 — 브랜치 통일 공지 이후에도 여전히
+  다른 브랜치로 드리프트될 수 있다는 실제 사례. `git checkout
+  claude/jippalgo360-platform-6bvrfh` → `git pull`(36 커밋 fast-forward,
+  카카오 로그인/관리자 화면/집서비스 라이프스타일 개편 등 다른
+  세션들 작업 전부 포함) → `apps/api`에서 `alembic upgrade head`
+  (0005/0006 마이그레이션) → `zippalgo360-api` 재시작 → `apps/web`
+  `npm run build` → `zippalgo360-web` 재시작.
+- **[완료] 검증**: `systemctl status` 양쪽 다 `active (running)`,
+  `git log -1`로 최신 커밋(`fbef83f`) 배포 확인.
+- **다음 확인 필요(사용자)**: 실제 포트폴리오로 `/map?mode=interior`
+  에서 방별 그룹핑/콘텐츠 블록이 정상 렌더링되는지 브라우저로 확인.
+
+---
+
+## 2026-08-27 — 집테리어 회원 이관 스크립트 작성 (사용자 "넘어가자" 지시로 SQL 조회 결과 대기 없이 진행)
+
+- 이전 턴에서 요청한 읽기전용 조회 SQL 결과를 사용자가 보내기 전에
+  "넘어가자"고 해서, 집테리어의 정확한 `users` 컬럼명을 모른 채로도
+  안전하게 동작하도록 **스키마 비의존적으로 설계**해서 바로 진행.
+- **[완료]** `apps/api/scripts/zipterior_migration/`:
+  - `01_export_on_zipterior.sql` — 집테리어 서버에서 실행할 읽기전용
+    내보내기. 컬럼명을 몰라도 되게 `SELECT row_to_json(u) FROM users u`
+    로 전체 컬럼을 JSON 한 줄씩 그대로 내보냄(사용자에게 파일로 전달 —
+    집테리어는 이 저장소 밖의 별도 코드베이스라 git pull로 못 받음).
+  - `02_import_to_zippalgo360.py` — 집팔고360 서버에서 실행. JSON의 여러
+    후보 키 이름(email/hashed_password/nickname/kakao_id 등)을 순서대로
+    시도해 필드를 뽑고, kakao_id→이메일 순으로 기존 계정과 매칭해
+    **있으면 무조건 건너뜀**(덮어쓰기 없음), 비밀번호 해시는 bcrypt
+    형식(`$2[aby]$..`)일 때만 복사하고 아니면 NULL. 탈퇴/비활성으로
+    보이는 행(`deleted_at`/`status=deleted` 등 후보 키)은 건너뜀.
+    **기본은 dry-run**(통계만 출력, DB 변경 없음), `--commit`을 붙여야
+    실제 INSERT. `role`은 전부 `customer`로 고정, 업체 데이터는 다루지
+    않음(범위 밖 — 집테리어 자체 관리자가 계속 관리).
+  - `README.md` — 실행 순서(백업 → 집테리어에서 내보내기 → 파일 이동 →
+    dry-run 확인 → `--commit`) 정리.
+- **[완료] 검증**: `pick()`/`is_inactive()`/bcrypt 정규식 로직을 venv에서
+  합성 데이터로 단위 테스트(이메일/카카오ID 우선순위 추출, bcrypt
+  형식 판별, deleted_at/status 기반 비활성 판정 전부 의도대로 동작
+  확인). 실제 DB 연결 테스트는 이 세션에 접근 권한이 없어 못 함 — 서버에서
+  dry-run으로 먼저 확인 필요.
+- **아직 실행 안 됨** — 사용자가 실제 서버에서 순서대로 실행해야 함.
+
+---
+
+## 2026-08-27 — PC `/zipterior`를 `/map?mode=interior`로 완전 교체 (2단계)
+
+### 시작 전
+- 위 "content_blocks/공간별 그룹핑" 작업(1단계) 배포 후, 사용자가
+  "/zipterior 화면이 전혀 안 바뀐 것 같다"고 재확인 — 1단계는 `/map`
+  쪽 백엔드 작업이었을 뿐, 실제로 `/zipterior` 화면 자체를 `/map`
+  디자인으로 바꾸는 2단계는 아직 안 한 상태였음(순서를 사용자와
+  맞췄었으나, 계속 기다리게 하지 않고 바로 2단계 진행하기로 함).
+
+### 진행 중
+- **[완료]** `apps/web/src/app/zipterior/page.tsx` — PC(모바일 UA
+  아님)면 zipterior iframe을 아예 안 띄우고 `router.replace("/map?
+  mode=interior")`로 즉시 리다이렉트하도록 변경. 모바일은 기존과
+  동일하게 `zipterior.zippalgo360.com/m` iframe 유지(견적요청/
+  포트폴리오/MY집테리어 탭 등 우리 쪽에 아직 없는 기능이 많아서).
+  전환 중 짧게 "이동 중..." 문구 표시.
+  - **트레이드오프**: 이 화면에서 zipterior 자체 로그인/회원사/
+    관리자 메뉴가 빠짐(PC에서 그 메뉴들이 필요하면 별도 경로 필요
+    — 아직 논의 안 됨).
+- **[완료] 검증**: `next build` 클린. `npx eslint` 새 오류 없음
+  (`react-hooks/set-state-in-effect` 1건은 이 프로젝트 전역에 이미
+  있던 패턴과 동일한 종류라 비차단으로 판단, 이전 세션들과 동일 기준).
+- **미검증(실사용 확인 필요)**: 배포 후 실제로 PC에서
+  `zippalgo360.com/zipterior` 접속 시 `/map`으로 넘어가고 화면이
+  100% 동일하게 보이는지, 인테리어 포트폴리오 클릭 시 방별 그룹핑/
+  콘텐츠 블록이 정상 렌더링되는지(1단계 작업의 실사용 첫 확인이기도
+  함) 브라우저로 확인 필요.
+
+### 후속: 우측 하단 "우리집과 가까운/최근 등록 시공사례" 위젯 추가
+- 배포 후 사용자 확인: `/zipterior`→`/map` 전환은 잘 됨. 다만 `/map`은
+  "토탈" 개념이라 집테리어 전용 느낌이 부족하다며, 모바일 앱 셸에
+  이미 있는 "우리집과 가까운 시공사례"/"최근 등록 시공사례" 두 탭을
+  우측 하단에 추가해달라는 요청(집테리어 PC 화면의 `.local-stats`
+  "내 주변 시공사례" 위젯과 같은 자리, 모바일 탭 UX로).
+- zipterior 서버(`js/app.js`의 PC 위젯, `js/mobile-app.js`의 모바일
+  탭)를 읽어서 실제 API 확인: `GET /api/v1/portfolios?sort=nearest&
+  near_lat=&near_lng=&limit=&offset=`(하버사인 거리, 서버가 계산한
+  `distance_km` 포함) / `sort=latest`(최근 등록) — 우리 백엔드엔
+  단지 하나로 스코프된 `sort=popular` 엔드포인트만 있고 이 전체 피드
+  엔드포인트가 없었음.
+- **[완료] 백엔드**: `ZipteriorPortfolioCard`에 `distance_km` 추가,
+  신규 `get_portfolio_feed(sort, near_lat, near_lng, limit, offset)`
+  가 `/api/v1/portfolios?sort=...`를 그대로 프록시, 신규 라우트
+  `GET /integrations/zipterior/portfolios/feed`(`/portfolios/{id}`
+  경로보다 먼저 등록해 라우팅 충돌 방지).
+- **[완료] 프론트엔드**: `components/map/NearbyPortfolioWidget.tsx`
+  신규 — 두 탭("우리집과 가까운"/"최근 등록"), 마운트 시 조용히
+  위치 한 번 시도(거부돼도 토스트 없이 안내 문구만, zipterior와
+  동일 정책), 카드 클릭 시 기존 `setSelectedPortfolio`로 상세 패널
+  오픈(카드 데이터만으로 `ZipteriorPortfolioSummary` 최소 형태를
+  구성 — 상세 패널이 어차피 API에서 다시 불러오므로 id만 정확하면
+  됨). `/map/page.tsx`에 `activeLayers.has("interiorPortfolio")`일
+  때만(=인테리어 모드일 때만) 우측 하단에 렌더링.
+- **[완료] 검증**: `next build` 클린, 백엔드 `ast.parse` 통과.
+
+### 배포 및 실제 데이터 검증
+- 사용자가 `git pull` → `zippalgo360-api`/`zippalgo360-web` 재시작·
+  재빌드 실행, 둘 다 `active (running)` 확인.
+- **[완료] 서버 로컬에서 실제 API 응답 검증**(포트 8001, `/api` 접두사
+  필요 — 처음에 접두사 빼먹어서 404, 재확인함):
+  - `GET /api/integrations/zipterior/portfolios/feed?sort=latest` —
+    실제 포트폴리오 목록 정상 응답(`total: 10180`).
+  - `GET .../feed?sort=nearest&near_lat=37.5665&near_lng=126.9780`
+    (서울시청 좌표) — `distance_km` 정상 계산되어 옴(0.66km/0.98km,
+    가까운 순 정렬 확인).
+  - `GET .../portfolios/18988`(실제 포트폴리오) — `spaces` 8개,
+    `content_blocks` 98개, `images` 40개, 이미지의 `space_id`/
+    `room_label`(예: "거실")까지 전부 예상한 필드명 그대로 정상 응답.
+    **1단계(content_blocks/공간 그룹핑) 작업과 이번 위젯 작업 둘 다
+    데이터 레벨에서 확인 완료** — app.js를 읽고 재현한 필드명 추정이
+    실제 데이터와 정확히 일치함.
+- **남은 미검증**: 브라우저 화면에서 실제로 잘 렌더링되는지(방별
+  그룹핑 섹션, content_blocks 문서형 레이아웃, 위젯 카드 클릭 시
+  상세 패널 오픈)는 API 응답 확인과 별개로 사용자가 직접 확인 필요.
+
+### 후속: 실사용 확인 결과 4가지 지적 (위젯 위치 버그, 평형 기본값, 안내메시지)
+- 사용자가 실제 화면 스크린샷 2장 첨부해 지적: (1) 상세 문서(텍스트)는
+  잘 나옴 — content_blocks 작업 정상 확인. (2) 위젯이 지도 우측
+  하단이 아니라 열린 패널 옆 엉뚱한 위치에 붙어 있음. (3) 마커 클릭
+  → 단지 열었을 때 평형 타입이 "전체"가 아니라 특정 평형이 기본
+  선택돼 있음(부챗살에서 특정 평형 클릭 시 그 평형만 보이는 건
+  의도대로). (4) 상세 문서 맨 아래에 관리자 설정 안내 메시지(집테리어
+  자체 기능)가 우리 쪽엔 아예 없음.
+- **[완료] 원인 파악 및 수정 (2)**: `NearbyPortfolioWidget`을
+  `absolute left-0 top-0 flex h-full`인 왼쪽 패널 스택(클러스터
+  선택/단지정보/포트폴리오 상세가 나란히 쌓이는 flex 컨테이너) **안에
+  4번째 flex 아이템으로 잘못 넣어서**, 그 컨테이너의 실제 너비(열린
+  패널 개수에 따라 0~2×28rem으로 계속 바뀜) 기준으로
+  `right-4`가 계산되고 있었음 — 그래서 패널이 열릴 때마다 위젯이
+  화면 이곳저곳으로 튐. `apps/web/src/app/map/page.tsx` — 위젯을 그
+  flex 컨테이너 밖, 뷰포트 전체 기준 `relative` 컨테이너의 직계
+  자식으로 이동(줌/현재위치 컨트롤과 동일한 포지셔닝 기준).
+- **[완료] 원인 파악 및 수정 (3)**: `InteriorComplexPanel.tsx`의
+  단지 상세 로딩 `useEffect`가 `!selectedArea`(마커 클릭 직후 부모가
+  이미 null로 리셋해둔 상태)일 때 **첫 번째 평형 타입을 자동
+  선택**하고 있었음 — 마커 클릭(`openInteriorComplex`)은 이미
+  `setSelectedArea(null)`로 올바르게 "전체"를 세팅하고, 부챗살 평형
+  조각 클릭(`bindFanInteractions`)도 이미 올바르게 특정 평형을
+  세팅하는데, 이 자동 선택 로직이 매번 그걸 덮어쓰고 있었던 것.
+  해당 블록 삭제 — 부챗살 평형 클릭 로직은 원래도 맞았어서 안 건드림.
+- **[완료] 검증**: `next build` 클린.
+- **[완료] (4) 확인**: `GET /public/portfolio-display-settings`
+  (zipterior API). 실제 값 curl로 확인: `notice_enabled: true`,
+  `notice_text: null`, `notice_image_path` 설정됨, `notice_button_label:
+  "우리집과 같은 집 인테리어 견적 문의하기"`.
+- **[완료] (4) 구현**: 백엔드에
+  `ZipteriorPortfolioDisplaySettingsOut` +
+  `get_portfolio_display_settings()`(실패 시 `notice_enabled=False`로
+  안전 폴백) + 신규 라우트 `GET /integrations/zipterior/
+  portfolio-display-settings`. 프론트 `InteriorPortfolioPanel.tsx` —
+  `portfolioId`와 무관한 전역 설정이라 별도 `useEffect([])`로 한 번만
+  불러옴, `notice_enabled`일 때만 상세 문서 맨 아래에 이미지+텍스트+
+  CTA 버튼 렌더링.
+  - **의도적 단순화**: zipterior의 CTA 버튼은 클릭 시 포트폴리오별
+    견적문의 입력 모달(`data-portfolio-inquiry`)을 여는데, 그 모달
+    자체를 새로 만드는 건 이번 범위 밖이라 **기존 상단 "회사에
+    문의하기" 버튼과 동일하게 `tel:회사전화번호`로 연결**해둠(전화번호
+    없으면 버튼 자체를 숨김). 진짜 견적문의 폼이 필요하면 별도 작업
+    필요 — 사용자에게 안내함.
+- **[완료] 검증**: `next build` 클린, 백엔드 `ast.parse` 통과.
+
+### 배포
+- 사용자가 `git pull` → `zippalgo360-api`/`zippalgo360-web` 재시작·
+  재빌드, 둘 다 정상.
+- **[완료] 실제 API 검증**: `curl
+  http://127.0.0.1:8001/api/integrations/zipterior/portfolio-display-settings`
+  → `notice_image_path`가 `https://zipterior.kr/uploads/...`로 정상
+  절대경로 변환되어 응답 확인.
+- **남은 미검증(브라우저)**: 위젯 위치, 평형 기본값(전체), 부챗살
+  평형 필터, 안내 메시지 4가지 전부 사용자가 직접 화면으로 확인
+  필요.
+
+### 후속: 실사용 확인 후 5가지 추가 수정
+- 사용자가 실제 화면 스크린샷 2장으로 리포트:
+  1. 위젯이 지도 우측 하단이 아니라 열린 패널 옆에 붙어서 뜬다.
+  2. 상세 하단 견적문의 버튼이 안 보인다.
+  3. 안내 이미지가 흐리게 보인다(24인치 기준으로 만든 이미지).
+  4. 위젯 카드 클릭 시 포트폴리오 상세만 열리고 단지정보/부챗살은
+     그대로(또는 무관하게) 남아있다.
+  5. 스크린샷에서 서울 단지 패널이 열린 채로 위젯의 여주 포트폴리오를
+     눌렀더니 서로 다른 단지 정보가 나란히 뒤섞여 보였다 — 이게
+     버그인지, 4번을 고치면 자연히 해결되는지 판단해달라는 요청.
+
+- **[원인 1]**: `NearbyPortfolioWidget`을 왼쪽 패널들이 들어있는
+  `<div className="absolute left-0 top-0 flex h-full">`(패널
+  개수에 따라 폭이 늘었다 줄었다 하는 flex 컨테이너) **안에** 잘못
+  넣어서, `absolute right-4 bottom-4`가 뷰포트가 아니라 그 좁은
+  flex 컨테이너 기준으로 계산되고 있었음. 그 컨테이너 바깥, 최상위
+  뷰포트 컨테이너의 직계 자식으로 이동해서 해결(줌/현재위치
+  컨트롤과 동일한 기준점).
+- **[원인 2]**: 안내 CTA 버튼을 `portfolio.company_phone` 존재
+  여부로 숨겼었는데, 실제 데이터에서 전화번호가 없는 업체가 많아
+  버튼 자체가 안 뜬 것. 집테리어 원본은 `notice_enabled`만으로
+  버튼을 항상 보여준다(모달로 견적 입력). **[완료] 수정**: 버튼은
+  `notice_enabled`일 때 항상 노출, 전화번호 있으면 `tel:`, 없으면
+  포트폴리오 원본 상세 페이지(`zipterior.kr/?portfolio=id`, 새 탭)로
+  연결 — 진짜 견적문의 입력 모달 자체는 아직 안 만들었다는 걸
+  버튼 동작으로 알 수 있게 남겨둠(백엔드에 `detail_url` 추가해서
+  프론트로 전달).
+- **[원인 3]**: 안내 이미지가 우리 패널(28rem=448px)보다 넓은
+  화면 기준으로 만들어진 파일이라 실제 소스 해상도보다 크게 늘려
+  그리는 상태였음. **[완료] 조치**: 표시 폭을 `max-w-xs`로 줄여
+  체감 선명도를 높임 — 다만 이건 완화일 뿐 근본 해결은 아니라서,
+  여전히 흐리면 집테리어 관리자에서 더 고해상도 원본으로 교체하는
+  게 정석이라고 사용자에게 안내함.
+- **[원인 4/5]**: 위젯 클릭이 `setSelectedPortfolio`만 호출해서
+  포트폴리오 패널만 열고, 그 포트폴리오가 실제로 속한 단지의
+  단지정보 패널/부챗살 마커/지도 이동은 전혀 안 건드리고 있었음 —
+  그래서 이전에 열려있던 **다른(무관한) 단지**의 패널이 그대로
+  남아, 지금 연 포트폴리오와 안 맞는 채로 나란히 보인 것(5번
+  리포트). **[완료] 수정**: `map/page.tsx`에 `openPortfolioFromFeed`
+  신규 — 마커 클릭과 동일하게 `openInteriorComplex(complexId)`를
+  먼저 호출(부챗살+단지패널+지도이동), 캐시된 단지 상세에서
+  `apartment_type_id`가 일치하는 평형을 찾아 `selectedArea`까지
+  맞춘 뒤에 포트폴리오 패널을 연다. 이 흐름 자체가 5번을 함께
+  해결 — 열려있던 엉뚱한 단지 패널이 새 단지 정보로 정확히
+  교체되므로, **판단: 4번 수정 외에 별도의 "막아두는" 로직이나
+  추가 API 호출은 불필요**(이미 `openInteriorComplex`가 캐시를
+  써서 중복 호출도 없음).
+  - 부수 정리: 위젯이 넘기던 값을 `ZipteriorPortfolioSummary`
+    사전 변환에서 원본 `ZipteriorPortfolioCard` 그대로 위로
+    올리도록 바꿈(단지/평형 매칭에 카드의 `complex_id`/
+    `apartment_type_id`가 필요해서).
+- **[완료] 부가 수정**: 위젯 탭 전환 시 깜빡이던 문제(3번 리포트,
+  이번 라운드에서 같이 발견) — 탭별로 한 번 받아온 목록을
+  `feedCache`에 캐시해서, 이미 불러온 탭으로 돌아가면 재요청 없이
+  바로 보여주고(깜빡임 없음), 처음 불러오는 탭에서만 "불러오는
+  중..." 문구를 보여주도록 재작성.
+- **[완료] 검증**: `next build` 클린. `npx eslint` — 수정 전
+  베이스라인 11개 오류였던 게 수정 후 10개로 오히려 줄었고(전부
+  이 프로젝트 전역의 기존 관례인 `react-hooks/set-state-in-effect`/
+  `react-hooks/refs` 종류), 새로 생긴 오류 없음.
+- **미검증**: 서버 배포 후 다섯 가지 전부 실사용 확인 필요.
+
+### 후속: push 실패 이어받음 (새 세션)
+- 이전 세션이 위 커밋(위젯 위치/깜빡임/안내버튼/이미지/단지-포트폴리오
+  연동 5가지 수정)을 로컬에서 완료했으나, 세션 쪽 GitHub 인증 프록시
+  문제로 `git push`가 계속 실패("could not read Username for
+  'https://github.com'")해 새 세션으로 이어받음. 새 세션에서 저장소를
+  다시 클론해 브랜치/`docs/WORK_LOG.md` 끝부분/`CLAUDE.md`가 인계받은
+  내용과 일치하는지 확인한 뒤 동일 패치를 `git am`으로 적용, `next
+  build`·backend `ast.parse` 재검증 후 정상 push함. 코드 변경 내용은
+  위 항목 그대로(추가 수정 없음).
+
+### 후속: 위젯 닫기를 아이콘으로, 최초 로딩 깜빡임 제거
+- 사용자 리포트 2건:
+  1. 위젯을 닫으면(×버튼) 완전히 사라지는데, 완전히 안 보이게 하지
+     말고 작은 아이콘 형태로 남겨서 다시 열 수 있게 해달라.
+  2. 탭별 캐시를 넣은 뒤에도 "최근 등록" 탭을 **처음** 눌렀을 때는
+     여전히 한 번 깜빡이고, 그 이후 왔다갔다 할 때만 안 깜빡인다 —
+     최초 1회도 깜빡이지 않게 해달라.
+- **[원인 2]**: 로딩 문구 표시 조건이 `items === undefined &&
+  loadingTab === tab`이었는데, 탭을 바꾸면 `tab` state는 클릭 즉시
+  바뀌지만 `loadingTab`은 그 다음 렌더에서 실행되는 `useEffect` 안에서만
+  갱신됨. 그래서 탭 전환 직후 한 프레임은 `items===undefined`이면서
+  `loadingTab`이 아직 이전 값이라 조건이 거짓이 되어 "불러오는 중..."이
+  아니라 바로 아래 "아직 등록된 시공사례가 없어요"(빈 상태)로 먼저
+  렌더링됐다가, effect가 실행되고 나서야 "불러오는 중..."으로 바뀌는
+  깜빡임이 발생. **[완료] 수정**: `loadingTab` state를 완전히 없애고
+  로딩 여부를 `items === undefined`만으로 판단하도록 단순화 — 캐시에
+  아직 값이 없으면(성공/실패 어느 쪽이든 fetch가 끝나야 값이 채워짐)
+  무조건 로딩 문구, 값이 있으면(빈 배열 포함) 그 결과를 바로 렌더링.
+  중복 요청 방지는 기존 `requestedTabsRef`가 그대로 담당.
+- **[완료] 수정 1**: `closed` 상태일 때 `null`을 반환하는 대신, 같은
+  `bottom-4 right-4` 위치에 지도 우측 상단 컨트롤 버튼들과 톤을 맞춘
+  원형 아이콘 버튼(`h-11 w-11`, 갤러리 아이콘)을 렌더링 — 클릭하면
+  `setClosed(false)`로 위젯을 다시 연다.
+- **[완료] 검증**: `next build` 클린. `npx eslint
+  NearbyPortfolioWidget.tsx` — 오류 1건(`react-hooks/set-state-in-effect`,
+  줄 43 `setLocationDenied`)은 이번 수정과 무관한 기존 코드(위치 권한
+  거부 처리) 그대로라 베이스라인과 동일, 새로 생긴 오류 없음.
+- **미검증**: 브라우저에서 닫기 아이콘 재오픈 동작과 "최근 등록" 최초
+  클릭 시 깜빡임 없는지 실사용 확인 필요.
+
+### 후속: 닫기 아이콘 위치/모양 변경, 최초 클릭 깜빡임 재수정
+- 사용자가 배포 후 실사용 확인, 2건 리포트:
+  1. "최근 등록" 탭을 처음 눌렀을 때 여전히 깜빡거림 — 직전 수정
+     (`loadingTab` 제거)은 탭 전환 시점의 렌더 경쟁(레이스)만 없앤
+     것이라, 탭을 누른 **그 순간부터** fetch가 시작되는 구조라서
+     "로딩 문구 → 목록"으로 바뀌는 전환 자체(첫 로딩)는 여전히
+     보였음. 즉 이전 수정과 이번 리포트는 서로 다른 원인.
+  2. 닫기(×) 눌렀을 때 남는 재오픈 아이콘을 상단으로 옮기고,
+     기존 지도 컨트롤과 같은 "둥근사각" 스타일로 맞추고, 아이콘 대신
+     "인테/리어" 두 줄 텍스트로 바꿔달라.
+- **[원인 1 재분석]**: 탭을 실제로 누르기 **전까지** 그 탭의 데이터를
+  아예 요청조차 안 하는 구조(지연 로딩)였던 게 근본 원인 — 캐시가
+  아무리 정확해도 처음 누르는 순간엔 캐시가 비어 있을 수밖에 없다.
+  **[완료] 수정**: `NearbyPortfolioWidget`에서 탭 클릭과 fetch 시작을
+  완전히 분리 — "최근 등록"은 컴포넌트 마운트 즉시(위치 정보 불필요),
+  "우리집과 가까운"은 위치를 얻는 즉시 두 탭 다 백그라운드로 미리
+  요청해둔다. 사용자가 실제로 탭을 눌러볼 때쯤엔 이미 캐시가 채워져
+  있을 가능성이 높아 로딩 문구 자체가 안 보이는 경우가 대부분이 된다
+  (완전히 0으로 보장하는 건 아니고, 느린 회선에서 탭을 누르는 타이밍이
+  아주 빠르면 여전히 잠깐 보일 수 있음 — 근본적으로는 네트워크 왕복이
+  걸리는 한 어쩔 수 없는 부분이라고 사용자에게 안내 필요).
+- **[완료] 수정 2**: 재오픈 아이콘을 `NearbyPortfolioWidget` 내부의
+  독립 `absolute bottom-4 right-4` 엘리먼트 대신, `map/page.tsx`의
+  기존 우측 상단 지도 컨트롤 스택(`controlButtonClass`, 채팅/줌/
+  현재위치/일반·위성/㎡/레이어 버튼들과 같은 `flex flex-col gap-2`
+  컨테이너) 안으로 옮김 — 닫힘 상태(`portfolioWidgetClosed`)를
+  `NearbyPortfolioWidget`이 아니라 `ServiceMapView`(map/page.tsx)가
+  들고 있게 바꿔서, 위젯을 안 그리고 그 대신 같은 스택 안에
+  `controlButtonClass(false)` 그대로 쓰는 버튼을 추가함 — 그래서
+  다른 컨트롤과 크기(h-11 w-11)·모서리(rounded-xl 둥근사각)·테두리·
+  그림자·간격(부모의 gap-2)이 전부 자동으로 맞음(수동 픽셀 계산 불필요).
+  아이콘 대신 `인테`/`리어` 두 줄 텍스트(text-[10px] font-bold
+  leading-none)로 표시.
+- **[완료] 검증**: `next build` 클린. `npx eslint
+  NearbyPortfolioWidget.tsx src/app/map/page.tsx` — 오류 6건 전부
+  이 프로젝트 전역의 기존 관례(`react-hooks/refs`,
+  `react-hooks/set-state-in-effect`, map/page.tsx의 사전부터 있던
+  줄들 + 위젯의 위치 권한 거부 처리 줄)와 동일, 새로 생긴 오류 없음.
+- **미검증**: 브라우저에서 (1) 재오픈 아이콘이 우측 상단 컨트롤
+  스택에 자연스럽게 붙어 보이는지, (2) "최근 등록" 최초 클릭 시
+  체감상 깜빡임이 사라졌는지 실사용 확인 필요.
