@@ -237,3 +237,12 @@ body {
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.13);
   cursor: pointer;
 }
+
+/* 스크롤은 되지만 스크롤바는 안 보이게 (지도 홈 사이드바 패널용) */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
