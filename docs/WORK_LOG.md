@@ -4185,3 +4185,22 @@ sudo systemctl restart zippalgo360-web
 - 서버 배포는 아직 안 함 — 사용자 확인 후 이전과 동일한 방식
   (`git pull` → `npm run build` → `systemctl restart
   zippalgo360-web`)으로 진행 예정.
+
+---
+
+## 2026-08-28 (밤 2, 배포) — 위 홈 사이드바 정리 작업 클라우드 서버 배포
+
+배포(API/DB 변경 없음 — 프론트엔드 전용):
+```
+cd /srv/zippalgo360
+git pull origin claude/jippalgo360-platform-6bvrfh   # a0300d2..b943acf fast-forward
+cd apps/web
+npm run build                                         # 성공
+sudo systemctl restart zippalgo360-web
+```
+
+사용자가 직접 실행·확인: `git pull` 성공(3개 파일), `npm run build` 성공,
+`systemctl status zippalgo360-web` → `active (running)` 확인.
+
+**[완료] 배포 완료** — zippalgo360.com/map에 화살표 제거·CTA 실제 페이지
+연결·매물/구매의뢰 탭 실데이터·시황 제거가 전부 라이브 반영됨.
