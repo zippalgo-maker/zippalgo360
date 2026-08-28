@@ -3518,3 +3518,13 @@ sudo systemctl restart zippalgo360-web
   이 프로젝트 전역의 기존 관례인 `react-hooks/set-state-in-effect`/
   `react-hooks/refs` 종류), 새로 생긴 오류 없음.
 - **미검증**: 서버 배포 후 다섯 가지 전부 실사용 확인 필요.
+
+### 후속: push 실패 이어받음 (새 세션)
+- 이전 세션이 위 커밋(위젯 위치/깜빡임/안내버튼/이미지/단지-포트폴리오
+  연동 5가지 수정)을 로컬에서 완료했으나, 세션 쪽 GitHub 인증 프록시
+  문제로 `git push`가 계속 실패("could not read Username for
+  'https://github.com'")해 새 세션으로 이어받음. 새 세션에서 저장소를
+  다시 클론해 브랜치/`docs/WORK_LOG.md` 끝부분/`CLAUDE.md`가 인계받은
+  내용과 일치하는지 확인한 뒤 동일 패치를 `git am`으로 적용, `next
+  build`·backend `ast.parse` 재검증 후 정상 push함. 코드 변경 내용은
+  위 항목 그대로(추가 수정 없음).
