@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import type { ZipteriorPortfolioCard } from "@/lib/types";
 
@@ -8,6 +8,7 @@ type FeedTab = "nearby" | "latest";
 
 interface NearbyPortfolioWidgetProps {
   onOpenPortfolio: (card: ZipteriorPortfolioCard) => void;
+  onClose: () => void;
 }
 
 const FEED_LIMIT = 5;
@@ -22,21 +23,31 @@ function dateLabel(iso: string): string {
   return date.toLocaleDateString("ko-KR", { year: "2-digit", month: "2-digit", day: "2-digit" });
 }
 
+function fetchFeed(params: URLSearchParams): Promise<ZipteriorPortfolioCard[]> {
+  return apiFetch<{ items: ZipteriorPortfolioCard[]; available: boolean }>(
+    `/integrations/zipterior/portfolios/feed?${params}`,
+  )
+    .then((data) => (data.available ? data.items : []))
+    .catch(() => []);
+}
+
 /**
  * 집테리어 자체 지도 화면(PC "내 주변 시공사례" 위젯, 모바일 "우리집과
  * 가까운/최근 등록 시공사례" 탭)과 동일한 구성 — /map 페이지의 인테리어
  * 모드에서만 우측 하단에 뜬다.
  */
-export default function NearbyPortfolioWidget({ onOpenPortfolio }: NearbyPortfolioWidgetProps) {
+export default function NearbyPortfolioWidget({ onOpenPortfolio, onClose }: NearbyPortfolioWidgetProps) {
   const [tab, setTab] = useState<FeedTab>("nearby");
-  // 탭별로 한 번 받아온 목록을 그대로 캐시해둔다 — 안 그러면 탭을
-  // 왔다갔다 할 때마다 목록이 비었다가 다시 채워지면서 깜빡였다(실사용
-  // 리포트). 이미 불러온 탭은 재요청 없이 캐시된 값을 즉시 보여준다.
+  // 두 탭 모두 화면에 보이기 전에 미리 받아둔다 — 탭을 누른 시점에야
+  // 요청을 시작하면, 아무리 캐시를 잘 짜도 "최초 클릭"만큼은 로딩
+  // 문구가 한 번 보였다 사라지는 게 보인다(실사용 리포트: 최초
+  // 상태에서 "최근 등록" 처음 눌렀을 때만 깜빡임). "최근 등록"은
+  // 위치 정보가 필요 없으니 마운트 즉시, "우리집과 가까운"은 위치를
+  // 얻는 즉시 받아서, 사용자가 실제로 탭을 누를 때는 대부분 이미
+  // 캐시가 채워져 있게 한다.
   const [feedCache, setFeedCache] = useState<Partial<Record<FeedTab, ZipteriorPortfolioCard[]>>>({});
-  const requestedTabsRef = useRef<Set<FeedTab>>(new Set());
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationDenied, setLocationDenied] = useState(false);
-  const [closed, setClosed] = useState(false);
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -53,45 +64,34 @@ export default function NearbyPortfolioWidget({ onOpenPortfolio }: NearbyPortfol
   }, []);
 
   useEffect(() => {
-    if (tab === "nearby" && !location) return;
-    if (requestedTabsRef.current.has(tab)) return;
-    requestedTabsRef.current.add(tab);
     let cancelled = false;
-    const params = new URLSearchParams({ sort: tab === "nearby" ? "nearest" : "latest", limit: String(FEED_LIMIT) });
-    if (tab === "nearby" && location) {
-      params.set("near_lat", String(location.lat));
-      params.set("near_lng", String(location.lng));
-    }
-    apiFetch<{ items: ZipteriorPortfolioCard[]; available: boolean }>(`/integrations/zipterior/portfolios/feed?${params}`)
-      .then((data) => {
-        if (!cancelled) setFeedCache((prev) => ({ ...prev, [tab]: data.available ? data.items : [] }));
-      })
-      .catch(() => {
-        if (!cancelled) setFeedCache((prev) => ({ ...prev, [tab]: [] }));
-      });
+    const params = new URLSearchParams({ sort: "latest", limit: String(FEED_LIMIT) });
+    fetchFeed(params).then((items) => {
+      if (!cancelled) setFeedCache((prev) => ({ ...prev, latest: items }));
+    });
     return () => {
       cancelled = true;
     };
-  }, [tab, location]);
+  }, []);
+
+  useEffect(() => {
+    if (!location) return;
+    let cancelled = false;
+    const params = new URLSearchParams({
+      sort: "nearest",
+      limit: String(FEED_LIMIT),
+      near_lat: String(location.lat),
+      near_lng: String(location.lng),
+    });
+    fetchFeed(params).then((items) => {
+      if (!cancelled) setFeedCache((prev) => ({ ...prev, nearby: items }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [location]);
 
   const items = feedCache[tab];
-
-  if (closed) {
-    return (
-      <button
-        type="button"
-        onClick={() => setClosed(false)}
-        aria-label="시공사례 위젯 열기"
-        className="absolute bottom-4 right-4 z-20 flex h-11 w-11 items-center justify-center rounded-full border border-line bg-white text-ink/80 shadow-md transition hover:bg-soft"
-      >
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8">
-          <rect x="3.5" y="4.5" width="17" height="14" rx="2" />
-          <path d="M3.5 15.5 8.5 11l3.5 3 3.5-4 4.5 5.5" />
-          <circle cx="8" cy="8.5" r="1.4" fill="currentColor" stroke="none" />
-        </svg>
-      </button>
-    );
-  }
 
   return (
     <div className="absolute bottom-4 right-4 z-20 w-72 overflow-hidden rounded-2xl border border-line bg-white shadow-lg">
@@ -118,7 +118,7 @@ export default function NearbyPortfolioWidget({ onOpenPortfolio }: NearbyPortfol
         </div>
         <button
           type="button"
-          onClick={() => setClosed(true)}
+          onClick={onClose}
           aria-label="닫기"
           className="flex h-6 w-6 items-center justify-center rounded-full text-sm text-muted hover:bg-soft hover:text-ink"
         >

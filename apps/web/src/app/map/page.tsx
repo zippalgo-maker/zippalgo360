@@ -270,6 +270,14 @@ function ServiceMapView() {
   const [unreadChatCount] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
 
+  // NearbyPortfolioWidget을 닫으면(× 버튼) 우측 상단 지도 컨트롤
+  // 스택에 다시 열기용 아이콘만 남긴다 — 닫힌 상태를 여기서 들고
+  // 있어야 그 아이콘을 컨트롤 스택 안에 자연스럽게(같은 gap-2로) 끼워
+  // 넣을 수 있다(위젯 내부에 별도 absolute로 두면 위치를 수동으로
+  // 맞춰야 해서 다른 컨트롤과 간격이 어긋난다, 2026-08-28 실사용
+  // 리포트).
+  const [portfolioWidgetClosed, setPortfolioWidgetClosed] = useState(false);
+
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(null), 2200);
@@ -1295,6 +1303,18 @@ function ServiceMapView() {
             불러오는 중...
           </div>
         )}
+
+        {activeLayers.has("interiorPortfolio") && portfolioWidgetClosed && (
+          <button
+            type="button"
+            onClick={() => setPortfolioWidgetClosed(false)}
+            aria-label="시공사례 위젯 열기"
+            className={`${controlButtonClass(false)} flex-col gap-0.5 text-[10px] font-bold leading-none`}
+          >
+            <span>인테</span>
+            <span>리어</span>
+          </button>
+        )}
       </div>
 
       {/* 인테리어 시공사례 패널들 — 집테리어(zipterior.kr)와 동일하게
@@ -1380,8 +1400,8 @@ function ServiceMapView() {
           들어가 있으면 열린 패널 개수에 따라 위치가 널뛰는 버그가 있었음
           (2026-08-28 실제로 발생) — 반드시 이 바깥, 뷰포트 전체 기준
           absolute로 둬야 줌/현재위치 컨트롤과 같은 우측 하단에 고정됨. */}
-      {activeLayers.has("interiorPortfolio") && (
-        <NearbyPortfolioWidget onOpenPortfolio={openPortfolioFromFeed} />
+      {activeLayers.has("interiorPortfolio") && !portfolioWidgetClosed && (
+        <NearbyPortfolioWidget onOpenPortfolio={openPortfolioFromFeed} onClose={() => setPortfolioWidgetClosed(true)} />
       )}
 
       {chatOpen && (
