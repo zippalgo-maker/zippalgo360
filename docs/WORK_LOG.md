@@ -3379,7 +3379,23 @@ sudo systemctl restart zippalgo360-web
   됨). `/map/page.tsx`에 `activeLayers.has("interiorPortfolio")`일
   때만(=인테리어 모드일 때만) 우측 하단에 렌더링.
 - **[완료] 검증**: `next build` 클린, 백엔드 `ast.parse` 통과.
-- **미검증**: 이 세션은 zipterior API 네트워크 접근이 없어 실제
-  거리순/최신순 데이터 응답을 확인 못함 — 배포 후 위치 권한 허용한
-  상태에서 "가까운"/"최근 등록" 두 탭 다 카드가 실제로 뜨는지,
-  카드 클릭 시 상세 패널이 정상 열리는지 확인 필요.
+
+### 배포 및 실제 데이터 검증
+- 사용자가 `git pull` → `zippalgo360-api`/`zippalgo360-web` 재시작·
+  재빌드 실행, 둘 다 `active (running)` 확인.
+- **[완료] 서버 로컬에서 실제 API 응답 검증**(포트 8001, `/api` 접두사
+  필요 — 처음에 접두사 빼먹어서 404, 재확인함):
+  - `GET /api/integrations/zipterior/portfolios/feed?sort=latest` —
+    실제 포트폴리오 목록 정상 응답(`total: 10180`).
+  - `GET .../feed?sort=nearest&near_lat=37.5665&near_lng=126.9780`
+    (서울시청 좌표) — `distance_km` 정상 계산되어 옴(0.66km/0.98km,
+    가까운 순 정렬 확인).
+  - `GET .../portfolios/18988`(실제 포트폴리오) — `spaces` 8개,
+    `content_blocks` 98개, `images` 40개, 이미지의 `space_id`/
+    `room_label`(예: "거실")까지 전부 예상한 필드명 그대로 정상 응답.
+    **1단계(content_blocks/공간 그룹핑) 작업과 이번 위젯 작업 둘 다
+    데이터 레벨에서 확인 완료** — app.js를 읽고 재현한 필드명 추정이
+    실제 데이터와 정확히 일치함.
+- **남은 미검증**: 브라우저 화면에서 실제로 잘 렌더링되는지(방별
+  그룹핑 섹션, content_blocks 문서형 레이아웃, 위젯 카드 클릭 시
+  상세 패널 오픈)는 API 응답 확인과 별개로 사용자가 직접 확인 필요.
