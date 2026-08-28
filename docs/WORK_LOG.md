@@ -3857,3 +3857,59 @@ sudo systemctl restart zippalgo360-web
   실제 운영 서버(`/srv/zipterior/backend`)에 `git pull` +
   `alembic upgrade head` + 서비스 재시작을 사용자가 해줘야 새 API가
   살아난다. 이 세션은 서버 SSH 접근 불가.
+
+### 후속: 프론트엔드 반영 + 배포 중 발견한 심각한 문제 (⚠️ 사용자 확인 전까지 추가 조치 보류)
+
+- **[완료]** 사용자가 서버에서 정확한 파일 목록/구조를 직접 확인해줌
+  (`/var/www/zipterior/admin-dashboard.html`, `js/admin-api.js` 등 —
+  git 관리 밖의 정적 파일이 맞음, 위 "중요 발견" 재확인). 기존
+  `companyManageView`(업체 관리) 패턴을 그대로 복제해 "영업관리" 메뉴를
+  코드로 작성 → Python 스크립트(앵커 문자열 정확히 1회 매칭 시에만
+  수정, 자동 타임스탬프 백업)로 사용자가 직접 실행해 반영 완료. 검증:
+  `salesContactView|salesContactModal` 3건, `loadSalesContactManage|
+  openSalesContactDetail` 10건으로 정상 삽입 확인. 백업:
+  `admin-dashboard.html.bak_20260828_171031_before_sales_contact_menu`,
+  `admin-api.js.bak_20260828_171031_before_sales_contact_menu`.
+
+- **⚠️ [심각] 백엔드 배포 시도 중 발견 — 아직 미해결**:
+  1. **서버(`/srv/zipterior/backend`)에 커밋 안 된 로컬 변경사항이 대량
+     존재함** — `admin`/`auth`/`chat`/`estimates`/`public_map`/
+     `reviews`/`users` 등 기존 파일 다수 수정 + 완전히 새로운 미커밋
+     파일들(`app/modules/admin/activity_*.py`,
+     `app/modules/admin/server_status_*.py`,
+     `app/modules/admin/suspension_worker.py`,
+     **`app/modules/auth/sso_bridge.py`**). 이 저장소가 이번 세션에서
+     처음 clone되기 전부터, 서버에는 한 번도 push 안 된 상당한
+     작업물이 계속 쌓여 있었다는 뜻 — 이 사실 자체를 이번에 처음
+     확인함.
+  2. **Alembic 리비전 ID 충돌**: 제가 만든
+     `a25000000010_add_company_sales_contacts.py`와, 서버에 이미
+     있던(미커밋) `a25000000010_add_reviews_milestones_notification_
+     prefs.py`가 **같은 리비전 ID `a25000000010`**을 씀.
+  3. **`git pull origin main`이 충돌로 중단(Aborting)됐는데도**,
+     그 직후 실행한 `alembic upgrade head`는 (git과 무관하게 디스크의
+     .py 파일을 그대로 읽으므로) 서버에 이미 있던 그 미커밋
+     `a25000000010`(리뷰/마일스톤/알림설정 마이그레이션)을 **실제
+     운영 DB에 적용해버림** — `alembic current` 결과 `a25000000010
+     (head)`로 확인. 즉 **제 커밋(003fe37)은 서버 파일시스템에 아직
+     전혀 반영 안 됐고**, 대신 이 세션이 전혀 모르는 다른 미커밋
+     마이그레이션이 방금 운영 DB 스키마를 바꿈.
+  4. **잠재적 개인정보/Secret 유출 위험**: 미커밋 파일 중
+     `db_backups/`라는 디렉터리가 있음. `zipterior-backend`
+     저장소는 **퍼블릭**이라, 만약 여기 실제 DB 덤프가 들어있는 채로
+     커밋되면 그대로 인터넷에 노출됨. **아직 내용 확인 전 — 사용자에게
+     `ls -la db_backups/`, `du -sh db_backups/`, `.gitignore` 내용
+     요청해둔 상태, 결과 오기 전까지 어떤 git add/commit도 진행 안 함.**
+
+- **다음 세션 인계사항(중요)**:
+  - **`zipterior-backend`의 `main` 브랜치는 서버 로컬 상태와 GitHub
+    원격 상태가 상당히 다르다** — 서버가 진실에 가까운 최신 상태이고
+    GitHub(제가 이번에 커밋한 003fe37 포함)가 오히려 뒤처져 있을 수
+    있음. 앞으로 이 저장소를 다룰 때 GitHub만 보고 판단하지 말 것.
+  - `a25000000010_add_company_sales_contacts.py`(제 마이그레이션)는
+    리비전 ID를 새로 발급해서 서버의 `a25000000010_add_reviews_
+    milestones_notification_prefs`(이미 운영 DB에 적용됨) **뒤에**
+    체이닝하도록 고쳐야 함 — 지금 상태로는 절대 그대로 pull/upgrade
+    하면 안 됨.
+  - db_backups/ 내용 확인 전까지 이 저장소에서 `git add -A`류의
+    전체 스테이징을 하지 말 것 — 개인정보 유출 위험.
