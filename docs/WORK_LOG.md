@@ -4075,3 +4075,38 @@ Claude Design 캔버스 목업으로 여러 라운드 반복(집품/KB부동산 
   TM코드 즉시 반영, 상세보기 안에서 담당자/날짜/요일 필터+정렬+검색,
   리치텍스트 굵게/색상 적용 후 저장·재조회 시 서식 유지, 기록 수정
   (사유 입력 강제) 후 "수정됨" 배지와 수정이력 펼쳐보기 정상 동작.
+
+---
+
+## 2026-08-28 (밤) — 부동산 사이클 홈 사이드바 클라우드 서버 배포
+
+### 배경
+- 위 "부동산 사이클 홈 사이드바" 작업(`HomeSidebar.tsx`/`PromoOverlays.tsx`,
+  커밋 `7e46bcb`)은 로컬 빌드/린트/Playwright 검증까지만 끝나고 서버엔
+  미배포 상태였음. 사용자가 "로컬 서버(사무실 PC 이전용)는 안 건드리고
+  클라우드 서버(zippalgo360.com, 115.68.195.144)만 배포하라"고 명시,
+  사용자 본인 터미널이 서버에 SSH로 연결돼 있어 배포 명령을 사용자가
+  직접 실행하는 기존 방식으로 진행함(이 세션은 서버에 직접 SSH 불가 —
+  포트 22 접속 테스트로 재확인함).
+
+### 배포 (API/DB 변경 없음 — 프론트엔드 전용)
+```
+cd /srv/zippalgo360
+git pull origin claude/jippalgo360-platform-6bvrfh   # 4b9b2e8..a0300d2 fast-forward
+cd apps/web
+npm run build                                         # 성공, /map 라우트 포함 29개 페이지 정상 생성
+sudo systemctl restart zippalgo360-web
+```
+
+### 검증
+- 사용자가 직접 실행: `git pull` 성공(6개 파일 변경 — HomeSidebar.tsx,
+  PromoOverlays.tsx, page.tsx, 프로모 이미지 2장, WORK_LOG.md), `npm run
+  build` 성공(TypeScript 에러 없음), `systemctl status zippalgo360-web` →
+  `active (running)` 확인.
+- **[완료] 배포 완료** — zippalgo360.com/map에 부동산 사이클 사이드바 +
+  코너배너/센터모달(실제 이미지) 라이브 반영됨.
+
+### 다음에 손볼 것 (이전 기록과 동일, 아직 미착수)
+- 매물/구매의뢰/집서비스 탭과 "최근 조회 단지 랭킹"/"이번 주 시황"을
+  정적 데이터 대신 실제 API로 연결
+- CTA 폼 제출을 실제 매물 등록/구매의뢰 생성 API에 연결
