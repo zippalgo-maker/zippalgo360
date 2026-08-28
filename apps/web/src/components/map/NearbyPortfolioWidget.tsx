@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import type { ZipteriorPortfolioCard } from "@/lib/types";
 
@@ -11,7 +11,18 @@ interface NearbyPortfolioWidgetProps {
   onClose: () => void;
 }
 
-const FEED_LIMIT = 5;
+// 페이지당 6개(2열×3행) × 3페이지 = 18개. 백엔드 /portfolios/feed의
+// limit 상한이 20이라 한 번의 요청으로 다 받아와 클라이언트에서
+// 페이지로 나눈다(요청 3번 대신 1번).
+const PAGE_SIZE = 6;
+const PAGE_COUNT = 3;
+const FEED_LIMIT = PAGE_SIZE * PAGE_COUNT;
+
+function chunk<T>(list: T[], size: number): T[][] {
+  const pages: T[][] = [];
+  for (let i = 0; i < list.length; i += size) pages.push(list.slice(i, i + size));
+  return pages;
+}
 
 function distanceLabel(km: number): string {
   return km < 1 ? `${Math.round(km * 1000)}m` : `${km.toFixed(1)}km`;
@@ -50,6 +61,22 @@ export default function NearbyPortfolioWidget({ onOpenPortfolio, onClose }: Near
   const [feedCache, setFeedCache] = useState<Partial<Record<FeedTab, ZipteriorPortfolioCard[]>>>({});
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationDenied, setLocationDenied] = useState(false);
+  // 6개씩 페이지로 나눠 가로 스크롤로 넘기고, 하단 점으로 현재 위치를
+  // 보여준다(실사용 요청 — 세로 스크롤 없이 총 18개를 3페이지로).
+  const [page, setPage] = useState(0);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  function switchTab(nextTab: FeedTab) {
+    setTab(nextTab);
+    setPage(0);
+    scrollRef.current?.scrollTo({ left: 0 });
+  }
+
+  function handleScroll(event: React.UIEvent<HTMLDivElement>) {
+    const el = event.currentTarget;
+    if (el.clientWidth === 0) return;
+    setPage(Math.round(el.scrollLeft / el.clientWidth));
+  }
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -94,6 +121,7 @@ export default function NearbyPortfolioWidget({ onOpenPortfolio, onClose }: Near
   }, [location]);
 
   const items = feedCache[tab];
+  const pages = items ? chunk(items, PAGE_SIZE) : [];
 
   return (
     <div className="absolute right-0 top-12 z-20 w-80 overflow-hidden rounded-2xl border border-line bg-white shadow-lg">
@@ -101,7 +129,7 @@ export default function NearbyPortfolioWidget({ onOpenPortfolio, onClose }: Near
         <div className="flex gap-1">
           <button
             type="button"
-            onClick={() => setTab("nearby")}
+            onClick={() => switchTab("nearby")}
             className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
               tab === "nearby" ? "bg-brand-green/15 text-brand-green" : "text-muted hover:bg-soft"
             }`}
@@ -110,7 +138,7 @@ export default function NearbyPortfolioWidget({ onOpenPortfolio, onClose }: Near
           </button>
           <button
             type="button"
-            onClick={() => setTab("latest")}
+            onClick={() => switchTab("latest")}
             className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
               tab === "latest" ? "bg-brand-green/15 text-brand-green" : "text-muted hover:bg-soft"
             }`}
@@ -128,7 +156,7 @@ export default function NearbyPortfolioWidget({ onOpenPortfolio, onClose }: Near
         </button>
       </div>
 
-      <div className="max-h-80 overflow-y-auto">
+      <div className="p-2">
         {tab === "nearby" && !location ? (
           <p className="px-3 py-6 text-center text-[11px] leading-relaxed text-muted">
             {locationDenied
@@ -140,39 +168,62 @@ export default function NearbyPortfolioWidget({ onOpenPortfolio, onClose }: Near
         ) : items.length === 0 ? (
           <p className="px-3 py-6 text-center text-[11px] text-muted">아직 등록된 시공사례가 없어요</p>
         ) : (
-          // 2열로 배치 — 세로로 쭉 나열하면 5개만으로도 max-h를 넘어
-          // 스크롤이 생겼다(실사용 리포트). 한 줄에 2개씩 배치해 같은
-          // 개수를 절반 높이에 담는다. 카드를 정사각 썸네일 위주로
-          // 키우면 오히려 한 줄이 더 두꺼워져 역효과라, 기존 목록과
-          // 같은 "작은 썸네일 + 텍스트" 가로 배치를 그대로 2열로만
-          // 감싼다.
-          <div className="grid grid-cols-2 gap-1 p-2">
-            {items.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => onOpenPortfolio(item)}
-                className="flex min-w-0 items-center gap-1.5 rounded-lg p-1.5 text-left transition hover:bg-soft"
-              >
-                <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg bg-soft">
-                  {item.thumbnail_url && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.thumbnail_url} alt="" className="h-full w-full object-cover" />
-                  )}
+          <>
+            {/* 한 페이지 = 2열×3행(6개), 최대 3페이지(18개)를 가로
+                스크롤/스냅으로 넘겨 본다 — 세로로 쭉 나열하면 18개는
+                스크롤이 너무 길어지고, 2열만으로는(5~6개) 그래도 살짝
+                넘쳤다(실사용 리포트). 페이지 폭을 스크롤 컨테이너
+                폭(w-full)과 똑같이 맞춰야 스냅 시 다음 페이지가 딱
+                맞게 넘어간다. */}
+            <div
+              ref={scrollRef}
+              onScroll={handleScroll}
+              className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+              {pages.map((pageItems, pageIndex) => (
+                <div key={pageIndex} className="grid h-44 w-full shrink-0 snap-center content-start grid-cols-2 gap-1">
+                  {pageItems.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => onOpenPortfolio(item)}
+                      className="flex min-w-0 items-center gap-1.5 rounded-lg p-1.5 text-left transition hover:bg-soft"
+                    >
+                      <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg bg-soft">
+                        {item.thumbnail_url && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={item.thumbnail_url} alt="" className="h-full w-full object-cover" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[11px] font-bold text-ink">{item.complex_name || item.title}</p>
+                        <p className="truncate text-[9px] text-muted">
+                          {item.company.name}
+                          {item.pyeong_label ? ` · ${item.pyeong_label}평` : ""}
+                        </p>
+                        <p className="text-[9px] text-brand-green">
+                          {tab === "nearby" && item.distance_km != null ? distanceLabel(item.distance_km) : dateLabel(item.published_at)}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[11px] font-bold text-ink">{item.complex_name || item.title}</p>
-                  <p className="truncate text-[9px] text-muted">
-                    {item.company.name}
-                    {item.pyeong_label ? ` · ${item.pyeong_label}평` : ""}
-                  </p>
-                  <p className="text-[9px] text-brand-green">
-                    {tab === "nearby" && item.distance_km != null ? distanceLabel(item.distance_km) : dateLabel(item.published_at)}
-                  </p>
-                </div>
-              </button>
-            ))}
-          </div>
+              ))}
+            </div>
+
+            {pages.length > 1 && (
+              <div className="mt-1 flex items-center justify-center gap-2">
+                {pages.map((_, pageIndex) => (
+                  <span
+                    key={pageIndex}
+                    className={`rounded-full transition-all ${
+                      pageIndex === page ? "h-2.5 w-2.5 bg-ink/70" : "h-2 w-2 bg-line"
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

@@ -1172,7 +1172,10 @@ function ServiceMapView() {
         <div className="relative">
           <button
             type="button"
-            onClick={() => setLayerPanelOpen((open) => !open)}
+            onClick={() => {
+              setLayerPanelOpen((open) => !open);
+              setPortfolioPanelOpen(false);
+            }}
             aria-label="지도 레이어 선택"
             aria-expanded={layerPanelOpen}
             className={`relative ${controlButtonClass(layerPanelOpen)}`}
@@ -1307,10 +1310,13 @@ function ServiceMapView() {
           <div className="relative">
             <button
               type="button"
-              onClick={() => setPortfolioPanelOpen((open) => !open)}
+              onClick={() => {
+                setPortfolioPanelOpen((open) => !open);
+                setLayerPanelOpen(false);
+              }}
               aria-label="시공사례 위젯 열기"
               aria-expanded={portfolioPanelOpen}
-              className={`${controlButtonClass(portfolioPanelOpen)} flex-col gap-0.5 text-[10px] font-bold leading-none`}
+              className={`${controlButtonClass(portfolioPanelOpen)} flex-col gap-0.5 text-[11px] font-extrabold leading-none`}
             >
               <span>인테</span>
               <span>리어</span>
