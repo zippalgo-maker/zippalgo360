@@ -220,6 +220,9 @@ class ZipteriorPortfolioDetailOut(BaseModel):
     images: list[ZipteriorPortfolioImage]
     spaces: list[ZipteriorPortfolioSpace] = []
     content_blocks: list[ZipteriorContentBlock] = []
+    detail_url: str = ""
+    """집테리어 자체 견적문의 모달로 이어지는 원본 상세 페이지 — 우리 쪽에
+    아직 없는 기능(포트폴리오별 견적문의 폼)의 폴백 링크로 쓴다."""
     available: bool
     """집테리어 API에 접속할 수 없거나 포트폴리오를 못 찾으면 False."""
 

@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import type { ZipteriorPortfolioCard, ZipteriorPortfolioSummary } from "@/lib/types";
+import type { ZipteriorPortfolioCard } from "@/lib/types";
 
 type FeedTab = "nearby" | "latest";
 
 interface NearbyPortfolioWidgetProps {
-  onOpenPortfolio: (summary: ZipteriorPortfolioSummary) => void;
+  onOpenPortfolio: (card: ZipteriorPortfolioCard) => void;
 }
 
 const FEED_LIMIT = 5;
@@ -22,26 +22,6 @@ function dateLabel(iso: string): string {
   return date.toLocaleDateString("ko-KR", { year: "2-digit", month: "2-digit", day: "2-digit" });
 }
 
-// InteriorPortfolioPanel은 portfolioId만 실제로 쓰지만(상세를 API에서
-// 다시 불러옴), setSelectedPortfolio의 타입(ZipteriorPortfolioSummary)을
-// 맞추기 위해 카드에서 아는 정보만으로 최소한의 형태를 채워 넣는다.
-function toSummary(card: ZipteriorPortfolioCard): ZipteriorPortfolioSummary {
-  return {
-    id: card.id,
-    company_id: card.company.id,
-    company_name: card.company.name,
-    complex_name: card.complex_name ?? "",
-    title: card.title,
-    scope: "",
-    budget: "",
-    duration: "",
-    date: card.published_at,
-    area: card.pyeong_label ?? "",
-    type: card.apartment_type_name ?? "",
-    image: card.thumbnail_url,
-  };
-}
-
 /**
  * 집테리어 자체 지도 화면(PC "내 주변 시공사례" 위젯, 모바일 "우리집과
  * 가까운/최근 등록 시공사례" 탭)과 동일한 구성 — /map 페이지의 인테리어
@@ -49,8 +29,12 @@ function toSummary(card: ZipteriorPortfolioCard): ZipteriorPortfolioSummary {
  */
 export default function NearbyPortfolioWidget({ onOpenPortfolio }: NearbyPortfolioWidgetProps) {
   const [tab, setTab] = useState<FeedTab>("nearby");
-  const [items, setItems] = useState<ZipteriorPortfolioCard[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  // 탭별로 한 번 받아온 목록을 그대로 캐시해둔다 — 안 그러면 탭을
+  // 왔다갔다 할 때마다 목록이 비었다가 다시 채워지면서 깜빡였다(실사용
+  // 리포트). 이미 불러온 탭은 재요청 없이 캐시된 값을 즉시 보여준다.
+  const [feedCache, setFeedCache] = useState<Partial<Record<FeedTab, ZipteriorPortfolioCard[]>>>({});
+  const [loadingTab, setLoadingTab] = useState<FeedTab | null>(null);
+  const requestedTabsRef = useRef<Set<FeedTab>>(new Set());
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationDenied, setLocationDenied] = useState(false);
   const [closed, setClosed] = useState(false);
@@ -70,12 +54,11 @@ export default function NearbyPortfolioWidget({ onOpenPortfolio }: NearbyPortfol
   }, []);
 
   useEffect(() => {
-    if (tab === "nearby" && !location) {
-      setItems([]);
-      return;
-    }
+    if (tab === "nearby" && !location) return;
+    if (requestedTabsRef.current.has(tab)) return;
+    requestedTabsRef.current.add(tab);
     let cancelled = false;
-    setIsLoading(true);
+    setLoadingTab(tab);
     const params = new URLSearchParams({ sort: tab === "nearby" ? "nearest" : "latest", limit: String(FEED_LIMIT) });
     if (tab === "nearby" && location) {
       params.set("near_lat", String(location.lat));
@@ -83,13 +66,13 @@ export default function NearbyPortfolioWidget({ onOpenPortfolio }: NearbyPortfol
     }
     apiFetch<{ items: ZipteriorPortfolioCard[]; available: boolean }>(`/integrations/zipterior/portfolios/feed?${params}`)
       .then((data) => {
-        if (!cancelled) setItems(data.available ? data.items : []);
+        if (!cancelled) setFeedCache((prev) => ({ ...prev, [tab]: data.available ? data.items : [] }));
       })
       .catch(() => {
-        if (!cancelled) setItems([]);
+        if (!cancelled) setFeedCache((prev) => ({ ...prev, [tab]: [] }));
       })
       .finally(() => {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) setLoadingTab((current) => (current === tab ? null : current));
       });
     return () => {
       cancelled = true;
@@ -97,6 +80,8 @@ export default function NearbyPortfolioWidget({ onOpenPortfolio }: NearbyPortfol
   }, [tab, location]);
 
   if (closed) return null;
+
+  const items = feedCache[tab];
 
   return (
     <div className="absolute bottom-4 right-4 z-20 w-72 overflow-hidden rounded-2xl border border-line bg-white shadow-lg">
@@ -138,9 +123,9 @@ export default function NearbyPortfolioWidget({ onOpenPortfolio }: NearbyPortfol
               ? "위치 권한을 허용하면\n우리집과 가까운 시공사례를 보여드려요"
               : "위치 확인 중..."}
           </p>
-        ) : isLoading ? (
+        ) : items === undefined && loadingTab === tab ? (
           <p className="px-3 py-6 text-center text-[11px] text-muted">불러오는 중...</p>
-        ) : items.length === 0 ? (
+        ) : !items || items.length === 0 ? (
           <p className="px-3 py-6 text-center text-[11px] text-muted">아직 등록된 시공사례가 없어요</p>
         ) : (
           <ul className="divide-y divide-line">
@@ -148,7 +133,7 @@ export default function NearbyPortfolioWidget({ onOpenPortfolio }: NearbyPortfol
               <li key={item.id}>
                 <button
                   type="button"
-                  onClick={() => onOpenPortfolio(toSummary(item))}
+                  onClick={() => onOpenPortfolio(item)}
                   className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition hover:bg-soft"
                 >
                   <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg bg-soft">

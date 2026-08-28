@@ -15,6 +15,7 @@ import type {
   ZipteriorComplexDetailOut,
   ZipteriorMapMarker,
   ZipteriorMapMarkerListOut,
+  ZipteriorPortfolioCard,
   ZipteriorPortfolioSummary,
   ZipteriorSearchItem,
   ZipteriorSearchOut,
@@ -532,6 +533,38 @@ function ServiceMapView() {
       centerMapOnComplex(complex.latitude, complex.longitude);
     },
     [collapseInteriorMarker, bindFanInteractions, centerMapOnComplex]
+  );
+
+  // "우리집과 가까운/최근 등록" 위젯에서 포트폴리오 카드를 클릭했을 때 —
+  // 마커를 직접 클릭한 것과 동일하게 그 포트폴리오가 속한 단지를 열고
+  // (부챗살 마커 표시 + 지도 이동 + 단지정보 패널), 그 포트폴리오의
+  // 평형으로 selectedArea까지 맞춘 뒤에야 포트폴리오 상세를 연다.
+  // 이렇게 안 하면 이전에 열려있던 다른 단지의 패널과 방금 연 포트폴리오가
+  // 서로 안 맞는 채로 같이 떠 있는 문제가 생긴다(실사용 리포트).
+  const openPortfolioFromFeed = useCallback(
+    async (card: ZipteriorPortfolioCard) => {
+      if (card.complex_id != null) {
+        await openInteriorComplex(card.complex_id);
+        const complex = interiorComplexCacheRef.current.get(card.complex_id);
+        const match = complex?.apartment_types.find((type) => type.id === card.apartment_type_id);
+        setSelectedArea(match ? `${match.area}|${match.type}` : null);
+      }
+      setSelectedPortfolio({
+        id: card.id,
+        company_id: card.company.id,
+        company_name: card.company.name,
+        complex_name: card.complex_name ?? "",
+        title: card.title,
+        scope: "",
+        budget: "",
+        duration: "",
+        date: card.published_at,
+        area: card.pyeong_label ?? "",
+        type: card.apartment_type_name ?? "",
+        image: card.thumbnail_url,
+      });
+    },
+    [openInteriorComplex]
   );
 
   // 지금까지 누적된 원본 단지 마커 하나를 "표준 배지" 상태로 그린다
@@ -1348,7 +1381,7 @@ function ServiceMapView() {
           (2026-08-28 실제로 발생) — 반드시 이 바깥, 뷰포트 전체 기준
           absolute로 둬야 줌/현재위치 컨트롤과 같은 우측 하단에 고정됨. */}
       {activeLayers.has("interiorPortfolio") && (
-        <NearbyPortfolioWidget onOpenPortfolio={setSelectedPortfolio} />
+        <NearbyPortfolioWidget onOpenPortfolio={openPortfolioFromFeed} />
       )}
 
       {chatOpen && (

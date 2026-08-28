@@ -401,5 +401,6 @@ export interface ZipteriorPortfolioDetailOut {
   images: ZipteriorPortfolioImage[];
   spaces: ZipteriorPortfolioSpace[];
   content_blocks: ZipteriorContentBlock[];
+  detail_url: string;
   available: boolean;
 }
