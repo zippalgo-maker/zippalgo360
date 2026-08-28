@@ -3445,5 +3445,14 @@ sudo systemctl restart zippalgo360-web
     없으면 버튼 자체를 숨김). 진짜 견적문의 폼이 필요하면 별도 작업
     필요 — 사용자에게 안내함.
 - **[완료] 검증**: `next build` 클린, 백엔드 `ast.parse` 통과.
-- **미검증**: 서버 배포 후 실제 안내 이미지/버튼이 상세 하단에
-  보이는지 브라우저 확인 필요.
+
+### 배포
+- 사용자가 `git pull` → `zippalgo360-api`/`zippalgo360-web` 재시작·
+  재빌드, 둘 다 정상.
+- **[완료] 실제 API 검증**: `curl
+  http://127.0.0.1:8001/api/integrations/zipterior/portfolio-display-settings`
+  → `notice_image_path`가 `https://zipterior.kr/uploads/...`로 정상
+  절대경로 변환되어 응답 확인.
+- **남은 미검증(브라우저)**: 위젯 위치, 평형 기본값(전체), 부챗살
+  평형 필터, 안내 메시지 4가지 전부 사용자가 직접 화면으로 확인
+  필요.
