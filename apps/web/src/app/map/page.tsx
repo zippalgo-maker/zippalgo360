@@ -9,6 +9,8 @@ import { buildCountMarkerHtml, buildFanMarkerHtml, type AreaUnit } from "@/lib/i
 import InteriorComplexPanel from "@/components/map/InteriorComplexPanel";
 import InteriorPortfolioPanel from "@/components/map/InteriorPortfolioPanel";
 import NearbyPortfolioWidget from "@/components/map/NearbyPortfolioWidget";
+import HomeSidebar from "@/components/map/HomeSidebar";
+import PromoOverlays from "@/components/map/PromoOverlays";
 import type {
   CompanyMapMarker,
   ListingMapMarker,
@@ -1045,8 +1047,11 @@ function ServiceMapView() {
     }`;
 
   return (
-    <div className="relative h-[calc(100vh-4rem)] w-full">
+    <div className="flex h-[calc(100vh-4rem)] w-full">
+      <HomeSidebar />
+      <div className="relative h-full flex-1">
       <div ref={mapContainerRef} className="h-full w-full bg-soft" />
+      <PromoOverlays />
 
       {/* 가운데 통합검색 — 집테리어 지도의 검색창과 같은 위치(상단 중앙). */}
       <div className="absolute left-1/2 top-4 z-20 w-full max-w-xl -translate-x-1/2 px-4">
@@ -1443,6 +1448,7 @@ function ServiceMapView() {
           <p className="text-sm text-muted">{mapError}</p>
         </div>
       )}
+      </div>
     </div>
   );
 }
