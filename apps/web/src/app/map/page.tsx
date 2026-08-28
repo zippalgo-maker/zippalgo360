@@ -270,13 +270,12 @@ function ServiceMapView() {
   const [unreadChatCount] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
 
-  // NearbyPortfolioWidget을 닫으면(× 버튼) 우측 상단 지도 컨트롤
-  // 스택에 다시 열기용 아이콘만 남긴다 — 닫힌 상태를 여기서 들고
-  // 있어야 그 아이콘을 컨트롤 스택 안에 자연스럽게(같은 gap-2로) 끼워
-  // 넣을 수 있다(위젯 내부에 별도 absolute로 두면 위치를 수동으로
-  // 맞춰야 해서 다른 컨트롤과 간격이 어긋난다, 2026-08-28 실사용
-  // 리포트).
-  const [portfolioWidgetClosed, setPortfolioWidgetClosed] = useState(false);
+  // NearbyPortfolioWidget을 레이어 버튼과 똑같은 "버튼→드롭다운"
+  // 패턴으로 바꿨다 — 기본은 닫혀 있고, 우측 상단 컨트롤 스택의
+  // "인테리어" 버튼을 누르면 그 버튼 바로 아래에 패널이 펼쳐지며
+  // 버튼 자체도 다른 켜진 컨트롤처럼 빨간색으로 강조된다(2026-08-28
+  // 사용자 요청 — 레이어 패널과 동일한 UX로 통일).
+  const [portfolioPanelOpen, setPortfolioPanelOpen] = useState(false);
 
   useEffect(() => {
     if (!toast) return;
@@ -1304,16 +1303,22 @@ function ServiceMapView() {
           </div>
         )}
 
-        {activeLayers.has("interiorPortfolio") && portfolioWidgetClosed && (
-          <button
-            type="button"
-            onClick={() => setPortfolioWidgetClosed(false)}
-            aria-label="시공사례 위젯 열기"
-            className={`${controlButtonClass(false)} flex-col gap-0.5 text-[10px] font-bold leading-none`}
-          >
-            <span>인테</span>
-            <span>리어</span>
-          </button>
+        {activeLayers.has("interiorPortfolio") && (
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setPortfolioPanelOpen((open) => !open)}
+              aria-label="시공사례 위젯 열기"
+              aria-expanded={portfolioPanelOpen}
+              className={`${controlButtonClass(portfolioPanelOpen)} flex-col gap-0.5 text-[10px] font-bold leading-none`}
+            >
+              <span>인테</span>
+              <span>리어</span>
+            </button>
+            {portfolioPanelOpen && (
+              <NearbyPortfolioWidget onOpenPortfolio={openPortfolioFromFeed} onClose={() => setPortfolioPanelOpen(false)} />
+            )}
+          </div>
         )}
       </div>
 
@@ -1395,14 +1400,6 @@ function ServiceMapView() {
           />
         )}
       </div>
-
-      {/* 위 왼쪽 패널 스택(absolute left-0, flex)의 flex 아이템으로 잘못
-          들어가 있으면 열린 패널 개수에 따라 위치가 널뛰는 버그가 있었음
-          (2026-08-28 실제로 발생) — 반드시 이 바깥, 뷰포트 전체 기준
-          absolute로 둬야 줌/현재위치 컨트롤과 같은 우측 하단에 고정됨. */}
-      {activeLayers.has("interiorPortfolio") && !portfolioWidgetClosed && (
-        <NearbyPortfolioWidget onOpenPortfolio={openPortfolioFromFeed} onClose={() => setPortfolioWidgetClosed(true)} />
-      )}
 
       {chatOpen && (
         <div className="absolute right-0 top-0 z-30 flex h-full w-full max-w-sm flex-col overflow-hidden border-l border-line bg-white shadow-2xl">

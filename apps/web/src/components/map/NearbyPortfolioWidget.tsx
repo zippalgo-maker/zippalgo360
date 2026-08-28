@@ -33,8 +33,10 @@ function fetchFeed(params: URLSearchParams): Promise<ZipteriorPortfolioCard[]> {
 
 /**
  * 집테리어 자체 지도 화면(PC "내 주변 시공사례" 위젯, 모바일 "우리집과
- * 가까운/최근 등록 시공사례" 탭)과 동일한 구성 — /map 페이지의 인테리어
- * 모드에서만 우측 하단에 뜬다.
+ * 가까운/최근 등록 시공사례" 탭)과 동일한 구성 — /map 페이지에서는
+ * "지도 레이어" 패널과 같은 패턴으로, 우측 상단 "인테리어" 버튼 바로
+ * 아래에 드롭다운으로 펼쳐진다(2026-08-28, 사용자 요청으로 항상 떠
+ * 있는 하단 위젯에서 버튼-드롭다운 방식으로 변경).
  */
 export default function NearbyPortfolioWidget({ onOpenPortfolio, onClose }: NearbyPortfolioWidgetProps) {
   const [tab, setTab] = useState<FeedTab>("nearby");
@@ -94,7 +96,7 @@ export default function NearbyPortfolioWidget({ onOpenPortfolio, onClose }: Near
   const items = feedCache[tab];
 
   return (
-    <div className="absolute bottom-4 right-4 z-20 w-72 overflow-hidden rounded-2xl border border-line bg-white shadow-lg">
+    <div className="absolute right-0 top-12 z-20 w-80 overflow-hidden rounded-2xl border border-line bg-white shadow-lg">
       <div className="flex items-center justify-between border-b border-line px-3 py-2">
         <div className="flex gap-1">
           <button
@@ -138,34 +140,39 @@ export default function NearbyPortfolioWidget({ onOpenPortfolio, onClose }: Near
         ) : items.length === 0 ? (
           <p className="px-3 py-6 text-center text-[11px] text-muted">아직 등록된 시공사례가 없어요</p>
         ) : (
-          <ul className="divide-y divide-line">
+          // 2열로 배치 — 세로로 쭉 나열하면 5개만으로도 max-h를 넘어
+          // 스크롤이 생겼다(실사용 리포트). 한 줄에 2개씩 배치해 같은
+          // 개수를 절반 높이에 담는다. 카드를 정사각 썸네일 위주로
+          // 키우면 오히려 한 줄이 더 두꺼워져 역효과라, 기존 목록과
+          // 같은 "작은 썸네일 + 텍스트" 가로 배치를 그대로 2열로만
+          // 감싼다.
+          <div className="grid grid-cols-2 gap-1 p-2">
             {items.map((item) => (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  onClick={() => onOpenPortfolio(item)}
-                  className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition hover:bg-soft"
-                >
-                  <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg bg-soft">
-                    {item.thumbnail_url && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={item.thumbnail_url} alt="" className="h-full w-full object-cover" />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-bold text-ink">{item.complex_name || item.title}</p>
-                    <p className="truncate text-[10px] text-muted">
-                      {item.company.name}
-                      {item.pyeong_label ? ` · ${item.pyeong_label}평` : ""}
-                    </p>
-                    <p className="text-[10px] text-brand-green">
-                      {tab === "nearby" && item.distance_km != null ? distanceLabel(item.distance_km) : dateLabel(item.published_at)}
-                    </p>
-                  </div>
-                </button>
-              </li>
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onOpenPortfolio(item)}
+                className="flex min-w-0 items-center gap-1.5 rounded-lg p-1.5 text-left transition hover:bg-soft"
+              >
+                <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg bg-soft">
+                  {item.thumbnail_url && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={item.thumbnail_url} alt="" className="h-full w-full object-cover" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[11px] font-bold text-ink">{item.complex_name || item.title}</p>
+                  <p className="truncate text-[9px] text-muted">
+                    {item.company.name}
+                    {item.pyeong_label ? ` · ${item.pyeong_label}평` : ""}
+                  </p>
+                  <p className="text-[9px] text-brand-green">
+                    {tab === "nearby" && item.distance_km != null ? distanceLabel(item.distance_km) : dateLabel(item.published_at)}
+                  </p>
+                </div>
+              </button>
             ))}
-          </ul>
+          </div>
         )}
       </div>
     </div>
