@@ -33,7 +33,6 @@ export default function NearbyPortfolioWidget({ onOpenPortfolio }: NearbyPortfol
   // 왔다갔다 할 때마다 목록이 비었다가 다시 채워지면서 깜빡였다(실사용
   // 리포트). 이미 불러온 탭은 재요청 없이 캐시된 값을 즉시 보여준다.
   const [feedCache, setFeedCache] = useState<Partial<Record<FeedTab, ZipteriorPortfolioCard[]>>>({});
-  const [loadingTab, setLoadingTab] = useState<FeedTab | null>(null);
   const requestedTabsRef = useRef<Set<FeedTab>>(new Set());
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationDenied, setLocationDenied] = useState(false);
@@ -58,7 +57,6 @@ export default function NearbyPortfolioWidget({ onOpenPortfolio }: NearbyPortfol
     if (requestedTabsRef.current.has(tab)) return;
     requestedTabsRef.current.add(tab);
     let cancelled = false;
-    setLoadingTab(tab);
     const params = new URLSearchParams({ sort: tab === "nearby" ? "nearest" : "latest", limit: String(FEED_LIMIT) });
     if (tab === "nearby" && location) {
       params.set("near_lat", String(location.lat));
@@ -70,18 +68,30 @@ export default function NearbyPortfolioWidget({ onOpenPortfolio }: NearbyPortfol
       })
       .catch(() => {
         if (!cancelled) setFeedCache((prev) => ({ ...prev, [tab]: [] }));
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingTab((current) => (current === tab ? null : current));
       });
     return () => {
       cancelled = true;
     };
   }, [tab, location]);
 
-  if (closed) return null;
-
   const items = feedCache[tab];
+
+  if (closed) {
+    return (
+      <button
+        type="button"
+        onClick={() => setClosed(false)}
+        aria-label="시공사례 위젯 열기"
+        className="absolute bottom-4 right-4 z-20 flex h-11 w-11 items-center justify-center rounded-full border border-line bg-white text-ink/80 shadow-md transition hover:bg-soft"
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <rect x="3.5" y="4.5" width="17" height="14" rx="2" />
+          <path d="M3.5 15.5 8.5 11l3.5 3 3.5-4 4.5 5.5" />
+          <circle cx="8" cy="8.5" r="1.4" fill="currentColor" stroke="none" />
+        </svg>
+      </button>
+    );
+  }
 
   return (
     <div className="absolute bottom-4 right-4 z-20 w-72 overflow-hidden rounded-2xl border border-line bg-white shadow-lg">
@@ -123,9 +133,9 @@ export default function NearbyPortfolioWidget({ onOpenPortfolio }: NearbyPortfol
               ? "위치 권한을 허용하면\n우리집과 가까운 시공사례를 보여드려요"
               : "위치 확인 중..."}
           </p>
-        ) : items === undefined && loadingTab === tab ? (
+        ) : items === undefined ? (
           <p className="px-3 py-6 text-center text-[11px] text-muted">불러오는 중...</p>
-        ) : !items || items.length === 0 ? (
+        ) : items.length === 0 ? (
           <p className="px-3 py-6 text-center text-[11px] text-muted">아직 등록된 시공사례가 없어요</p>
         ) : (
           <ul className="divide-y divide-line">
