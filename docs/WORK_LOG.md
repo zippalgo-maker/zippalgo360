@@ -4017,3 +4017,61 @@ Claude Design 캔버스 목업으로 여러 라운드 반복(집품/KB부동산 
     것도 검토
 - CTA 폼 제출을 실제 매물 등록/구매의뢰 생성 API에 연결(지금은 "다음"
   누르면 그냥 완료 화면으로 넘어가기만 함, 서버에 아무것도 안 남음)
+
+---
+
+## 2026-08-28 — 영업관리 고도화 (상태/TM코드, 리치텍스트, 필터/정렬/검색, 수정+수정이력)
+
+### 요청
+- 사용자가 기존 심플 버전(업체 목록 + 통화기록 버튼→모달)에 대해
+  대폭 확장 요청: 목록 마지막 컬럼을 "상세보기"로, 상세보기 안에서
+  날짜·요일·담당자별 필터/정렬/검색, 목록 자체에서 빠른 기록
+  입력·저장(속도감), 상태(통화완료/부재중/결번/오번호)·TM내용(전화금지/
+  다시전화 등) 드롭다운을 관리자가 "코드추가" 버튼으로 직접 늘릴 수
+  있게, 상세내용은 클릭 시 커지는 텍스트창 + 텍스트 단위 굵게/색상
+  서식, 수정 시 사유 필수 입력 + 수정 로그(누가 언제) 표시.
+
+### 진행 — 전부 완료, 배포·검증까지 끝남
+- **[완료] 백엔드**(`zipterior-backend`, 커밋 `b47e360`, `7b5c6b1`):
+  - 마이그레이션 `a25000000012`: `sales_contact_codes`(관리자가 추가하는
+    상태/TM코드, 초기 6개 시드), `company_sales_contacts`에
+    `status_code_id`/`reason_code_id`/`updated_at`/`updated_by`/
+    `update_reason` 컬럼 추가, `sales_contact_edits`(수정 이력 감사로그
+    — 수정 전 값 스냅샷).
+  - `app/common/rich_text.py`: `HTMLParser` 기반 화이트리스트 sanitizer
+    (`sanitize_rich_text` — b/strong/i/em/u/br/span[color만] 외 전부
+    제거, XSS 방지) + `rich_text_to_plain`(목록 미리보기용, 태그가
+    중간에 잘려 깨지지 않게 순수 텍스트로 변환 후 자름). 위험한 페이로드
+    (`<script>`, `onerror`, `javascript:` href, 임의 style 등)로 직접
+    단위 테스트해서 전부 안전하게 걸러지는 것 확인.
+  - `sales_contact_router.py` 확장: `GET/POST /admin/sales-contact-codes`
+    (코드 목록/추가), `GET`(admin_user_id/date_from/date_to/weekday/q/
+    sort 필터)·`PATCH`(수정, reason 필수, 수정 시 edits 테이블에
+    이전값 스냅샷 기록) `/admin/companies/{id}/sales-contacts`,
+    `GET .../sales-contacts/{contact_id}`(상세+수정이력).
+  - `overview_repository.list_companies`에 `last_sales_contact_status_label`/
+    `last_sales_contact_preview`(순수 텍스트 변환+60자 truncate) 추가 —
+    업체 목록에서 마지막 기록의 상태·내용을 바로 보여주기 위함.
+- **[완료] 프론트엔드**: `salesContactView` section 전체 교체(목록에
+  마지막 기록 미리보기+인라인 빠른기록 입력창+상세보기 버튼) +
+  `admin-api.js`의 영업관리 JS 블록 전체 교체(상세보기 모달: 필터바
+  +정렬토글+검색, `contenteditable`+`execCommand`(굵게/색상 4가지)
+  리치텍스트, 수정 인라인폼(사유 필수), 수정이력 펼쳐보기). Python
+  anchor-replace 스크립트를 실행 전 기존 배포본에서 실제로 추출해
+  바이트 단위로 일치하는지 먼저 검증(`ast.literal_eval`로 이전 스크립트의
+  삽입 텍스트와 diff)한 뒤에 사용자에게 전달 — 앵커 불일치로 인한
+  중단 없이 1회 실행으로 성공.
+- **[완료] 배포·검증**: `zipterior-backend` `git pull`(변경 없음, 이미
+  최신) → `alembic upgrade head` → `alembic current` = `a25000000012
+  (head)` 확인 → `systemctl restart zipterior-api` → `active (running)`
+  → `GET /openapi.json`에서 `/admin/sales-contact-codes`,
+  `/admin/companies/{company_id}/sales-contacts`,
+  `/admin/companies/{company_id}/sales-contacts/{contact_id}` 3개
+  경로 전부 확인. 프론트 패치 스크립트도 백업 남기고 정상 완료
+  메시지 확인.
+
+### 미검증(사용자 확인 필요)
+- 브라우저 실사용: 목록 인라인 빠른기록 저장, "코드추가"로 새 상태/
+  TM코드 즉시 반영, 상세보기 안에서 담당자/날짜/요일 필터+정렬+검색,
+  리치텍스트 굵게/색상 적용 후 저장·재조회 시 서식 유지, 기록 수정
+  (사유 입력 강제) 후 "수정됨" 배지와 수정이력 펼쳐보기 정상 동작.
