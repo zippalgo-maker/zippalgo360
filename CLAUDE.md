@@ -108,10 +108,15 @@ truth)다.
 
 ## 목표 DB/서버 아키텍처 문서와 지금 스키마의 관계 (2026-08-27 결정)
 
-사용자가 로컬 서버(사무실 PC) 이전을 준비하며 목표 아키텍처 문서 3건을 전달함
-— `docs/zippalgo360-db-architecture-guide.md`, `docs/zippalgo360-server
--architecture-guide.md`, `docs/zippalgo360-local-server-migration-guide.md`.
-이 문서들은 **미래 목표 설계도**이지 지금 당장 코드에 반영할 지시가 아니다.
+사용자가 로컬 서버(사무실 PC) 이전을 준비하며 목표 아키텍처 문서를 전달함 —
+처음엔 3건(`zippalgo360-db-architecture-guide.md`, `zippalgo360-server
+-architecture-guide.md`, `zippalgo360-local-server-migration-guide.md`)이었으나
+2026-08-28 하나로 통합·개정된 `docs/zippalgo360-server-db-architecture-guide.md`
+("최종 통합 지침서")로 대체됨 — **앞으로는 이 파일 하나가 서버/DB/회원·관리자
+체계의 최상위 지침 문서**다. 옛 3건은 저장소에서 삭제했다(git 히스토리에는
+남아 있음). 이 문서는 **미래 목표 설계도이자 확정된 운영 원칙**이지, 목표
+구조 부분(문서 자체가 "목표 구조"라고 표시한 절)까지 지금 당장 코드에 반영할
+지시는 아니다.
 
 - **지금(로컬 서버 셋업 진행 중)은 현재 스키마·구조를 그대로 유지한다.**
   목표 문서가 제안하는 구조 변경(`users.role`→`user_type`, `kakao_id` 컬럼
