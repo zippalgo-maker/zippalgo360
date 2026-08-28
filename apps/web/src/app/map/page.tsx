@@ -8,6 +8,7 @@ import { loadKakaoMaps } from "@/lib/kakao-maps";
 import { buildCountMarkerHtml, buildFanMarkerHtml, type AreaUnit } from "@/lib/interior-marker";
 import InteriorComplexPanel from "@/components/map/InteriorComplexPanel";
 import InteriorPortfolioPanel from "@/components/map/InteriorPortfolioPanel";
+import NearbyPortfolioWidget from "@/components/map/NearbyPortfolioWidget";
 import type {
   CompanyMapMarker,
   ListingMapMarker,
@@ -1339,6 +1340,9 @@ function ServiceMapView() {
             onClose={() => setSelectedPortfolio(null)}
             areaUnit={areaUnit}
           />
+        )}
+        {activeLayers.has("interiorPortfolio") && (
+          <NearbyPortfolioWidget onOpenPortfolio={setSelectedPortfolio} />
         )}
       </div>
 

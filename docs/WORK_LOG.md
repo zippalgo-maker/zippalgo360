@@ -3352,3 +3352,34 @@ sudo systemctl restart zippalgo360-web
   100% 동일하게 보이는지, 인테리어 포트폴리오 클릭 시 방별 그룹핑/
   콘텐츠 블록이 정상 렌더링되는지(1단계 작업의 실사용 첫 확인이기도
   함) 브라우저로 확인 필요.
+
+### 후속: 우측 하단 "우리집과 가까운/최근 등록 시공사례" 위젯 추가
+- 배포 후 사용자 확인: `/zipterior`→`/map` 전환은 잘 됨. 다만 `/map`은
+  "토탈" 개념이라 집테리어 전용 느낌이 부족하다며, 모바일 앱 셸에
+  이미 있는 "우리집과 가까운 시공사례"/"최근 등록 시공사례" 두 탭을
+  우측 하단에 추가해달라는 요청(집테리어 PC 화면의 `.local-stats`
+  "내 주변 시공사례" 위젯과 같은 자리, 모바일 탭 UX로).
+- zipterior 서버(`js/app.js`의 PC 위젯, `js/mobile-app.js`의 모바일
+  탭)를 읽어서 실제 API 확인: `GET /api/v1/portfolios?sort=nearest&
+  near_lat=&near_lng=&limit=&offset=`(하버사인 거리, 서버가 계산한
+  `distance_km` 포함) / `sort=latest`(최근 등록) — 우리 백엔드엔
+  단지 하나로 스코프된 `sort=popular` 엔드포인트만 있고 이 전체 피드
+  엔드포인트가 없었음.
+- **[완료] 백엔드**: `ZipteriorPortfolioCard`에 `distance_km` 추가,
+  신규 `get_portfolio_feed(sort, near_lat, near_lng, limit, offset)`
+  가 `/api/v1/portfolios?sort=...`를 그대로 프록시, 신규 라우트
+  `GET /integrations/zipterior/portfolios/feed`(`/portfolios/{id}`
+  경로보다 먼저 등록해 라우팅 충돌 방지).
+- **[완료] 프론트엔드**: `components/map/NearbyPortfolioWidget.tsx`
+  신규 — 두 탭("우리집과 가까운"/"최근 등록"), 마운트 시 조용히
+  위치 한 번 시도(거부돼도 토스트 없이 안내 문구만, zipterior와
+  동일 정책), 카드 클릭 시 기존 `setSelectedPortfolio`로 상세 패널
+  오픈(카드 데이터만으로 `ZipteriorPortfolioSummary` 최소 형태를
+  구성 — 상세 패널이 어차피 API에서 다시 불러오므로 id만 정확하면
+  됨). `/map/page.tsx`에 `activeLayers.has("interiorPortfolio")`일
+  때만(=인테리어 모드일 때만) 우측 하단에 렌더링.
+- **[완료] 검증**: `next build` 클린, 백엔드 `ast.parse` 통과.
+- **미검증**: 이 세션은 zipterior API 네트워크 접근이 없어 실제
+  거리순/최신순 데이터 응답을 확인 못함 — 배포 후 위치 권한 허용한
+  상태에서 "가까운"/"최근 등록" 두 탭 다 카드가 실제로 뜨는지,
+  카드 클릭 시 상세 패널이 정상 열리는지 확인 필요.

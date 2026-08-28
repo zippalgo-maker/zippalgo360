@@ -71,6 +71,7 @@ def _to_card(item: dict) -> ZipteriorPortfolioCard:
         like_count=item.get("like_count", 0),
         published_at=item["published_at"],
         detail_url=detail_url,
+        distance_km=item.get("distance_km"),
     )
 
 
@@ -85,6 +86,44 @@ def get_portfolios_for_complex_type(
     params: dict = {"complex_id": complex_id, "limit": limit, "sort": "popular"}
     if apartment_type_id is not None:
         params["apartment_type_id"] = apartment_type_id
+
+    try:
+        response = httpx.get(
+            f"{settings.zipterior_api_base_url}/api/v1/portfolios",
+            params=params,
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        data = response.json()
+    except (httpx.HTTPError, ValueError, KeyError):
+        return ZipteriorPortfolioListOut(items=[], total=0, available=False)
+
+    try:
+        items = [_to_card(item) for item in data["items"]]
+    except (KeyError, TypeError):
+        return ZipteriorPortfolioListOut(items=[], total=0, available=False)
+
+    return ZipteriorPortfolioListOut(items=items, total=data.get("total", len(items)), available=True)
+
+
+def get_portfolio_feed(
+    *,
+    sort: str,
+    near_lat: float | None = None,
+    near_lng: float | None = None,
+    limit: int = 4,
+    offset: int = 0,
+) -> ZipteriorPortfolioListOut:
+    """단지에 묶이지 않은 전체 포트폴리오 피드 — "우리집과 가까운 시공사례"
+    (`sort=nearest`, 하버사인 거리순, 집테리어가 이미 서버에서 distance_km을
+    계산해 내려줌)와 "최근 등록 시공사례"(`sort=latest`) 두 탭용. 집테리어
+    자체 지도 화면(PC `.local-stats`/모바일 지도 탭)의 위젯과 동일한
+    `/api/v1/portfolios?sort=...` 엔드포인트를 그대로 재사용한다.
+    """
+    params: dict = {"sort": sort, "limit": limit, "offset": offset}
+    if sort == "nearest" and near_lat is not None and near_lng is not None:
+        params["near_lat"] = near_lat
+        params["near_lng"] = near_lng
 
     try:
         response = httpx.get(

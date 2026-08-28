@@ -26,6 +26,19 @@ def get_portfolios_for_complex_type(
     )
 
 
+@router.get("/portfolios/feed", response_model=ZipteriorPortfolioListOut)
+def get_portfolio_feed(
+    sort: str = Query("latest", pattern="^(nearest|latest)$"),
+    near_lat: float | None = Query(None, ge=-90, le=90),
+    near_lng: float | None = Query(None, ge=-180, le=180),
+    limit: int = Query(4, ge=1, le=20),
+    offset: int = Query(0, ge=0),
+) -> ZipteriorPortfolioListOut:
+    return zipterior_client.get_portfolio_feed(
+        sort=sort, near_lat=near_lat, near_lng=near_lng, limit=limit, offset=offset
+    )
+
+
 @router.get("/map-markers", response_model=ZipteriorMapMarkerListOut)
 def get_interior_map_markers(
     north: float | None = None,

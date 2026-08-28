@@ -25,6 +25,8 @@ class ZipteriorPortfolioCard(BaseModel):
     like_count: int
     published_at: datetime
     detail_url: str
+    distance_km: float | None = None
+    """`sort=nearest`로 조회했을 때만 채워지는, 기준 좌표로부터의 거리(km)."""
 
 
 class ZipteriorPortfolioListOut(BaseModel):

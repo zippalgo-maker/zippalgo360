@@ -222,6 +222,7 @@ export interface ZipteriorPortfolioCard {
   like_count: number;
   published_at: string;
   detail_url: string;
+  distance_km: number | null;
 }
 
 export interface ZipteriorPortfolioListOut {
