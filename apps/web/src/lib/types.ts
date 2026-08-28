@@ -374,6 +374,13 @@ export interface ZipteriorSearchOut {
   available: boolean;
 }
 
+export interface ZipteriorPortfolioDisplaySettingsOut {
+  notice_enabled: boolean;
+  notice_image_path: string | null;
+  notice_text: string | null;
+  notice_button_label: string | null;
+}
+
 export interface ZipteriorPortfolioDetailOut {
   id: number;
   company_id: number | null;

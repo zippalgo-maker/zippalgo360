@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { ContentBlockView, groupImagesBySpace } from "@/lib/content-blocks";
 import { formatAreaLabel, type AreaUnit } from "@/lib/interior-marker";
-import type { ZipteriorPortfolioDetailOut } from "@/lib/types";
+import type { ZipteriorPortfolioDetailOut, ZipteriorPortfolioDisplaySettingsOut } from "@/lib/types";
 
 interface InteriorPortfolioPanelProps {
   portfolioId: number;
@@ -15,6 +15,24 @@ interface InteriorPortfolioPanelProps {
 export default function InteriorPortfolioPanel({ portfolioId, onClose, areaUnit }: InteriorPortfolioPanelProps) {
   const [portfolio, setPortfolio] = useState<ZipteriorPortfolioDetailOut | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [displaySettings, setDisplaySettings] = useState<ZipteriorPortfolioDisplaySettingsOut | null>(null);
+
+  // 관리자가 설정하는 전역 안내문구/이미지/견적문의 CTA — 특정 포트폴리오에
+  // 딸린 값이 아니라 집테리어 전체 공통 설정이라 portfolioId와 무관하게
+  // 한 번만 불러온다. 실패해도 조용히 무시(안내 블록을 그냥 안 보여줌).
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch<ZipteriorPortfolioDisplaySettingsOut>("/integrations/zipterior/portfolio-display-settings")
+      .then((settings) => {
+        if (!cancelled) setDisplaySettings(settings);
+      })
+      .catch(() => {
+        if (!cancelled) setDisplaySettings(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -178,6 +196,26 @@ export default function InteriorPortfolioPanel({ portfolioId, onClose, areaUnit 
                 </div>
               );
             })()
+          )}
+
+          {displaySettings?.notice_enabled && (
+            <div className="border-t border-line px-5 py-4 text-center">
+              {displaySettings.notice_image_path && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={displaySettings.notice_image_path} alt="" className="mx-auto mb-3 w-full rounded-xl" />
+              )}
+              {displaySettings.notice_text && (
+                <p className="mb-3 whitespace-pre-line text-xs leading-relaxed text-ink/80">{displaySettings.notice_text}</p>
+              )}
+              {portfolio.company_phone && (
+                <a
+                  href={`tel:${portfolio.company_phone}`}
+                  className="flex w-full items-center justify-center rounded-full bg-brand-green px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+                >
+                  {displaySettings.notice_button_label || "이 포트폴리오의 집 인테리어 견적 문의하기"}
+                </a>
+              )}
+            </div>
           )}
         </div>
       )}
