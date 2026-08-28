@@ -2876,3 +2876,67 @@ sudo systemctl restart zippalgo360-web
   또 다른 진단 결과를 보내왔는데(`origin/claude/jippalgo360-service
   -screen-lmv8de`가 `9abf8c7`보다 한 커밋(`6231697`) 더 앞서 있음)
   이것도 fetch해서 같이 병합해야 함 — 아직 안 함, 이어서 진행.
+- **[완료]** 추가로 fetch한 `6231697`은 이미 병합 결과에 포함돼 있음을
+  `git merge-base --is-ancestor`로 확인(따로 더 할 것 없음). `next
+  build` 최종 재확인(`/zipservice/companies` 등 새 라우트 정상 생성),
+  세 브랜치(`claude/jippalgo360-platform-6bvrfh`,
+  `claude/zippalgo360-interior-service-tz2qfv`,
+  `claude/jippalgo360-service-screen-lmv8de`) 전부에 fast-forward
+  푸시 완료. 사용자에게 브랜치 이름 없는 `git pull` 배포 스크립트
+  전달.
+- **[완료] 재발 방지**: 사용자가 이 사고를 다른 세션들에도 전파하고
+  싶다고 해서, (1) 지금 활성 세션들에 붙여넣을 공지 메시지, (2)
+  `CLAUDE.md`에 넣을 영구 규칙 두 가지를 작성해서 제시. 사용자가 (2)만
+  자동으로 반영해달라고 함 — `CLAUDE.md`에 "브랜치 정책: 모든 세션은
+  `claude/jippalgo360-platform-6bvrfh` 하나만 쓴다" 섹션 신설(오늘
+  사고 경위 요약 + 배포 전 `git branch --show-current` 확인 + fetch
+  후 fast-forward 확인 + 충돌 시 병합(rebase/reset 금지) + 규칙
+  위반 시 WORK_LOG 기록 의무화). 커밋·푸시 완료.
+
+---
+
+## 2026-08-27 — 별개 문의: zipterior.kr 프로덕션 DB 정리 스크립트 검토 요청
+
+- 사용자가 "다른 아이디의 클로드 앱 세션"에서 진행 중이라며, zipterior
+  서버(`/srv/zipterior/backend`)의 실패한 대량등록 job(95번, 이미지
+  디스크풀로 저장 실패)을 정리하는 Python 스크립트를 공유하고 "아까
+  만든 2가지 지침(브랜치 정책)이 여기도 적용되냐"고 문의.
+- **[완료] 답변만 하고 실행은 안 함(이 세션 SSH 권한 자체가 없음,
+  zipterior는 이 저장소가 관리하는 대상도 아님)**: 브랜치 정책은
+  `zippalgo360` git 저장소 얘기라 이 작업(zipterior 프로덕션 DB 직접
+  SQL 조작)과는 무관하다고 답변. 대신 스크립트 자체를 검토해서
+  전달 — 로직(개수 assert, job94와 겹침 체크, 트랜잭션 롤백,
+  AuditService 감사로그 기록)은 신중하게 짜여 있어 보이지만,
+  삭제 대상 426건 중 **234건이 이미 승인·공개 상태로 노출 중**이라는
+  점(단순 실패 데이터 정리가 아니라 실제 공개 콘텐츠를 내리는 작업)과,
+  "다른 세션이 이미 스크립트를 서버에 올려두고 실행만 요청"하는 전달
+  방식 자체를 사용자 본인이 직접 지시한 게 맞는지 재확인하라고
+  안내. 실행 여부는 사용자 판단에 맡김 — 이 세션은 관여하지 않음.
+
+---
+
+## 2026-08-27 — `/map`, `/zipterior`에서 전역 푸터 제거(24인치 모니터 기준 스크롤 없이 지도만 꽉 차게)
+
+### 시작 전
+- 사용자가 `/map` 스크린샷 첨부: 지도 아래로 사이트 전역 푸터(로고/
+  소개문구/서비스·회원 링크/저작권)가 그대로 이어져서, 지도가 뷰포트를
+  꽉 채우려고 `h-[calc(100vh-4rem)]`로 만들어놨어도 그 밑에 푸터만큼
+  문서 전체 높이가 늘어나 스크롤이 생김. "24인치 모니터 기준으로
+  스크롤 없이 지도만 딱 나오도록" 요청.
+
+### 진행 중
+- **원인**: `apps/web/src/app/layout.tsx`(루트 레이아웃)가 모든
+  라우트에 무조건 `<Footer />`를 렌더링하고 있었음 — `/map`/
+  `/zipterior`처럼 전체화면 앱 화면으로 설계된 라우트도 예외 없이
+  포함.
+- **[완료]** `apps/web/src/components/layout/Footer.tsx`를 클라이언트
+  컴포넌트로 바꾸고(`usePathname` 사용), 경로가 `/map` 또는
+  `/zipterior`로 시작하면 `null`을 반환해 아예 렌더링하지 않도록 수정
+  (레이아웃 자체를 라우트별로 분기하는 것보다 변경 범위가 작고 안전).
+- **[완료] 검증**: `next build` 클린. Playwright로 `/map`·`/zipterior`
+  스크린샷 찍어 푸터 사라진 것 확인, `document.documentElement.
+  scrollHeight` vs `window.innerHeight` 비교 — 이전엔 푸터 높이만큼
+  (수백 px) 초과했을 것, 수정 후 1px 이내 오차(헤더 보더 등에 의한
+  서브픽셀 반올림으로 추정, 실사용에 지장 없는 수준)로 사실상 스크롤
+  없음 확인. 홈(`/`)에는 여전히 푸터가 정상 렌더링되는 것도 확인
+  (다른 페이지 회귀 없음). `npx eslint` 새 오류 없음.

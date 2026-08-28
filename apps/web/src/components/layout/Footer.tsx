@@ -1,7 +1,22 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { SERVICES } from "@/lib/services";
 
+// /map, /zipterior는 헤더 높이를 뺀 나머지 뷰포트를 지도가 정확히 꽉
+// 채우도록 만든 전체화면 앱 화면이라(h-[calc(100vh-4rem)]), 그 아래에
+// 푸터까지 붙으면 문서 전체 높이가 뷰포트를 넘겨 스크롤이 생기고
+// 지도가 화면에 딱 안 맞아 보인다 — 이 두 라우트에서는 푸터를 아예
+// 렌더링하지 않는다.
+const FULLSCREEN_ROUTE_PREFIXES = ["/map", "/zipterior"];
+
 export default function Footer() {
+  const pathname = usePathname();
+  if (FULLSCREEN_ROUTE_PREFIXES.some((prefix) => pathname?.startsWith(prefix))) {
+    return null;
+  }
+
   return (
     <footer className="border-t border-line bg-soft">
       <div className="mx-auto max-w-[1600px] px-5 py-12 sm:px-10">
