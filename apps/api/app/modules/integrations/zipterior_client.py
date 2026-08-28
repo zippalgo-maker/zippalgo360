@@ -15,6 +15,7 @@ from app.modules.integrations.schemas import (
     ZipteriorContentBlock,
     ZipteriorPortfolioCard,
     ZipteriorPortfolioDetailOut,
+    ZipteriorPortfolioDisplaySettingsOut,
     ZipteriorPortfolioImage,
     ZipteriorPortfolioListOut,
     ZipteriorPortfolioSpace,
@@ -466,6 +467,27 @@ def get_complex_portfolios(*, complex_id: int, limit: int = 100, offset: int = 0
         return ZipteriorComplexPortfolioListOut(items=[], total=0, available=False)
 
     return ZipteriorComplexPortfolioListOut(items=items, total=data.get("total", len(items)), available=True)
+
+
+def get_portfolio_display_settings() -> ZipteriorPortfolioDisplaySettingsOut:
+    """포트폴리오 상세 맨 아래 안내문구/이미지/견적문의 CTA 관리자 설정.
+    실패해도(네트워크 장애 등) 안전한 기본값(미노출)으로 폴백한다 —
+    집테리어 app.js의 폴백 정책과 동일."""
+    try:
+        response = httpx.get(
+            f"{settings.zipterior_api_base_url}/api/v1/public/portfolio-display-settings",
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        data = response.json()
+        return ZipteriorPortfolioDisplaySettingsOut(
+            notice_enabled=bool(data.get("notice_enabled")),
+            notice_image_path=_absolute_media_url(data.get("notice_image_path")),
+            notice_text=data.get("notice_text"),
+            notice_button_label=data.get("notice_button_label"),
+        )
+    except (httpx.HTTPError, ValueError):
+        return ZipteriorPortfolioDisplaySettingsOut(notice_enabled=False)
 
 
 def get_portfolio_detail(portfolio_id: int) -> ZipteriorPortfolioDetailOut:

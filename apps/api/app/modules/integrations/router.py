@@ -7,6 +7,7 @@ from app.modules.integrations.schemas import (
     ZipteriorComplexPortfolioListOut,
     ZipteriorMapMarkerListOut,
     ZipteriorPortfolioDetailOut,
+    ZipteriorPortfolioDisplaySettingsOut,
     ZipteriorPortfolioListOut,
     ZipteriorSearchOut,
     ZipteriorViewportOut,
@@ -100,6 +101,11 @@ def get_complex_portfolios(
     offset: int = Query(0, ge=0),
 ) -> ZipteriorComplexPortfolioListOut:
     return zipterior_client.get_complex_portfolios(complex_id=complex_id, limit=limit, offset=offset)
+
+
+@router.get("/portfolio-display-settings", response_model=ZipteriorPortfolioDisplaySettingsOut)
+def get_portfolio_display_settings() -> ZipteriorPortfolioDisplaySettingsOut:
+    return zipterior_client.get_portfolio_display_settings()
 
 
 @router.get("/portfolios/{portfolio_id}", response_model=ZipteriorPortfolioDetailOut)

@@ -3426,6 +3426,24 @@ sudo systemctl restart zippalgo360-web
   세팅하는데, 이 자동 선택 로직이 매번 그걸 덮어쓰고 있었던 것.
   해당 블록 삭제 — 부챗살 평형 클릭 로직은 원래도 맞았어서 안 건드림.
 - **[완료] 검증**: `next build` 클린.
-- **진행 중 (4)**: zipterior `js/app.js`의 `portfolioDisplaySettingsCache`
-  (안내 이미지/문구/버튼 라벨, `notice_enabled`로 on/off)가 어느
-  API에서 오는지 서버에서 확인 중.
+- **[완료] (4) 확인**: `GET /public/portfolio-display-settings`
+  (zipterior API). 실제 값 curl로 확인: `notice_enabled: true`,
+  `notice_text: null`, `notice_image_path` 설정됨, `notice_button_label:
+  "우리집과 같은 집 인테리어 견적 문의하기"`.
+- **[완료] (4) 구현**: 백엔드에
+  `ZipteriorPortfolioDisplaySettingsOut` +
+  `get_portfolio_display_settings()`(실패 시 `notice_enabled=False`로
+  안전 폴백) + 신규 라우트 `GET /integrations/zipterior/
+  portfolio-display-settings`. 프론트 `InteriorPortfolioPanel.tsx` —
+  `portfolioId`와 무관한 전역 설정이라 별도 `useEffect([])`로 한 번만
+  불러옴, `notice_enabled`일 때만 상세 문서 맨 아래에 이미지+텍스트+
+  CTA 버튼 렌더링.
+  - **의도적 단순화**: zipterior의 CTA 버튼은 클릭 시 포트폴리오별
+    견적문의 입력 모달(`data-portfolio-inquiry`)을 여는데, 그 모달
+    자체를 새로 만드는 건 이번 범위 밖이라 **기존 상단 "회사에
+    문의하기" 버튼과 동일하게 `tel:회사전화번호`로 연결**해둠(전화번호
+    없으면 버튼 자체를 숨김). 진짜 견적문의 폼이 필요하면 별도 작업
+    필요 — 사용자에게 안내함.
+- **[완료] 검증**: `next build` 클린, 백엔드 `ast.parse` 통과.
+- **미검증**: 서버 배포 후 실제 안내 이미지/버튼이 상세 하단에
+  보이는지 브라우저 확인 필요.

@@ -189,6 +189,17 @@ class ZipteriorContentBlock(BaseModel):
     raw_node: dict | None = None
 
 
+class ZipteriorPortfolioDisplaySettingsOut(BaseModel):
+    """포트폴리오 상세 맨 아래 고정 안내문구/이미지/견적문의 CTA — 집테리어
+    관리자가 설정하는 값을 그대로 프록시(`GET /public/portfolio-display-
+    settings`). notice_enabled가 꺼져 있으면 프론트에서 아무것도 안 그린다."""
+
+    notice_enabled: bool
+    notice_image_path: str | None = None
+    notice_text: str | None = None
+    notice_button_label: str | None = None
+
+
 class ZipteriorPortfolioDetailOut(BaseModel):
     id: int
     company_id: int | None = None
